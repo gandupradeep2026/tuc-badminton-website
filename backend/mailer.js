@@ -20,19 +20,27 @@ export async function sendPasswordResetEmail({ to, approvalCode, expiresMinutes 
   const pass = process.env.SMTP_PASS;
   const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587;
 
-  if (!host || !user || !pass) {
+  if (!user || !pass) {
     // Console fallback is secure on laptop home server
     return { success: true, method: 'console' };
   }
 
   try {
     const nodemailer = await import('nodemailer');
-    const transporter = nodemailer.default.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? {
+          service: 'gmail',
+          auth: { user, pass },
+        }
+      : {
+          host: host || 'smtp.gmail.com',
+          port,
+          secure: port === 465,
+          auth: { user, pass },
+        };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
 
     await transporter.sendMail({
       from: `"TU Chemnitz Badminton" <${user}>`,
