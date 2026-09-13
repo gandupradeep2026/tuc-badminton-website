@@ -153,7 +153,7 @@ export default function ServerStatusBadge() {
               <div className="flex gap-2">
                 <input
                   type="url"
-                  placeholder="https://tuc-badminton-backend.onrender.com"
+                  placeholder="https://130-61-242-26.sslip.io"
                   value={tunnelInput}
                   onChange={(e) => setTunnelInput(e.target.value)}
                   className="flex-1 px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 focus:outline-none focus:border-[#005A36] focus:ring-1 focus:ring-[#005A36]"

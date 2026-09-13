@@ -40,7 +40,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_BASE_PATH: ./
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://tuc-badminton-backend.onrender.com' }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'https://130-61-242-26.sslip.io' }}
         run: npm run build
 
       - name: Upload Pages Artifact

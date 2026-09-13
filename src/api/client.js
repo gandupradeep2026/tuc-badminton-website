@@ -45,8 +45,8 @@ export function getBaseApiUrl() {
     return 'http://localhost:5000';
   }
 
-  // Live Cloud Backend default (Render Web Service)
-  return 'https://tuc-badminton-backend.onrender.com';
+  // Live Cloud Backend default (Oracle Cloud Always Free VM with Let's Encrypt HTTPS)
+  return 'https://130-61-242-26.sslip.io';
 }
 
 /**
