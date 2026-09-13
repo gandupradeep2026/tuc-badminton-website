@@ -10,7 +10,7 @@ export default function TrainersSection({ refreshTrigger = 0 }) {
   const fetchTrainers = async () => {
     try {
       const res = await safeFetchJson('/api/trainers');
-      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.ok && Array.isArray(res.data)) {
         setTrainers(res.data);
       } else {
         setTrainers(DEFAULT_TRAINERS);
@@ -54,8 +54,18 @@ export default function TrainersSection({ refreshTrigger = 0 }) {
           </div>
         )}
 
+        {!loading && trainers.length === 0 && (
+          <div className="text-center py-12 px-4 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 max-w-xl mx-auto">
+            <Award className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
+              Noch keine Trainer eingetragen / No trainers registered yet
+            </h3>
+          </div>
+        )}
+
         {/* Trainers Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        {!loading && trainers.length > 0 && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
           {trainers.map((coach) => {
             const focusList = coach.focus_areas
               ? coach.focus_areas.split(',').map((f) => f.trim())
@@ -135,6 +145,7 @@ export default function TrainersSection({ refreshTrigger = 0 }) {
             );
           })}
         </div>
+        )}
 
       </div>
     </section>

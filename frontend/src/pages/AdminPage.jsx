@@ -268,23 +268,11 @@ export default function AdminPage() {
   const fetchPlayers = async () => {
     setPlayersLoading(true);
     try {
-      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
-      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
       const res = await safeFetchJson('/api/players');
-      let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_PLAYERS];
-      const mergedMap = new Map();
-      list.forEach(p => mergedMap.set(String(p.id), p));
-      customPlayers.forEach(p => mergedMap.set(String(p.id), p));
-      const finalList = Array.from(mergedMap.values()).filter(p => !deletedIds.includes(String(p.id)));
-      setPlayersList(finalList);
+      let list = (res.ok && res.data && Array.isArray(res.data)) ? res.data : [...DEFAULT_PLAYERS];
+      setPlayersList(list);
     } catch (err) {
-      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
-      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
-      const mergedMap = new Map();
-      DEFAULT_PLAYERS.forEach(p => mergedMap.set(String(p.id), p));
-      customPlayers.forEach(p => mergedMap.set(String(p.id), p));
-      const finalList = Array.from(mergedMap.values()).filter(p => !deletedIds.includes(String(p.id)));
-      setPlayersList(finalList);
+      setPlayersList([...DEFAULT_PLAYERS]);
     } finally {
       setPlayersLoading(false);
     }
@@ -293,23 +281,11 @@ export default function AdminPage() {
   const fetchTrainers = async () => {
     setTrainersLoading(true);
     try {
-      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
-      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
       const res = await safeFetchJson('/api/trainers');
-      let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_TRAINERS];
-      const mergedMap = new Map();
-      list.forEach(t => mergedMap.set(String(t.id), t));
-      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
-      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
-      setTrainersList(finalList);
+      let list = (res.ok && res.data && Array.isArray(res.data)) ? res.data : [...DEFAULT_TRAINERS];
+      setTrainersList(list);
     } catch (err) {
-      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
-      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
-      const mergedMap = new Map();
-      DEFAULT_TRAINERS.forEach(t => mergedMap.set(String(t.id), t));
-      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
-      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
-      setTrainersList(finalList);
+      setTrainersList([...DEFAULT_TRAINERS]);
     } finally {
       setTrainersLoading(false);
     }

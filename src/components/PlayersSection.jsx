@@ -20,7 +20,7 @@ export default function PlayersSection({ refreshTrigger = 0 }) {
   const fetchPlayers = async () => {
     try {
       const res = await safeFetchJson('/api/players');
-      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.ok && Array.isArray(res.data)) {
         setPlayers(res.data);
       } else {
         setPlayers(DEFAULT_PLAYERS);
@@ -188,8 +188,17 @@ export default function PlayersSection({ refreshTrigger = 0 }) {
           </div>
         )}
 
+        {!loading && players.length === 0 && (
+          <div className="text-center py-12 px-4 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+            <Users className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
+              Noch keine Spieler eingetragen / No players registered yet
+            </h3>
+          </div>
+        )}
+
         {/* Subsection: Herren / Men */}
-        {(activeFilter === 'all' || activeFilter === 'men') && (
+        {!loading && players.length > 0 && (activeFilter === 'all' || activeFilter === 'men') && (
           <div className="space-y-4 mb-12">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
@@ -206,7 +215,7 @@ export default function PlayersSection({ refreshTrigger = 0 }) {
         )}
 
         {/* Subsection: Damen / Women */}
-        {(activeFilter === 'all' || activeFilter === 'women') && (
+        {!loading && players.length > 0 && (activeFilter === 'all' || activeFilter === 'women') && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
               <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />

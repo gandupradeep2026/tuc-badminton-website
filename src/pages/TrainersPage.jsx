@@ -13,24 +13,14 @@ export default function TrainersPage({ onNavigate }) {
 
   const fetchTrainers = async () => {
     try {
-      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
-      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+      localStorage.removeItem('tuc_custom_trainers');
+      localStorage.removeItem('tuc_deleted_trainer_ids');
       const res = await safeFetchJson('/api/trainers');
-      let list = (res.ok && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_TRAINERS];
-      const mergedMap = new Map();
-      list.forEach(t => mergedMap.set(String(t.id), t));
-      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
-      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
-      setTrainers(finalList);
+      let list = (res.ok && Array.isArray(res.data)) ? res.data : [...DEFAULT_TRAINERS];
+      setTrainers(list);
     } catch (err) {
       console.error('Failed to load trainers, using fallback:', err);
-      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
-      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
-      const mergedMap = new Map();
-      DEFAULT_TRAINERS.forEach(t => mergedMap.set(String(t.id), t));
-      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
-      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
-      setTrainers(finalList);
+      setTrainers([...DEFAULT_TRAINERS]);
     } finally {
       setLoading(false);
     }
@@ -81,8 +71,32 @@ export default function TrainersPage({ onNavigate }) {
         </div>
       )}
 
+      {!loading && trainers.length === 0 && (
+        <div className="text-center py-16 px-4 bg-white rounded-3xl border border-dashed border-slate-200 shadow-xs">
+          <Shield className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-slate-700">
+            {isDe ? 'Noch keine Trainer eingetragen' : 'No trainers registered yet'}
+          </h3>
+          <p className="text-sm text-slate-500 max-w-md mx-auto mt-1">
+            {isDe 
+              ? 'Trainer und Betreuer können über das Admin-Portal oder die Registrierungsseite hinzugefügt werden.'
+              : 'Coaches and trainers can be added via the admin dashboard or registration page.'}
+          </p>
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('register')}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-sm"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>{isDe ? 'Als Trainer bewerben' : 'Apply as Coach'}</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Trainers Grid (1-col on mobile, 2-col on tablet, 3-col on desktop) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+      {!loading && trainers.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
         {trainers.map((trainer) => {
           const localizedRole = tr.trainerRoles[trainer.id] || trainer.role;
           const localizedFocusList = tr.focusAreas[trainer.id] || (
@@ -164,6 +178,7 @@ export default function TrainersPage({ onNavigate }) {
           );
         })}
       </div>
+      )}
 
     </div>
   );

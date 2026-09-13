@@ -99,17 +99,11 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         safeFetchJson('/api/media'),
       ]);
 
-      let tList = (tRes.ok && Array.isArray(tRes.data) && tRes.data.length > 0) ? tRes.data : [...DEFAULT_TRAINERS];
-      const tMap = new Map();
-      tList.forEach(t => tMap.set(String(t.id), t));
-      customTrainers.forEach(t => tMap.set(String(t.id), t));
-      setTrainers(Array.from(tMap.values()).filter(t => !deletedTrainerIds.includes(String(t.id))));
+      let tList = (tRes.ok && Array.isArray(tRes.data)) ? tRes.data : [...DEFAULT_TRAINERS];
+      setTrainers(tList);
 
-      let pList = (pRes.ok && Array.isArray(pRes.data) && pRes.data.length > 0) ? pRes.data : [...DEFAULT_PLAYERS];
-      const pMap = new Map();
-      pList.forEach(p => pMap.set(String(p.id), p));
-      customPlayers.forEach(p => pMap.set(String(p.id), p));
-      setPlayers(Array.from(pMap.values()).filter(p => !deletedPlayerIds.includes(String(p.id))));
+      let pList = (pRes.ok && Array.isArray(pRes.data)) ? pRes.data : [...DEFAULT_PLAYERS];
+      setPlayers(pList);
 
       let toList = (tourRes.ok && Array.isArray(tourRes.data) && tourRes.data.length > 0) ? tourRes.data : [...(TERMINE_LIST || [])];
       const toMap = new Map();

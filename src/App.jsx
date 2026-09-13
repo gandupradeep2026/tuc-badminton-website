@@ -23,6 +23,18 @@ function PageFallback() {
   );
 }
 
+// One-time client-side cache purge to ensure stale laptop caches never show deleted mock players/trainers
+if (typeof window !== 'undefined') {
+  const CACHE_VERSION = 'tuc_empty_roster_2026_v1';
+  if (localStorage.getItem('tuc_version') !== CACHE_VERSION) {
+    localStorage.removeItem('tuc_custom_players');
+    localStorage.removeItem('tuc_custom_trainers');
+    localStorage.removeItem('tuc_deleted_player_ids');
+    localStorage.removeItem('tuc_deleted_trainer_ids');
+    localStorage.setItem('tuc_version', CACHE_VERSION);
+  }
+}
+
 function AppContent() {
   // Read initial page from URL hash if present
   const getPageFromHash = () => {
