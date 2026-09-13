@@ -268,8 +268,28 @@ export default function AdminPage() {
   const fetchPlayers = async () => {
     setPlayersLoading(true);
     try {
+      // Purge any local custom players that had Unsplash stock photos auto-injected
+      try {
+        const localCustom = localStorage.getItem('tuc_custom_players');
+        if (localCustom) {
+          const parsed = JSON.parse(localCustom);
+          let changed = false;
+          parsed.forEach(p => {
+            if (p.photo_url && p.photo_url.includes('images.unsplash.com')) {
+              p.photo_url = '';
+              changed = true;
+            }
+          });
+          if (changed) localStorage.setItem('tuc_custom_players', JSON.stringify(parsed));
+        }
+      } catch(e) {}
+
       const res = await safeFetchJson('/api/players');
       let list = (res.ok && res.data && Array.isArray(res.data)) ? res.data : [...DEFAULT_PLAYERS];
+      list = list.map(p => ({
+        ...p,
+        photo_url: (p.photo_url && p.photo_url.includes('images.unsplash.com')) ? '' : p.photo_url
+      }));
       setPlayersList(list);
     } catch (err) {
       setPlayersList([...DEFAULT_PLAYERS]);
@@ -281,8 +301,28 @@ export default function AdminPage() {
   const fetchTrainers = async () => {
     setTrainersLoading(true);
     try {
+      // Purge any local custom trainers that had Unsplash stock photos auto-injected
+      try {
+        const localCustom = localStorage.getItem('tuc_custom_trainers');
+        if (localCustom) {
+          const parsed = JSON.parse(localCustom);
+          let changed = false;
+          parsed.forEach(t => {
+            if (t.photo_url && t.photo_url.includes('images.unsplash.com')) {
+              t.photo_url = '';
+              changed = true;
+            }
+          });
+          if (changed) localStorage.setItem('tuc_custom_trainers', JSON.stringify(parsed));
+        }
+      } catch(e) {}
+
       const res = await safeFetchJson('/api/trainers');
       let list = (res.ok && res.data && Array.isArray(res.data)) ? res.data : [...DEFAULT_TRAINERS];
+      list = list.map(t => ({
+        ...t,
+        photo_url: (t.photo_url && t.photo_url.includes('images.unsplash.com')) ? '' : t.photo_url
+      }));
       setTrainersList(list);
     } catch (err) {
       setTrainersList([...DEFAULT_TRAINERS]);
@@ -828,9 +868,7 @@ export default function AdminPage() {
         specialization: playerSpec.trim(),
         team: playerTeam.trim() || 'TUC Shuttlers',
         email: playerEmail.trim().toLowerCase(),
-        photo_url: photoUrl || (playerGender === 'women'
-          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
-          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')
+        photo_url: photoUrl || ''
       };
 
       const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
@@ -998,7 +1036,7 @@ export default function AdminPage() {
         role: trainerRole.trim(),
         email: trainerEmail.trim().toLowerCase(),
         focus_areas: trainerFocus.trim(),
-        photo_url: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+        photo_url: photoUrl || ''
       };
 
       const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
@@ -2047,20 +2085,19 @@ export default function AdminPage() {
                     <div className="p-4 sm:p-5 space-y-3">
                       {/* Top row: Avatar + Name + Badges */}
                       <div className="flex items-start gap-3.5">
-                        <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
-                          <img
-                            src={getUploadUrl(player.photo_url) || (player.gender === 'women'
-                              ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
-                              : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')}
-                            alt={player.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = player.gender === 'women'
-                                ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
-                                : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
-                            }}
-                          />
+                        <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center">
+                          {player.photo_url && getUploadUrl(player.photo_url) ? (
+                            <img
+                              src={getUploadUrl(player.photo_url)}
+                              alt={player.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-[#005A36]/10 text-[#005A36] font-bold flex items-center justify-center text-lg">
+                              {player.name ? player.name.charAt(0) : <Users className="w-6 h-6 text-slate-400" />}
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-1 min-w-0 flex-1">
@@ -2195,16 +2232,19 @@ export default function AdminPage() {
                     <div className="p-4 sm:p-5 space-y-3">
                       {/* Top row: Avatar + Name + Role */}
                       <div className="flex items-start gap-3.5">
-                        <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
-                          <img
-                            src={getUploadUrl(trainer.photo_url) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'}
-                            alt={trainer.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
-                            }}
-                          />
+                        <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center">
+                          {trainer.photo_url && getUploadUrl(trainer.photo_url) ? (
+                            <img
+                              src={getUploadUrl(trainer.photo_url)}
+                              alt={trainer.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-emerald-100 text-[#005A36] font-bold flex items-center justify-center text-xl">
+                              🏸
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-1 min-w-0 flex-1">
@@ -2611,21 +2651,18 @@ export default function AdminPage() {
             {playersList.map((player) => (
               <div key={player.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  {player.photo_url ? (
+                  {player.photo_url && getUploadUrl(player.photo_url) ? (
                     <img
                       src={getUploadUrl(player.photo_url)}
                       alt=""
                       className="w-12 h-12 rounded-full object-cover border border-slate-200 flex-shrink-0"
                       onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = player.gender === 'women'
-                          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
-                          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
+                        e.target.style.display = 'none';
                       }}
                     />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-[#005A36]/10 text-[#005A36] font-bold flex items-center justify-center text-sm flex-shrink-0">
-                      {player.name.charAt(0)}
+                      {player.name ? player.name.charAt(0) : <Users className="w-4 h-4 text-slate-400" />}
                     </div>
                   )}
                   <div className="min-w-0 flex-1 space-y-0.5">
@@ -2789,14 +2826,13 @@ export default function AdminPage() {
             {trainersList.map((coach) => (
               <div key={coach.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  {coach.photo_url ? (
+                  {coach.photo_url && getUploadUrl(coach.photo_url) ? (
                     <img
                       src={getUploadUrl(coach.photo_url)}
                       alt=""
                       className="w-14 h-14 rounded-2xl object-cover border border-slate-200 flex-shrink-0"
                       onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
+                        e.target.style.display = 'none';
                       }}
                     />
                   ) : (

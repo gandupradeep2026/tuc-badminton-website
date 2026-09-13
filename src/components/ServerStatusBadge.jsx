@@ -28,9 +28,20 @@ export default function ServerStatusBadge() {
   const [savedMessage, setSavedMessage] = useState(null);
 
   useEffect(() => {
+    // If old render URL was stored in localStorage, purge it
+    const stored = localStorage.getItem('tuc_custom_backend_url') || '';
+    if (stored.includes('onrender.com')) {
+      localStorage.removeItem('tuc_custom_backend_url');
+      setCustomBackendUrl('');
+    }
+
     const unsubscribe = subscribeServerStatus((newStatus) => {
       setStatus(newStatus);
-      setTunnelInput(newStatus.backendUrl || '');
+      if (newStatus.backendUrl && !newStatus.backendUrl.includes('onrender.com')) {
+        setTunnelInput(newStatus.backendUrl);
+      } else {
+        setTunnelInput(getBaseApiUrl());
+      }
     });
     return unsubscribe;
   }, []);
@@ -38,14 +49,15 @@ export default function ServerStatusBadge() {
   const handleSaveTunnel = (e) => {
     e.preventDefault();
     setCustomBackendUrl(tunnelInput);
-    setSavedMessage(isDe ? 'Tunnel-URL gespeichert!' : 'Tunnel URL saved!');
+    setSavedMessage(isDe ? 'Server-URL gespeichert!' : 'Server URL saved!');
     setTimeout(() => setSavedMessage(null), 3000);
   };
 
   const handleResetTunnel = () => {
     setCustomBackendUrl('');
-    setTunnelInput('');
-    setSavedMessage(isDe ? 'Auf Standard zurückgesetzt.' : 'Reset to default.');
+    setTunnelInput(getBaseApiUrl());
+    setSavedMessage(isDe ? 'Auf Oracle Cloud Standard zurückgesetzt.' : 'Reset to Oracle Cloud default.');
+    checkServerHealth();
     setTimeout(() => setSavedMessage(null), 3000);
   };
 
@@ -139,16 +151,16 @@ export default function ServerStatusBadge() {
                   {status.state === 'online'
                     ? (status.venue || '12 Spielfelder • Sporthalle Thüringer Weg 11')
                     : (isDe 
-                        ? 'Alle Turnierspieler und Trainer werden aus dem lokalen Speicher geladen. Nach dem Start des Render-Cloud-Servers oder Tunnels verbindet sich die Seite automatisch.'
-                        : 'All tournament players and coaches are loaded from local cache. When your Render cloud service or tunnel is active, it connects automatically.')}
+                        ? 'Alle Turnierspieler und Trainer werden aus dem lokalen Speicher geladen. Der Oracle-Cloud-Server läuft dauerhaft 24/7.'
+                        : 'All tournament players and coaches are loaded from local cache. Your Oracle Cloud server runs 24/7.')}
                 </p>
               </div>
             </div>
 
-            {/* Custom Tunnel URL Configuration */}
+            {/* Custom Server URL Configuration */}
             <form onSubmit={handleSaveTunnel} className="space-y-3">
               <label className="block text-xs font-bold text-slate-700">
-                {isDe ? 'Live-Backend URL (Render Cloud oder Tunnel):' : 'Live Backend URL (Render Cloud or Tunnel):'}
+                {isDe ? 'Live-Backend URL (Oracle Cloud Always Free VM):' : 'Live Backend URL (Oracle Cloud Always Free VM):'}
               </label>
               <div className="flex gap-2">
                 <input
@@ -167,8 +179,8 @@ export default function ServerStatusBadge() {
               </div>
               <p className="text-[11px] text-slate-500 leading-tight">
                 {isDe 
-                  ? 'Geben Sie hier Ihre Render-Cloud-Adresse oder Cloudflare-Tunnel-URL ein, um Änderungen in Echtzeit zwischen Laptop und Smartphone abzugleichen.'
-                  : 'Enter your Render cloud address or Cloudflare tunnel URL here to sync changes in real time between laptop and phone.'}
+                  ? 'Standard-Server: Oracle Cloud Always Free (https://130-61-242-26.sslip.io) – läuft 24/7 dauerhaft ohne Ruhemodus.'
+                  : 'Default server: Oracle Cloud Always Free (https://130-61-242-26.sslip.io) – running 24/7 with zero downtime.'}
               </p>
             </form>
 

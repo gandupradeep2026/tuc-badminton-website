@@ -21,7 +21,10 @@ export default function PlayersSection({ refreshTrigger = 0 }) {
     try {
       const res = await safeFetchJson('/api/players');
       if (res.ok && Array.isArray(res.data)) {
-        setPlayers(res.data);
+        setPlayers(res.data.map(p => ({
+          ...p,
+          photo_url: (p.photo_url && p.photo_url.includes('images.unsplash.com')) ? '' : p.photo_url
+        })));
       } else {
         setPlayers(DEFAULT_PLAYERS);
       }
@@ -53,18 +56,21 @@ export default function PlayersSection({ refreshTrigger = 0 }) {
         <div className="space-y-4">
           {/* Avatar & Header */}
           <div className="flex items-start gap-3.5">
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex-shrink-0">
-              <img
-                src={getUploadUrl(player.photo_url) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
-                alt={player.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = player.gender === 'women'
-                    ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80'
-                    : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80';
-                }}
-              />
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex-shrink-0 flex items-center justify-center">
+              {player.photo_url && getUploadUrl(player.photo_url) ? (
+                <img
+                  src={getUploadUrl(player.photo_url)}
+                  alt={player.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full bg-[#005A36]/10 text-[#005A36] font-bold flex items-center justify-center text-xl">
+                  {player.name ? player.name.charAt(0) : <Users className="w-6 h-6 text-slate-400" />}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1 min-w-0 flex-1">

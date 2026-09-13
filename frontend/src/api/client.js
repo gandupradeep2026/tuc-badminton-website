@@ -12,7 +12,12 @@
 // 3. In local development (localhost), default to http://localhost:5000
 const getStoredBackendUrl = () => {
   try {
-    return localStorage.getItem('tuc_custom_backend_url') || '';
+    const val = localStorage.getItem('tuc_custom_backend_url') || '';
+    if (val.includes('onrender.com')) {
+      localStorage.removeItem('tuc_custom_backend_url');
+      return '';
+    }
+    return val;
   } catch (e) {
     return '';
   }
@@ -78,7 +83,7 @@ export function getApiUrl(endpoint) {
  * @returns {string} Fully qualified or normalized asset URL
  */
 export function getUploadUrl(path) {
-  if (!path) return '';
+  if (!path || typeof path !== 'string' || path.includes('images.unsplash.com')) return '';
   
   // External or already absolute URLs
   if (/^(https?:|\/\/|data:|blob:)/i.test(path)) {

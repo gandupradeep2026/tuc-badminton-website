@@ -18,6 +18,10 @@ export default function PlayersPage({ onNavigate }) {
       localStorage.removeItem('tuc_deleted_player_ids');
       const res = await safeFetchJson('/api/players');
       let list = (res.ok && Array.isArray(res.data)) ? res.data : [...DEFAULT_PLAYERS];
+      list = list.map(p => ({
+        ...p,
+        photo_url: (p.photo_url && p.photo_url.includes('images.unsplash.com')) ? '' : p.photo_url
+      }));
       setPlayers(list);
     } catch (err) {
       console.error('Failed to load players, using fallback:', err);
@@ -52,22 +56,23 @@ export default function PlayersPage({ onNavigate }) {
         <div className="space-y-3">
           {/* Header with Photo & Basic Info */}
           <div className="flex items-start gap-3 sm:gap-3.5">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
-              <img
-                src={getUploadUrl(player.photo_url) || (player.gender === 'women'
-                  ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
-                  : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')}
-                alt={player.name}
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = player.gender === 'women'
-                    ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
-                    : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
-                }}
-              />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center">
+              {player.photo_url && getUploadUrl(player.photo_url) ? (
+                <img
+                  src={getUploadUrl(player.photo_url)}
+                  alt={player.name}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full bg-[#005A36]/10 text-[#005A36] font-bold flex items-center justify-center text-lg sm:text-xl">
+                  {player.name ? player.name.charAt(0) : <Users className="w-6 h-6 text-slate-400" />}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1 min-w-0 flex-1">

@@ -100,9 +100,17 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
       ]);
 
       let tList = (tRes.ok && Array.isArray(tRes.data)) ? tRes.data : [...DEFAULT_TRAINERS];
+      tList = tList.map(t => ({
+        ...t,
+        photo_url: (t.photo_url && t.photo_url.includes('images.unsplash.com')) ? '' : t.photo_url
+      }));
       setTrainers(tList);
 
       let pList = (pRes.ok && Array.isArray(pRes.data)) ? pRes.data : [...DEFAULT_PLAYERS];
+      pList = pList.map(p => ({
+        ...p,
+        photo_url: (p.photo_url && p.photo_url.includes('images.unsplash.com')) ? '' : p.photo_url
+      }));
       setPlayers(pList);
 
       let toList = (tourRes.ok && Array.isArray(tourRes.data) && tourRes.data.length > 0) ? tourRes.data : [...(TERMINE_LIST || [])];
@@ -192,9 +200,7 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         specialization: playerForm.specialization.trim(),
         team: playerForm.team.trim() || '1. Mannschaft (Sachsenliga)',
         email: playerForm.email.trim().toLowerCase(),
-        photo_url: photoUrl || (playerForm.gender === 'women'
-          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
-          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')
+        photo_url: photoUrl || ''
       };
 
       const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
@@ -300,7 +306,7 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         role: trainerForm.role.trim(),
         email: trainerForm.email.trim().toLowerCase(),
         focus_areas: trainerForm.focus_areas.trim(),
-        photo_url: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+        photo_url: photoUrl || ''
       };
 
       const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
@@ -843,11 +849,20 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
                           className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs"
                         >
                           <div className="flex items-center gap-3">
-                            <img
-                              src={getUploadUrl(p.photo_url) || (p.gender === 'women' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80')}
-                              alt={p.name}
-                              className="w-10 h-10 rounded-lg object-cover"
-                            />
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-800 flex-shrink-0 flex items-center justify-center">
+                              {p.photo_url && getUploadUrl(p.photo_url) ? (
+                                <img
+                                  src={getUploadUrl(p.photo_url)}
+                                  alt={p.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-[#005A36]/15 text-[#005A36] dark:text-emerald-400 font-bold flex items-center justify-center text-sm">
+                                  {p.name ? p.name.charAt(0) : 'P'}
+                                </div>
+                              )}
+                            </div>
                             <div>
                               <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span>{p.name}</span>
@@ -966,11 +981,20 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
                           className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 text-xs"
                         >
                           <div className="flex items-center gap-3">
-                            <img
-                              src={getUploadUrl(t.photo_url) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
-                              alt={t.name}
-                              className="w-10 h-10 rounded-lg object-cover"
-                            />
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-200 dark:bg-slate-800 flex-shrink-0 flex items-center justify-center">
+                              {t.photo_url && getUploadUrl(t.photo_url) ? (
+                                <img
+                                  src={getUploadUrl(t.photo_url)}
+                                  alt={t.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-emerald-100 dark:bg-emerald-950 text-[#005A36] dark:text-emerald-400 font-bold flex items-center justify-center text-base">
+                                  🏸
+                                </div>
+                              )}
+                            </div>
                             <div>
                               <div className="font-bold text-slate-900 dark:text-white">{t.name}</div>
                               <div className="text-slate-500">{t.role}</div>

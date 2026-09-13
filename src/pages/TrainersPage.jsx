@@ -17,6 +17,10 @@ export default function TrainersPage({ onNavigate }) {
       localStorage.removeItem('tuc_deleted_trainer_ids');
       const res = await safeFetchJson('/api/trainers');
       let list = (res.ok && Array.isArray(res.data)) ? res.data : [...DEFAULT_TRAINERS];
+      list = list.map(t => ({
+        ...t,
+        photo_url: (t.photo_url && t.photo_url.includes('images.unsplash.com')) ? '' : t.photo_url
+      }));
       setTrainers(list);
     } catch (err) {
       console.error('Failed to load trainers, using fallback:', err);
@@ -110,21 +114,28 @@ export default function TrainersPage({ onNavigate }) {
             >
               <div>
                 {/* Photo Header */}
-                <div className="relative h-64 sm:h-72 bg-slate-100 overflow-hidden">
-                  <img
-                    src={getUploadUrl(trainer.photo_url) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80'}
-                    alt={trainer.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent" />
+                <div className="relative h-64 sm:h-72 bg-slate-900 overflow-hidden flex items-center justify-center">
+                  {trainer.photo_url && getUploadUrl(trainer.photo_url) ? (
+                    <img
+                      src={getUploadUrl(trainer.photo_url)}
+                      alt={trainer.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 flex flex-col items-center justify-center">
+                      <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 text-3xl flex items-center justify-center shadow-inner">
+                        🏸
+                      </div>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent pointer-events-none" />
                   
-                  <div className="absolute bottom-4 left-4 right-4 text-white">
+                  <div className="absolute bottom-4 left-4 right-4 text-white pointer-events-none">
                     <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-[#005A36] text-white shadow-sm mb-1.5">
                       {localizedRole}
                     </span>

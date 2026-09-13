@@ -11,7 +11,10 @@ export default function TrainersSection({ refreshTrigger = 0 }) {
     try {
       const res = await safeFetchJson('/api/trainers');
       if (res.ok && Array.isArray(res.data)) {
-        setTrainers(res.data);
+        setTrainers(res.data.map(t => ({
+          ...t,
+          photo_url: (t.photo_url && t.photo_url.includes('images.unsplash.com')) ? '' : t.photo_url
+        })));
       } else {
         setTrainers(DEFAULT_TRAINERS);
       }
@@ -79,21 +82,19 @@ export default function TrainersSection({ refreshTrigger = 0 }) {
                 <div className="space-y-6">
                   {/* Avatar & Header Info */}
                   <div className="flex items-start gap-4">
-                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border-2 border-tuc-800/20 dark:border-emerald-500/30 flex-shrink-0">
-                      {coach.photo_url ? (
+                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border-2 border-tuc-800/20 dark:border-emerald-500/30 flex-shrink-0 flex items-center justify-center">
+                      {coach.photo_url && getUploadUrl(coach.photo_url) ? (
                         <img
                           src={getUploadUrl(coach.photo_url)}
                           alt={coach.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src =
-                              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+                            e.target.style.display = 'none';
                           }}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100 dark:bg-slate-800">
-                          <User className="w-10 h-10" />
+                        <div className="w-full h-full flex items-center justify-center text-2xl sm:text-3xl bg-emerald-50 dark:bg-emerald-950/40 text-[#005A36] dark:text-emerald-400 font-bold">
+                          🏸
                         </div>
                       )}
                     </div>
