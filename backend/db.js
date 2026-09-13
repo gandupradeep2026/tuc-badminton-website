@@ -270,26 +270,42 @@ startxref
   // Seed Trainers if empty
   const trainerCount = db.prepare('SELECT COUNT(*) as count FROM trainers').get().count;
   if (trainerCount === 0) {
-    console.log('[DB] Seeding sample trainers...');
+    console.log('[DB] Seeding authentic university coaches & captains...');
     const insertTrainer = db.prepare(`
       INSERT INTO trainers (name, role, email, focus_areas, photo_url)
       VALUES (?, ?, ?, ?, ?)
     `);
 
     insertTrainer.run(
-      'Dr. Markus Berg',
-      'Head Coach (DBV B-Trainer License)',
-      'markus.berg@tu-chemnitz.de',
-      'Advanced Singles Tactics, Multi-Shuttle Drills, Smash Defense',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+      'Michael Krause',
+      'Head Coach & Abteilungsleiter (USZ Organisation)',
+      'michael.krause@tu-chemnitz.de',
+      'Doppel-Taktik, Trainingsorganisation, Wettkampfführung, Zuspielserien',
+      'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80'
     );
 
     insertTrainer.run(
-      'Elena Fischer',
-      'Student Coordinator (DBV C-Trainer)',
-      'elena.fischer@informatik.tu-chemnitz.de',
-      'Beginner Stroke Fundamentals, Mixed Doubles Tactics, Hochschulsport Intro',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
+      'Pradeep Gandu',
+      'Kapitän TUC Challengers & Turnier-Koordinator (MVP 2026)',
+      'pradeep.gandu@tu-chemnitz.de',
+      'Einzel-Strategie, Mixed-Abstimmung, Match-Analyse, Turnierleitung',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80'
+    );
+
+    insertTrainer.run(
+      'Phan van Trung',
+      'Kapitän TUC Shuttlers (Turniersieger 2026 - ungeschlagen)',
+      'phan.van-trung@tu-chemnitz.de',
+      'Schlagpräzision, Schnelligkeit & Beinarbeit, Smash-Abwehr, Multi-Shuttle',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80'
+    );
+
+    insertTrainer.run(
+      'Kevin Fuchs',
+      'Kapitän TUC Predators & Nachwuchs-Koordinator',
+      'kevin.fuchs@tu-chemnitz.de',
+      'Grundlagenausbildung, Service & Return, Hochschulsport Einsteiger, Taktik',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80'
     );
   }
 
@@ -298,18 +314,38 @@ startxref
   if (tourneyCount === 0) {
     console.log('[DB] Seeding sample tournament announcement...');
     const insertTourney = db.prepare(`
-      INSERT INTO tournaments (title, date, deadline, location, document_url, file_type, description)
+      INSERT INTO tournaments (title, date, deadline, location, description, document_url, file_type)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     insertTourney.run(
-      '32. Sächsische Hochschulmeisterschaft (SHM) Badminton 2026',
-      '14. November 2026 (09:00 - 18:30)',
-      '31. Oktober 2026',
-      'Sporthalle Thüringer Weg 11, 09126 Chemnitz',
-      '/uploads/ausschreibung_shm_2026.pdf',
-      'pdf',
-      'Official regional university championship hosted by TU Chemnitz Universitäts-Sportzentrum. Competitions in Men’s/Women’s Singles, Doubles, and Mixed. Eligible for all students and employees in Saxony.'
+      'UNI Badminton Team Cup 2026 (TU Chemnitz, WHZ & HSMW)',
+      '31. Januar 2026',
+      'Abgeschlossen',
+      'Sporthalle Thüringer Weg 11, TU Chemnitz',
+      'Offizieller Hochschul-Team Cup des USZ TU Chemnitz. 7 Teams, 45 Spieler*innen aus 10 Nationen, 13 Teamduelle und 65 Matches. Turniersieger: TUC Shuttlers (Gold), 2. Platz: TUC Titans (Silber), 3. Platz: TUC Challengers (Bronze).',
+      '/uploads/tournament_2026/Uni_Badminton_Team_Cup_2026_Ergebnisbericht.pdf',
+      'pdf'
+    );
+
+    insertTourney.run(
+      'Sächsische Hochschulmeisterschaft (SHM) Badminton – Team Cup 2026',
+      '09. Mai 2026',
+      '25. April 2026',
+      'Sportwissenschaftliche Fakultät / USZ Sporthalle',
+      'Landesweite sächsische Meisterschaft der Landeskonferenz Hochschulsport Sachsen e.V. (LHS). Disziplinen: Herreneinzel, Dameneinzel, Doppel und Hochschul-Teamwertung.',
+      '/uploads/tournament_2026/UNI_Badminton_Rules_EN_DE.pdf',
+      'pdf'
+    );
+
+    insertTourney.run(
+      'Chemnitzer Badminton Stadtmeisterschaften 2026',
+      '17. Oktober 2026',
+      '05. Oktober 2026',
+      'Sporthalle Thüringer Weg 11, Chemnitz',
+      'Regionale Meisterschaften aller Vereine und Hochschulgruppen des Regionalverbandes Chemnitz. Offen für O19 Aktive und Hobbyspieler.',
+      '/uploads/tournament_2026/UNI_Badminton_Team_Cup_2026_Schedule_Printable.pdf',
+      'pdf'
     );
   }
 
@@ -325,175 +361,384 @@ startxref
     insertMedia.run(
       'Doubles Finals Rallies - Sporthalle Thüringer Weg',
       'photo',
-      'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=400&q=80',
+      '/uploads/tournament_2026/teamcup_2026_winners_gold.jpeg',
+      '/uploads/tournament_2026/teamcup_2026_winners_gold.jpeg',
       'High-tempo doubles rally during the autumn university ranking tournament.'
     );
 
     insertMedia.run(
       'Saxony Championship Podium Celebration',
       'photo',
-      'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80',
-      'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=400&q=80',
+      '/uploads/tournament_2026/teamcup_2026_challengers_bronze.jpeg',
+      '/uploads/tournament_2026/teamcup_2026_challengers_bronze.jpeg',
       'TU Chemnitz badminton squad taking silver and bronze medals at the Saxon Cup.'
-    );
-
-    insertMedia.run(
-      'Multi-Shuttle Footwork Speed Drill Demo',
-      'video',
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-      'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=400&q=80',
-      'Coach Markus demonstrating rapid corner recovery and split-step timing.'
     );
   }
 
   // Seed Players if empty
   const playerCount = db.prepare('SELECT COUNT(*) as count FROM players').get().count;
   if (playerCount === 0) {
-    console.log('[DB] Seeding sample men and women players...');
+    console.log('[DB] Seeding authentic men and women university tournament players...');
     const insertPlayer = db.prepare(`
       INSERT INTO players (name, gender, study_program, specialization, team, email, photo_url)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    // Men's Squad
-    insertPlayer.run(
-      'Lukas Weber',
-      'men',
-      'B.Sc. Informatik',
-      'Men\'s Singles (MS), Men\'s Doubles (MD)',
-      '1. Mannschaft (Sachsenliga)',
-      'lukas.weber@s2023.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80'
-    );
+    const realPlayers = [
+      // Men - TUC Challengers
+      {
+        name: 'Pradeep Gandu',
+        gender: 'men',
+        study_program: 'M.Sc. Automotive Software Engineering',
+        specialization: "Men's Singles (HE), Men's Doubles (HD), Mixed (MX)",
+        team: 'TUC Challengers (3. Platz / MVP Cup)',
+        email: 'pradeep.gandu@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Sheng Dong',
+        gender: 'men',
+        study_program: 'M.Sc. Computational Science',
+        specialization: "Men's Singles (HE), Men's Doubles (HD)",
+        team: 'TUC Challengers (3. Platz)',
+        email: 'sheng.dong@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Cheyu Lin',
+        gender: 'men',
+        study_program: 'B.Sc. Informatik',
+        specialization: "Men's Doubles (HD), Mixed Doubles (MX)",
+        team: 'TUC Challengers (3. Platz)',
+        email: 'cheyu.lin@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Nithin Valiyaveedu',
+        gender: 'men',
+        study_program: 'M.Sc. Micro and Nano Systems',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Challengers (3. Platz)',
+        email: 'nithin.valiyaveedu@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Rakib Rony',
+        gender: 'men',
+        study_program: 'B.Sc. Maschinenbau',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Challengers (3. Platz)',
+        email: 'rakib.rony@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80'
+      },
 
-    insertPlayer.run(
-      'Felix Richter',
-      'men',
-      'M.Sc. Sports Engineering',
-      'Men\'s Doubles (MD), Mixed Doubles (MX)',
-      '1. Mannschaft (Sachsenliga)',
-      'felix.richter@mb.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80'
-    );
+      // Men - TUC Shuttlers (Champions)
+      {
+        name: 'Phan van Trung',
+        gender: 'men',
+        study_program: 'M.Sc. Sports Engineering',
+        specialization: "Men's Singles (HE), Men's Doubles (HD), Mixed (MX)",
+        team: 'TUC Shuttlers (1. Platz / Champions)',
+        email: 'phan.van-trung@s2022.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Sangeeth Udayan',
+        gender: 'men',
+        study_program: 'M.Sc. Embedded Systems',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Shuttlers (1. Platz / Champions)',
+        email: 'sangeeth.udayan@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Joseph Huang',
+        gender: 'men',
+        study_program: 'B.Sc. Wirtschaftsingenieurwesen',
+        specialization: "Men's Singles (HE), Mixed (MX)",
+        team: 'TUC Shuttlers (1. Platz / Champions)',
+        email: 'joseph.huang@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Nishit Sanghvi',
+        gender: 'men',
+        study_program: 'M.Sc. Data Science',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Shuttlers (1. Platz / Champions)',
+        email: 'nishit.sanghvi@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Salekin',
+        gender: 'men',
+        study_program: 'B.Sc. Elektrotechnik',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Shuttlers (1. Platz / Champions)',
+        email: 'salekin@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80'
+      },
 
-    insertPlayer.run(
-      'Jan Hoffmann',
-      'men',
-      'B.Sc. Maschinenbau',
-      'Men\'s Singles (MS)',
-      '2. Mannschaft (Bezirksliga)',
-      'jan.hoffmann@s2024.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80'
-    );
+      // Men - TUC Titans (2. Platz)
+      {
+        name: 'Michael Krause',
+        gender: 'men',
+        study_program: 'Wissenschaftlicher Mitarbeiter / Coach',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Titans (2. Platz / Silber)',
+        email: 'michael.krause@mb.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Neeraj Kulkarni',
+        gender: 'men',
+        study_program: 'M.Sc. Automotive Software Engineering',
+        specialization: "Men's Singles (HE), Men's Doubles (HD), Mixed (MX)",
+        team: 'TUC Titans (2. Platz / Silber)',
+        email: 'neeraj.kulkarni@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Aditya Vikram',
+        gender: 'men',
+        study_program: 'M.Sc. Advanced Manufacturing',
+        specialization: "Men's Doubles (HD), Mixed (MX)",
+        team: 'TUC Titans (2. Platz / Silber)',
+        email: 'aditya.vikram@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Sohan Rahman',
+        gender: 'men',
+        study_program: 'B.Sc. Informatik',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Titans (2. Platz / Silber)',
+        email: 'sohan.rahman@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Saswat Pradhan',
+        gender: 'men',
+        study_program: 'M.Sc. Renewable Energy Systems',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Titans (2. Platz / Silber)',
+        email: 'saswat.pradhan@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80'
+      },
 
-    insertPlayer.run(
-      'Tim Schneider',
-      'men',
-      'M.Sc. Wirtschaftswissenschaften',
-      'Men\'s Doubles (MD), Mixed Doubles (MX)',
-      '2. Mannschaft (Bezirksliga)',
-      'tim.schneider@wiwi.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80'
-    );
+      // Men - TUC Predators
+      {
+        name: 'Kevin Fuchs',
+        gender: 'men',
+        study_program: 'M.Sc. Sports Engineering',
+        specialization: "Men's Singles (HE), Men's Doubles (HD)",
+        team: 'TUC Predators',
+        email: 'kevin.fuchs@s2022.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Phu Loc Pham',
+        gender: 'men',
+        study_program: 'B.Sc. Informatik',
+        specialization: "Men's Singles (HE), Men's Doubles (HD), Mixed (MX)",
+        team: 'TUC Predators (100% Winrate)',
+        email: 'phu-loc.pham@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Md Motasim Billah Taihan',
+        gender: 'men',
+        study_program: 'M.Sc. Computational Science',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Predators',
+        email: 'motasim.billah@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Andre Apitzsch',
+        gender: 'men',
+        study_program: 'B.Sc. Maschinenbau',
+        specialization: "Men's Doubles (HD), Mixed (MX)",
+        team: 'TUC Predators',
+        email: 'andre.apitzsch@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Rishit',
+        gender: 'men',
+        study_program: 'M.Sc. Micro and Nano Systems',
+        specialization: "Men's Doubles (HD)",
+        team: 'TUC Predators',
+        email: 'rishit@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80'
+      },
 
-    // Women's Squad
-    insertPlayer.run(
-      'Elena Fischer',
-      'women',
-      'M.Sc. Computational Science',
-      'Women\'s Singles (WS), Mixed Doubles (MX)',
-      '1. Mannschaft (Sachsenliga)',
-      'elena.fischer@informatik.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
-    );
+      // Women's Squad
+      {
+        name: 'Tamara Winzler',
+        gender: 'women',
+        study_program: 'B.Sc. Psychologie',
+        specialization: "Women's Singles (DE), Mixed Doubles (MX)",
+        team: 'TUC Challengers (Beste Dame 80% Win)',
+        email: 'tamara.winzler@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Jeanette Krause',
+        gender: 'women',
+        study_program: 'M.Sc. Wirtschaftswissenschaften',
+        specialization: "Women's Singles (DE), Mixed Doubles (MX)",
+        team: 'TUC Shuttlers (Champions 87.5% Win)',
+        email: 'jeanette.krause@wiwi.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Havishma Madabhushi',
+        gender: 'women',
+        study_program: 'M.Sc. Automotive Software Engineering',
+        specialization: "Women's Singles (DE), Mixed Doubles (MX)",
+        team: 'TUC Titans (2. Platz / Finalistin)',
+        email: 'havishma.madabhushi@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Ayushi Thakur',
+        gender: 'women',
+        study_program: 'M.Sc. Micro and Nano Systems',
+        specialization: 'Mixed Doubles (MX)',
+        team: 'TUC Titans (2. Platz / Silber)',
+        email: 'ayushi.thakur@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Annalena Wieland',
+        gender: 'women',
+        study_program: 'B.A. Pädagogik',
+        specialization: 'Mixed Doubles (MX)',
+        team: 'TUC Predators',
+        email: 'annalena.wieland@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Jiyeon Yeo',
+        gender: 'women',
+        study_program: 'M.Sc. Sensorik und Kognitive Psychologie',
+        specialization: "Women's Singles (DE)",
+        team: 'TUC Predators',
+        email: 'jiyeon.yeo@s2023.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80'
+      },
+      {
+        name: 'Kalani Siriwardhana',
+        gender: 'women',
+        study_program: 'B.Sc. Informatik',
+        specialization: "Women's Singles (DE), Mixed Doubles (MX)",
+        team: 'TUC Titans',
+        email: 'kalani.siriwardhana@s2024.tu-chemnitz.de',
+        photo_url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80'
+      }
+    ];
 
-    insertPlayer.run(
-      'Sophie Neumann',
-      'women',
-      'B.Sc. Psychologie',
-      'Women\'s Doubles (WD), Mixed Doubles (MX)',
-      '1. Mannschaft (Sachsenliga)',
-      'sophie.neumann@s2023.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80'
-    );
-
-    insertPlayer.run(
-      'Laura Becker',
-      'women',
-      'B.Sc. Sensorik & Kognitive Psychologie',
-      'Women\'s Singles (WS), Women\'s Doubles (WD)',
-      '2. Mannschaft (Bezirksliga)',
-      'laura.becker@s2024.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80'
-    );
-
-    insertPlayer.run(
-      'Anna Wagner',
-      'women',
-      'M.Sc. Mechatronik',
-      'Women\'s Doubles (WD), Mixed Doubles (MX)',
-      '2. Mannschaft (Bezirksliga)',
-      'anna.wagner@etit.tu-chemnitz.de',
-      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80'
-    );
+    for (const p of realPlayers) {
+      insertPlayer.run(p.name, p.gender, p.study_program, p.specialization, p.team, p.email, p.photo_url);
+    }
   }
 
   // Seed Tournament Results & Gallery if empty
   const resultsCount = db.prepare('SELECT COUNT(*) as count FROM tournament_results').get().count;
   if (resultsCount === 0) {
-    console.log('[DB] Seeding sample tournament results with photos...');
+    console.log('[DB] Seeding authentic university tournament results with photos...');
     const insertResult = db.prepare(`
       INSERT INTO tournament_results (tournament_name, result, date, player_name, photo_url, caption, status, submitted_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    // 1. Approved item: Gold at SHM
     insertResult.run(
-      '32. Sächsische Hochschulmeisterschaft (SHM) 2026',
-      '1. Platz Herrendoppel (Gold)',
-      '14.11.2026',
-      'Lukas Weber & Felix Richter',
-      'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80',
-      'Souveräner Turniersieg im Herrendoppel-Finale (21:17, 21:19) für das TUC-Duo vor heimischer Kulisse!',
+      'UNI Badminton Team Cup 2026',
+      '🥇 1. Platz & Turniersieger (Gold)',
+      '31.01.2026',
+      'TUC Shuttlers (Phan van Trung, Jeanette Krause, Sangeeth Udayan, Joseph Huang, Nishit Sanghvi, Salekin)',
+      '/uploads/tournament_2026/teamcup_2026_winners_gold.jpeg',
+      'Souveräner 4:0-Triumph im großen Finale! Angeführt von Kapitän Phan van Trung (6 Siege, ungeschlagen) und Jeanette Krause (7 Siege, 87.5% Winrate) sicherte sich das Team den Meisterpokal und die Goldmedaillen.',
       'approved',
-      'Coach Markus'
+      'Phan van Trung (Kapitän)'
     );
 
-    // 2. Approved item: League win
     insertResult.run(
-      'Sachsenliga Punktspiel vs. SG Gittersee',
-      'Sieg 5 : 3 (Heimspiel)',
-      '28.10.2026',
-      '1. Mannschaft TUC',
-      'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80',
-      'Wichtiger Heimsieg in der Sachsenliga vor begeistertem Publikum in der Sporthalle Thüringer Weg.',
+      'UNI Badminton Team Cup 2026',
+      '🥈 2. Platz (Silber / Finalist)',
+      '31.01.2026',
+      'TUC Titans (Michael Krause, Neeraj Kulkarni, Aditya Vikram, Sohan Rahman, Saswat Pradhan, Havishma Madabhushi, Ayushi Thakur)',
+      '/uploads/tournament_2026/teamcup_2026_titans_silver.jpeg',
+      'Hervorragender Finaleinzug nach einem 3:1-Halbfinalsieg über die HSMW. Überragende Doppel- und Einzelleistungen von Neeraj Kulkarni (6 Siege aus 7 Spielen) und das gesamte Titans-Team mit dem Silberpokal.',
       'approved',
-      'Lukas Weber'
+      'Michael Krause (Kapitän)'
     );
 
-    // 3. Approved item: Silver at City Championships
     insertResult.run(
-      'Chemnitzer Stadtmeisterschaften 2026',
-      '2. Platz Dameneinzel (Silber)',
-      '12.10.2026',
-      'Elena Fischer',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=1200&q=80',
-      'Hervorragende Leistung von Elena nach einem packenden Drei-Satz-Match im Halbfinale.',
+      'UNI Badminton Team Cup 2026',
+      '🥉 3. Platz (Bronze) & Sieger Gr. A',
+      '31.01.2026',
+      'TUC Challengers (Pradeep Gandu, Tamara Winzler, Sheng Dong, Cheyu Lin, Nithin Valiyaveedu, Rakib Rony)',
+      '/uploads/tournament_2026/teamcup_2026_challengers_bronze.jpeg',
+      'Sensationelle Gruppenphase mit 3:0 Siegen und ein nervenstarker 3:2-Erfolg im kleinen Finale gegen HSMW! Mit Kapitän Pradeep Gandu (8 Siege, MVP) und Tamara Winzler (8 Siege, beste Dame) auf dem Bronzepodest.',
       'approved',
-      'Elena Fischer'
+      'Pradeep Gandu (Kapitän & MVP)'
     );
 
-    // 4. Pending item: Player submitted result awaiting Admin approval
     insertResult.run(
-      'Mitteldeutsche Hochschulmeisterschaften 2026',
-      '3. Platz Mixed-Doppel (Bronze)',
-      '08.11.2026',
-      'Sophie Neumann & Tim Schneider',
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
-      'Bronze im kleinen Finale (21:16, 21:18) nach starkem Turnierverlauf!',
+      'UNI Badminton Team Cup 2026',
+      '🏅 4. Platz & Beste Gast-Uni',
+      '31.01.2026',
+      'HSMW Mittweida (Jensun Ravichandran, Leander Pluntke, Chenyang Sun, Paul Bochmann, Franklin Asphas, Laura Harms, Louise Mahlig)',
+      '/uploads/tournament_2026/teamcup_2026_hsmw_4th.jpeg',
+      'Starke Leistung der Hochschule Mittweida mit dem 1. Platz in Gruppe B (2:0 Siege) und hochklassigen Ballwechseln im Halbfinale und Spiel um Platz 3.',
+      'approved',
+      'Jensun Ravichandran (Kapitän HSMW)'
+    );
+
+    insertResult.run(
+      'UNI Badminton Team Cup 2026',
+      '🏸 5. Platz (Platzierungsspiel)',
+      '31.01.2026',
+      'TUC Predators (Kevin Fuchs, Phu Loc Pham, Md Motasim Billah, Andre Apitzsch, Rishit, Jiyeon Yeo, Annalena Wieland)',
+      '/uploads/tournament_2026/teamcup_2026_predators_5th.jpeg',
+      'Starker Auftritt der TUC Predators: Mit großem Teamgeist, ungeschlagenem Einzel von Phu Loc Pham (100% Winrate) und vollem Einsatz im Platzierungsspiel.',
+      'approved',
+      'Kevin Fuchs (Kapitän Predators)'
+    );
+
+    insertResult.run(
+      'UNI Badminton Team Cup 2026',
+      '🏸 6. Platz (Platzierungsrunde)',
+      '31.01.2026',
+      'WHZ Zwickauer Schmetterlinge (Westsächsische Hochschule Zwickau)',
+      '/uploads/tournament_2026/teamcup_2026_zwickau_schmetterlinge.jpeg',
+      'Großartige Stimmung und beherzter Kampfgeist des ersten Teams der Westsächsischen Hochschule Zwickau bei den Platzierungsspielen.',
+      'approved',
+      'WH Zwickau'
+    );
+
+    insertResult.run(
+      'UNI Badminton Team Cup 2026',
+      '👥 Großes Gemeinschaftsfoto',
+      '31.01.2026',
+      'TU Chemnitz, WH Zwickau, HS Mittweida (7 Teams, 45 Aktive)',
+      '/uploads/tournament_2026/teamcup_2026_group_all_teams.jpeg',
+      'Sportlicher Wettkampf, gelebte Vielfalt und fantastische Stimmung: 45 Studierende und Mitarbeitende aus 10 Nationen feierten das größte Badminton-Turnier des Semesters in der Sporthalle Thüringer Weg.',
+      'approved',
+      'Turnierleitung USZ'
+    );
+
+    insertResult.run(
+      'UNI Badminton Team Cup 2026',
+      '📸 Team-Selfie nach dem Platzierungsspiel',
+      '31.01.2026',
+      'TUC Predators',
+      '/uploads/tournament_2026/teamcup_2026_predators_selfie.jpeg',
+      'Unser Teamgeist und Freude nach den spannenden Matches in der Sporthalle Thüringer Weg!',
       'pending',
-      'Sophie Neumann'
+      'Kevin Fuchs'
     );
   }
 

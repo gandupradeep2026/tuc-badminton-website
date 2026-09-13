@@ -97,7 +97,7 @@ export default function ServerStatusBadge() {
                 </div>
                 <div>
                   <h3 className="font-display font-black text-base sm:text-lg leading-tight">
-                    {isDe ? 'Laptop-Home-Server Status' : 'Laptop Home Server Status'}
+                    {isDe ? 'TU Chemnitz Server & Cloud Status' : 'TU Chemnitz Server & Cloud Status'}
                   </h3>
                   <p className="text-xs text-slate-500 font-bold">
                     TU Chemnitz Badminton Infrastructure
@@ -130,17 +130,17 @@ export default function ServerStatusBadge() {
               <div>
                 <p className="font-bold">
                   {status.state === 'online'
-                    ? (isDe ? 'Verbunden mit Laptop-Server' : 'Connected to Laptop Server')
+                    ? (isDe ? 'Verbunden mit Live-Server (Synchron)' : 'Connected to Live Server (Synced)')
                     : status.state === 'checking'
                     ? (isDe ? 'Überprüfe Serververbindung...' : 'Checking server connectivity...')
-                    : (isDe ? 'Laptop-Server derzeit nicht erreichbar' : 'Laptop server currently unreachable')}
+                    : (isDe ? 'Server derzeit offline (Fallback-Modus aktiv)' : 'Server currently offline (Fallback mode active)')}
                 </p>
                 <p className="mt-1 text-[11px] opacity-90">
                   {status.state === 'online'
                     ? (status.venue || '12 Spielfelder • Sporthalle Thüringer Weg 11')
                     : (isDe 
-                        ? 'Stellen Sie sicher, dass start-server.bat auf dem Laptop läuft und der Tunnel aktiv ist.'
-                        : 'Ensure start-server.bat is running on the host laptop and the tunnel is active.')}
+                        ? 'Alle Turnierspieler und Trainer werden aus dem lokalen Speicher geladen. Nach dem Start des Render-Cloud-Servers oder Tunnels verbindet sich die Seite automatisch.'
+                        : 'All tournament players and coaches are loaded from local cache. When your Render cloud service or tunnel is active, it connects automatically.')}
                 </p>
               </div>
             </div>
@@ -148,12 +148,12 @@ export default function ServerStatusBadge() {
             {/* Custom Tunnel URL Configuration */}
             <form onSubmit={handleSaveTunnel} className="space-y-3">
               <label className="block text-xs font-bold text-slate-700">
-                {isDe ? 'Cloudflare Tunnel / localtunnel URL:' : 'Cloudflare Tunnel / localtunnel URL:'}
+                {isDe ? 'Live-Backend URL (Render Cloud oder Tunnel):' : 'Live Backend URL (Render Cloud or Tunnel):'}
               </label>
               <div className="flex gap-2">
                 <input
                   type="url"
-                  placeholder="https://xxxxxx.trycloudflare.com"
+                  placeholder="https://tuc-badminton-backend.onrender.com"
                   value={tunnelInput}
                   onChange={(e) => setTunnelInput(e.target.value)}
                   className="flex-1 px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 focus:outline-none focus:border-[#005A36] focus:ring-1 focus:ring-[#005A36]"
@@ -167,8 +167,8 @@ export default function ServerStatusBadge() {
               </div>
               <p className="text-[11px] text-slate-500 leading-tight">
                 {isDe 
-                  ? 'Sie können hier jederzeit die neu generierte Tunnel-Adresse Ihres Laptops einfügen, ohne die Website neu bauen zu müssen.'
-                  : 'You can paste your laptop\'s newly generated tunnel address here at any time without rebuilding.'}
+                  ? 'Geben Sie hier Ihre Render-Cloud-Adresse oder Cloudflare-Tunnel-URL ein, um Änderungen in Echtzeit zwischen Laptop und Smartphone abzugleichen.'
+                  : 'Enter your Render cloud address or Cloudflare tunnel URL here to sync changes in real time between laptop and phone.'}
               </p>
             </form>
 

@@ -1,0 +1,22 @@
+# Render Blueprint Specification for TU Chemnitz Badminton API
+# Free Tier Web Service connected directly to GitHub repository
+services:
+  - type: web
+    name: tuc-badminton-backend
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: ADMIN_EMAIL
+        value: gandupradeep2026@gmail.com
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: SESSION_SECRET
+        value: tuc-badminton-secure-session-2026
+      - key: GMAIL_APP_PASSWORD
+        sync: false

@@ -45,7 +45,8 @@ export function getBaseApiUrl() {
     return 'http://localhost:5000';
   }
 
-  return '';
+  // Live Cloud Backend default (Render Web Service)
+  return 'https://tuc-badminton-backend.onrender.com';
 }
 
 /**
