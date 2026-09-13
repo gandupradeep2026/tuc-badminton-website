@@ -26,6 +26,7 @@ export default function SimpleFooter({ onNavigate }) {
             <button onClick={() => onNavigate('home')} className="p-1 hover:text-[#005A36] transition-colors">{n.home}</button>
             <button onClick={() => onNavigate('trainers')} className="p-1 hover:text-[#005A36] transition-colors">{n.trainers}</button>
             <button onClick={() => onNavigate('players')} className="p-1 hover:text-[#005A36] transition-colors">{n.players}</button>
+            <button onClick={() => onNavigate('services')} className="p-1 hover:text-[#005A36] transition-colors">{t.language === 'en' ? 'Services' : 'Besaitung & Ausrüstung'}</button>
             <button onClick={() => onNavigate('tournaments')} className="p-1 hover:text-[#005A36] transition-colors">{n.tournaments}</button>
             <button onClick={() => onNavigate('gallery')} className="p-1 hover:text-[#005A36] transition-colors">{n.gallery}</button>
             <button onClick={() => onNavigate('admin')} className="p-1 hover:text-[#005A36] text-slate-500 transition-colors">🔒 {n.admin}</button>

@@ -7,6 +7,7 @@ import SimpleFooter from './components/SimpleFooter';
 const HomePage = lazy(() => import('./pages/HomePage'));
 const TrainersPage = lazy(() => import('./pages/TrainersPage'));
 const PlayersPage = lazy(() => import('./pages/PlayersPage'));
+const ServicesPage = lazy(() => import('./pages/ServicesPage'));
 const TournamentsPage = lazy(() => import('./pages/TournamentsPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const RegistrationPage = lazy(() => import('./pages/RegistrationPage'));
@@ -39,7 +40,7 @@ function AppContent() {
   // Read initial page from URL hash if present
   const getPageFromHash = () => {
     const hash = window.location.hash.replace('#', '').toLowerCase();
-    if (['trainers', 'players', 'tournaments', 'gallery', 'register', 'admin'].includes(hash)) {
+    if (['trainers', 'players', 'services', 'tournaments', 'gallery', 'register', 'admin'].includes(hash)) {
       return hash;
     }
     return 'home';
@@ -84,6 +85,10 @@ function AppContent() {
 
           {activePage === 'players' && (
             <PlayersPage onNavigate={navigateTo} />
+          )}
+
+          {activePage === 'services' && (
+            <ServicesPage onNavigate={navigateTo} />
           )}
 
           {activePage === 'tournaments' && (

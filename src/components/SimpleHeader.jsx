@@ -1,15 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Globe, Lock, ShieldCheck } from 'lucide-react';
+import { Menu, X, Globe, Lock, ShieldCheck, Heart } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import DonationModal from './DonationModal';
 
 export default function SimpleHeader({ activePage, onNavigate }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
+  const isDe = language === 'de';
+
+  const [donationSettings, setDonationSettings] = useState(null);
+  const [donationModalOpen, setDonationModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/donation-settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.is_active) {
+          setDonationSettings(data);
+        } else {
+          setDonationSettings(null);
+        }
+      })
+      .catch(() => setDonationSettings(null));
+  }, []);
 
   const navItems = [
     { id: 'home', label: t.nav.home, icon: '🏛️' },
     { id: 'trainers', label: t.nav.trainers, icon: '👥' },
     { id: 'players', label: t.nav.players, icon: '🏸' },
+    { id: 'services', label: isDe ? 'Besaitung & Ausrüstung' : 'Services & Gear', icon: '🔧' },
     { id: 'tournaments', label: t.nav.tournaments, icon: '🏆' },
     { id: 'gallery', label: t.nav.gallery, icon: '📸' },
     { id: 'register', label: t.nav.register || 'Registrieren', icon: '✍️' },
@@ -118,6 +137,18 @@ export default function SimpleHeader({ activePage, onNavigate }) {
         {/* Right Controls: Language Switcher & Mobile Menu */}
         <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           
+          {/* Donate / Sponsor Button - ONLY VISIBLE WHEN ADMIN ACTIVATES IT */}
+          {donationSettings && donationSettings.is_active && (
+            <button
+              onClick={() => setDonationModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 active:bg-rose-200 border border-rose-200 shadow-2xs transition-all cursor-pointer"
+              title={isDe ? 'Das Team unterstützen / Sponsern' : 'Support the team / Sponsor'}
+            >
+              <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500 animate-pulse" />
+              <span>{isDe ? 'Spenden' : 'Donate'}</span>
+            </button>
+          )}
+
           {/* Language Toggle Switch (Always visible on all screens) */}
           <div className="flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200">
             <button
@@ -186,6 +217,20 @@ export default function SimpleHeader({ activePage, onNavigate }) {
               );
             })}
 
+            {/* Mobile Donate Button - ONLY WHEN ACTIVE */}
+            {donationSettings && donationSettings.is_active && (
+              <button
+                onClick={() => {
+                  setDonationModalOpen(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left px-4 py-3 rounded-xl text-sm font-bold flex items-center gap-3 transition-colors min-h-[48px] bg-rose-50 text-rose-800 border border-rose-200"
+              >
+                <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
+                <span>{isDe ? '❤️ Spenden & Sponsoring' : '❤️ Donate & Sponsor'}</span>
+              </button>
+            )}
+
             {/* Admin Link in Mobile Drawer */}
             <button
               onClick={() => handleSelect('admin')}
@@ -208,6 +253,13 @@ export default function SimpleHeader({ activePage, onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* Donation Modal - Active only when settings loaded and toggled */}
+      <DonationModal
+        isOpen={donationModalOpen}
+        onClose={() => setDonationModalOpen(false)}
+        settings={donationSettings}
+      />
 
     </header>
   );

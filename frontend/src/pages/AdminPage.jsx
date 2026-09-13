@@ -35,7 +35,13 @@ import {
   Star,
   Phone,
   School,
-  UserCheck
+  UserCheck,
+  Heart,
+  Wrench,
+  Package,
+  Building2,
+  CreditCard,
+  Copy
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import DisciplineSelector from '../components/DisciplineSelector';
@@ -218,11 +224,48 @@ export default function AdminPage() {
   const [schedSubmitting, setSchedSubmitting] = useState(false);
 
   // -----------------------------------------------------------------
-  // 10. Self-Registrations State (Players & Trainers)
+  // 10. Self-Registrations State (Players, Trainers & Equipment Services)
   // -----------------------------------------------------------------
   const [pendingPlayers, setPendingPlayers] = useState([]);
   const [pendingTrainers, setPendingTrainers] = useState([]);
+  const [pendingServices, setPendingServices] = useState([]);
+  const [approvedServices, setApprovedServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(false);
   const [registrationsLoading, setRegistrationsLoading] = useState(false);
+  const [isAddServiceOpen, setIsAddServiceOpen] = useState(false);
+  const [newService, setNewService] = useState({
+    name: '',
+    service_type: 'Schläger-Besaitungsservice',
+    email: '',
+    phone: '',
+    show_phone: true,
+    pricing_details: '',
+    available_items: '',
+    location_note: 'Sporthalle Thüringer Weg 11',
+    experience_years: '',
+  });
+
+  // -----------------------------------------------------------------
+  // 11. Donation & Sponsorship Settings State
+  // -----------------------------------------------------------------
+  const [donationSettings, setDonationSettings] = useState({
+    id: 1,
+    is_active: false,
+    title: 'Unterstütze das Badminton-Team der TU Chemnitz',
+    subtitle: 'Gemeinsam für Training, Ausrüstung & Turniere',
+    description: '',
+    paypal_me_link: '',
+    paypal_email: '',
+    bank_recipient: 'TU Chemnitz Badminton Community',
+    bank_iban: '',
+    bank_bic: '',
+    bank_name: '',
+    bank_reference: 'Spende Badminton TU Chemnitz',
+    sponsor_email: 'gandupradeep2026@gmail.com',
+    sponsor_info: '',
+  });
+  const [savingDonation, setSavingDonation] = useState(false);
+  const [donationSaveMsg, setDonationSaveMsg] = useState('');
 
   // -----------------------------------------------------------------
   // Data Fetching
@@ -237,6 +280,8 @@ export default function AdminPage() {
     fetchYouTubeVideos();
     fetchAdminSchedules();
     fetchPendingRegistrations();
+    fetchServices();
+    fetchDonationSettings();
   };
 
   const fetchGallery = async () => {
@@ -448,14 +493,17 @@ export default function AdminPage() {
       if (res.ok && res.data) {
         setPendingPlayers([...offlinePlayers, ...(res.data.players || [])]);
         setPendingTrainers([...offlineTrainers, ...(res.data.trainers || [])]);
+        setPendingServices(res.data.services || []);
       } else {
         setPendingPlayers(offlinePlayers);
         setPendingTrainers(offlineTrainers);
+        setPendingServices([]);
       }
     } catch (err) {
       const offlineQueue = getOfflineSubmissions();
       setPendingPlayers(offlineQueue.filter(r => r.type === 'player').map(r => ({ ...r.payload, id: 'offline-' + r.id, is_offline: true })));
       setPendingTrainers(offlineQueue.filter(r => r.type === 'trainer').map(r => ({ ...r.payload, id: 'offline-' + r.id, is_offline: true })));
+      setPendingServices([]);
     } finally {
       setRegistrationsLoading(false);
     }
@@ -558,6 +606,151 @@ export default function AdminPage() {
       }
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
+    }
+  };
+
+  const fetchServices = async () => {
+    try {
+      setServicesLoading(true);
+      const res = await safeFetchJson('/api/admin/equipment-services', { headers: getAdminHeaders() });
+      if (res.ok && Array.isArray(res.data)) {
+        setApprovedServices(res.data);
+      }
+    } catch (e) {
+      console.error('Error loading services:', e);
+    } finally {
+      setServicesLoading(false);
+    }
+  };
+
+  const fetchDonationSettings = async () => {
+    try {
+      const res = await safeFetchJson('/api/admin/donation-settings', { headers: getAdminHeaders() });
+      if (res.ok && res.data) {
+        setDonationSettings(res.data);
+      }
+    } catch (e) {
+      console.error('Error loading donation settings:', e);
+    }
+  };
+
+  const handleApproveService = async (id, name) => {
+    try {
+      const res = await safeFetchJson(`/api/admin/registrations/services/${id}/approve`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+      });
+      if (res.ok) {
+        setFeedback({ type: 'success', message: `Ausrüster / Besaiter ${name || ''} erfolgreich freigeschaltet!` });
+        fetchPendingRegistrations();
+        fetchServices();
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'Fehler bei der Freigabe' });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Verbindungsfehler bei der Freigabe' });
+    }
+  };
+
+  const handleRejectService = async (id, name) => {
+    if (!window.confirm(`Möchtest du diese Registrierung wirklich ablehnen und entfernen?\n\n${name || ''} (#${id})`)) return;
+    try {
+      const res = await safeFetchJson(`/api/admin/registrations/services/${id}/reject`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+      });
+      if (res.ok) {
+        setFeedback({ type: 'info', message: 'Registrierung abgelehnt und entfernt.' });
+        fetchPendingRegistrations();
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'Fehler beim Ablehnen' });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Verbindungsfehler beim Ablehnen' });
+    }
+  };
+
+  const handleDeleteService = async (id, name) => {
+    if (!window.confirm(`Dienstleister / Besaiter "${name}" wirklich löschen?`)) return;
+    try {
+      const res = await safeFetchJson(`/api/admin/equipment-services/${id}`, {
+        method: 'DELETE',
+        headers: getAdminHeaders(),
+      });
+      if (res.ok) {
+        setFeedback({ type: 'info', message: 'Eintrag erfolgreich gelöscht.' });
+        fetchServices();
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'Fehler beim Löschen' });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Verbindungsfehler beim Löschen' });
+    }
+  };
+
+  const handleCreateService = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!newService.name.trim()) {
+      setFeedback({ type: 'error', message: 'Bitte Name des Anbieters angeben.' });
+      return;
+    }
+    try {
+      const res = await safeFetchJson('/api/admin/equipment-services', {
+        method: 'POST',
+        headers: {
+          ...getAdminHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newService),
+      });
+      if (res.ok) {
+        setFeedback({ type: 'success', message: `Dienstleister "${newService.name}" erfolgreich angelegt!` });
+        setNewService({
+          name: '',
+          service_type: 'Schläger-Besaitungsservice',
+          email: '',
+          phone: '',
+          show_phone: true,
+          pricing_details: '',
+          available_items: '',
+          location_note: 'Sporthalle Thüringer Weg 11',
+          experience_years: '',
+        });
+        setIsAddServiceOpen(false);
+        fetchServices();
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'Fehler beim Anlegen des Dienstleisters' });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Verbindungsfehler beim Anlegen' });
+    }
+  };
+
+  const handleSaveDonationSettings = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setSavingDonation(true);
+    setDonationSaveMsg('');
+    try {
+      const res = await safeFetchJson('/api/admin/donation-settings', {
+        method: 'PUT',
+        headers: {
+          ...getAdminHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(donationSettings),
+      });
+      if (res.ok) {
+        setDonationSettings(res.data.settings || donationSettings);
+        setDonationSaveMsg(isDe ? 'Spenden-Einstellungen erfolgreich gespeichert!' : 'Donation settings saved successfully!');
+        setFeedback({ type: 'success', message: isDe ? 'Spenden-Einstellungen gespeichert!' : 'Donation settings saved!' });
+        setTimeout(() => setDonationSaveMsg(''), 4000);
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'Fehler beim Speichern' });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: 'Verbindungsfehler beim Speichern' });
+    } finally {
+      setSavingDonation(false);
     }
   };
 
@@ -1934,6 +2127,32 @@ export default function AdminPage() {
         >
           <span>⚙️ {adm.settingsTab}</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('services')}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'services' ? 'bg-[#005A36] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>🔧 {isDe ? 'Besaitung & Ausrüstung' : 'Services & Gear'}</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+            {approvedServices.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('donations')}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'donations' ? 'bg-[#005A36] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>❤️ {isDe ? 'Spenden & Sponsoring' : 'Donations & Sponsors'}</span>
+          {donationSettings.is_active ? (
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Öffentlich aktiv" />
+          ) : (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-normal">Privat</span>
+          )}
+        </button>
       </div>
 
       {/* =====================================================================
@@ -2323,6 +2542,107 @@ export default function AdminPage() {
                         className="px-4 py-2 text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
                       >
                         <UserCheck className="w-3.5 h-3.5" />
+                        <span>{adm.registrationsTab?.btnApprove || 'Genehmigen & Freischalten'}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sub-Section 3: Ausstehende Besaiter & Ausrüster */}
+          <div className="space-y-3 pt-6 border-t border-slate-200">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-[#005A36]" />
+              <h3 className="font-black text-sm text-slate-900">
+                {isDe ? 'Ausstehende Ausrüster & Besaiter-Registrierungen' : 'Pending Stringers & Equipment Providers'} ({pendingServices.length})
+              </h3>
+            </div>
+
+            {pendingServices.length === 0 ? (
+              <div className="p-5 bg-white border border-slate-200 rounded-2xl text-center text-xs text-slate-400">
+                {isDe ? 'Keine offenen Ausrüster- oder Besaiter-Registrierungen.' : 'No pending equipment service registrations.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingServices.map((srv) => (
+                  <div key={srv.id} className="bg-white border border-amber-300/80 rounded-2xl overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div className="p-4 sm:p-5 space-y-3">
+                      {/* Top row: Avatar + Name + Badges */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                          {srv.photo_url && getUploadUrl(srv.photo_url) ? (
+                            <img src={getUploadUrl(srv.photo_url)} alt={srv.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Wrench className="w-5 h-5 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                              ⏳ {isDe ? 'Ausstehende Prüfung' : 'Pending Verification'}
+                            </span>
+                          </div>
+                          <h4 className="font-black text-sm sm:text-base text-slate-900 truncate">{srv.name}</h4>
+                          <span className="text-xs text-[#005A36] font-bold block truncate">{srv.service_type}</span>
+                        </div>
+                      </div>
+
+                      {/* Details Box */}
+                      <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5 text-xs">
+                        <div className="flex items-center gap-1.5 text-slate-700">
+                          <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                          <span className="font-mono text-[11px] truncate">{srv.email}</span>
+                        </div>
+                        {srv.phone && (
+                          <div className="flex items-center gap-1.5 text-slate-700">
+                            <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <span className="font-mono text-[11px] truncate">{srv.phone}</span>
+                            {srv.show_phone ? <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1 rounded">({isDe ? 'Öffentlich' : 'Public'})</span> : <span className="text-[10px] text-slate-400 bg-slate-100 px-1 rounded">({isDe ? 'Privat' : 'Private'})</span>}
+                          </div>
+                        )}
+                        {srv.pricing_details && (
+                          <div className="pt-1 border-t border-slate-200 text-amber-900">
+                            <strong>{isDe ? 'Preise:' : 'Pricing:'}</strong> {srv.pricing_details}
+                          </div>
+                        )}
+                        {srv.available_items && (
+                          <div className="text-slate-700">
+                            <strong>{isDe ? 'Saiten / Bälle:' : 'Materials:'}</strong> {srv.available_items}
+                          </div>
+                        )}
+                        {srv.location_note && (
+                          <div className="text-slate-600">
+                            <strong>{isDe ? 'Übergabeort:' : 'Location:'}</strong> {srv.location_note}
+                          </div>
+                        )}
+                        {srv.experience_years && (
+                          <div className="text-slate-600">
+                            <strong>{isDe ? 'Erfahrung:' : 'Experience:'}</strong> {srv.experience_years}
+                          </div>
+                        )}
+                        <div className="text-[10px] text-slate-400 pt-1">
+                          {isDe ? 'Eingereicht am:' : 'Submitted at:'} {srv.created_at}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions bar */}
+                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRejectService(srv.id, srv.name)}
+                        className="px-3.5 py-2 text-xs font-bold text-red-700 bg-white border border-red-200 hover:bg-red-50 rounded-xl transition-colors"
+                      >
+                        ✕ {adm.registrationsTab?.btnReject || 'Ablehnen'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApproveService(srv.id, srv.name)}
+                        className="px-4 py-2 text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>{adm.registrationsTab?.btnApprove || 'Genehmigen & Freischalten'}</span>
                       </button>
                     </div>
@@ -3756,6 +4076,574 @@ export default function AdminPage() {
             </div>
           </div>
 
+        </div>
+      )}
+
+      {/* =====================================================================
+          TAB 10: Services & Gear (Ausrüster & Besaiter)
+      ===================================================================== */}
+      {activeTab === 'services' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#005A36] flex items-center justify-center">
+                <Wrench className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="font-black text-lg text-slate-900">
+                  {isDe ? 'Besaitungs- & Ausrüstungs-Dienstleister' : 'Stringing & Equipment Providers'} ({approvedServices.length})
+                </h2>
+                <p className="text-xs text-slate-500">
+                  {isDe ? 'Verwalte freigeschaltete Besaiter, Federball- und Schlägerverkäufer für die Community.' : 'Manage approved stringers and racket/shuttlecock sellers.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddServiceOpen(!isAddServiceOpen)}
+                className="px-4 py-2 bg-[#005A36] hover:bg-[#00472A] text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{isAddServiceOpen ? (isDe ? 'Formular schließen' : 'Close Form') : (isDe ? '+ Neuen Anbieter eintragen' : '+ Add Provider')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick-Add Provider Form */}
+          {isAddServiceOpen && (
+            <div className="p-6 bg-white border border-emerald-300 rounded-3xl shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-black text-sm text-slate-900 flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-[#005A36]" />
+                  <span>{isDe ? 'Neuen Dienstleister direkt freigeschaltet anlegen' : 'Create Approved Service Provider'}</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAddServiceOpen(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateService} className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'Name des Anbieters / Besaiters *' : 'Provider Name *'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newService.name}
+                      onChange={(e) => setNewService({ ...newService, name: e.target.value })}
+                      placeholder="z.B. Max Mustermann"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'Dienstleistungsart *' : 'Service Type *'}
+                    </label>
+                    <select
+                      value={newService.service_type}
+                      onChange={(e) => setNewService({ ...newService, service_type: e.target.value })}
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    >
+                      <option value="Schläger-Besaitungsservice">🏸 Schläger-Besaitungsservice</option>
+                      <option value="Verkauf von Badmintonschlägern">🏸 Verkauf von Badmintonschlägern</option>
+                      <option value="Verkauf von Federbällen">🪶 Verkauf von Federbällen</option>
+                      <option value="Besaitung & Ausrüstung (All-in-One)">🏸 Besaitung & Ausrüstung (All-in-One)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'E-Mail-Adresse *' : 'Email *'}
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={newService.email}
+                      onChange={(e) => setNewService({ ...newService, email: e.target.value })}
+                      placeholder="service@example.com"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'Telefon / WhatsApp' : 'Phone / WhatsApp'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newService.phone}
+                      onChange={(e) => setNewService({ ...newService, phone: e.target.value })}
+                      placeholder="+49 176 12345678"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    />
+                    <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newService.show_phone}
+                        onChange={(e) => setNewService({ ...newService, show_phone: e.target.checked })}
+                        className="rounded border-slate-300 text-[#005A36] focus:ring-[#005A36]"
+                      />
+                      <span className="text-[11px] text-slate-600">
+                        {isDe ? 'Telefonnummer öffentlich anzeigen (ermöglicht Direkt-WhatsApp)' : 'Show phone number publicly'}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'Preise / Tarife' : 'Pricing'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newService.pricing_details}
+                      onChange={(e) => setNewService({ ...newService, pricing_details: e.target.value })}
+                      placeholder="z.B. 12 € mit eigener Saite, 18 € inkl. Yonex BG 65"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'Vorhandene Saiten / Federball-Sorten' : 'Available items / strings'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newService.available_items}
+                      onChange={(e) => setNewService({ ...newService, available_items: e.target.value })}
+                      placeholder="z.B. Yonex BG 65, BG 80, Victor Champion Bälle"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'Übergabeort / Halle' : 'Handoff Location'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newService.location_note}
+                      onChange={(e) => setNewService({ ...newService, location_note: e.target.value })}
+                      placeholder="Sporthalle Thüringer Weg 11 oder TU Campus"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {isDe ? 'Erfahrung / Hinweise' : 'Experience / Notes'}
+                    </label>
+                    <input
+                      type="text"
+                      value={newService.experience_years}
+                      onChange={(e) => setNewService({ ...newService, experience_years: e.target.value })}
+                      placeholder="z.B. Elektronische Besaitungsmaschine, 4 Jahre Erfahrung"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddServiceOpen(false)}
+                    className="px-4 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  >
+                    {isDe ? 'Abbrechen' : 'Cancel'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[#005A36] hover:bg-[#00472A] text-white font-bold rounded-xl shadow-xs cursor-pointer"
+                  >
+                    {isDe ? 'Dienstleister speichern' : 'Save Provider'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Approved Providers Grid */}
+          {servicesLoading ? (
+            <div className="p-8 text-center text-xs text-slate-400">
+              <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#005A36]" />
+              Lade Ausrüster & Besaiter...
+            </div>
+          ) : approvedServices.length === 0 ? (
+            <div className="p-8 bg-white border border-dashed border-slate-200 rounded-3xl text-center space-y-2">
+              <Wrench className="w-8 h-8 text-slate-300 mx-auto" />
+              <p className="font-bold text-sm text-slate-700">{isDe ? 'Noch keine Dienstleister aktiv' : 'No active service providers'}</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                {isDe
+                  ? 'Neue Registrierungen erscheinen im Tab "Offene Anträge" und können dort freigeschaltet werden, oder du kannst oben direkt einen Anbieter eintragen.'
+                  : 'Registrations will appear in the pending tab, or you can add one directly above.'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {approvedServices.map((srv) => (
+                <div key={srv.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                          {srv.photo_url && getUploadUrl(srv.photo_url) ? (
+                            <img src={getUploadUrl(srv.photo_url)} alt={srv.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Wrench className="w-4 h-4 text-slate-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm text-slate-900">{srv.name}</h4>
+                          <span className="text-[11px] font-bold text-[#005A36]">{srv.service_type}</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        ✓ Aktiv
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <Mail className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                        <span className="font-mono text-[11px] truncate">{srv.email}</span>
+                      </div>
+                      {srv.phone && (
+                        <div className="flex items-center gap-1.5 truncate">
+                          <Phone className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          <span className="font-mono text-[11px] truncate">{srv.phone}</span>
+                          {srv.show_phone ? <span className="text-[9px] text-emerald-700 bg-emerald-100 px-1 rounded">Öffentlich</span> : <span className="text-[9px] text-slate-400 bg-slate-200 px-1 rounded">Privat</span>}
+                        </div>
+                      )}
+                      {srv.pricing_details && (
+                        <p className="text-[11px] text-amber-900 pt-1 border-t border-slate-200">
+                          <strong>Preise:</strong> {srv.pricing_details}
+                        </p>
+                      )}
+                      {srv.available_items && (
+                        <p className="text-[11px] text-slate-700">
+                          <strong>Material:</strong> {srv.available_items}
+                        </p>
+                      )}
+                      {srv.location_note && (
+                        <p className="text-[11px] text-slate-500">
+                          <strong>Ort:</strong> {srv.location_note}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">ID #{srv.id}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteService(srv.id, srv.name)}
+                      className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 cursor-pointer"
+                      title="Löschen"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =====================================================================
+          TAB 11: Spenden & Sponsoring (Donations & Sponsors)
+      ===================================================================== */}
+      {activeTab === 'donations' && (
+        <div className="space-y-6">
+          {/* Master Activation Card */}
+          <div className={`p-6 rounded-3xl border transition-all ${
+            donationSettings.is_active
+              ? 'bg-gradient-to-r from-emerald-500/10 via-emerald-50 to-teal-50 border-emerald-300'
+              : 'bg-gradient-to-r from-amber-50 to-slate-50 border-amber-300/80'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                    donationSettings.is_active
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-amber-500 text-white'
+                  }`}>
+                    {donationSettings.is_active ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{isDe ? 'Öffentlich aktiv' : 'Publicly Active'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>{isDe ? 'Deaktiviert (Nur Admin sichtbar)' : 'Hidden (Admin Only)'}</span>
+                      </>
+                    )}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {donationSettings.is_active
+                      ? (isDe ? 'Der Spenden-Button ist für alle Besucher im Menü sichtbar.' : 'The Donate button is visible to all visitors.')
+                      : (isDe ? 'Normale Besucher sehen keinen Spenden-Button oder Kontoinformationen.' : 'Visitors cannot see any donate button or bank info.')}
+                  </span>
+                </div>
+                <h2 className="text-lg font-black text-slate-900">
+                  {isDe ? 'Spenden- & Sponsoring-Option verwalten' : 'Manage Donations & Sponsorship'}
+                </h2>
+                <p className="text-xs text-slate-600 max-w-2xl">
+                  {isDe
+                    ? 'Hier kannst du festlegen, ob Spenden- und Sponsoren-Möglichkeiten auf der Website angezeigt werden. Solange dieser Schalter deaktiviert ist, erfährt kein Besucher von Spendenoptionen.'
+                    : 'Control whether donations and sponsorship links appear publicly. Keep it disabled until you are ready to accept contributions.'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDonationSettings(prev => ({ ...prev, is_active: !prev.is_active }));
+                  }}
+                  className={`px-5 py-2.5 rounded-2xl font-black text-xs transition-all shadow-sm flex items-center gap-2 cursor-pointer ${
+                    donationSettings.is_active
+                      ? 'bg-red-600 hover:bg-red-700 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  <Heart className="w-4 h-4 fill-current" />
+                  <span>
+                    {donationSettings.is_active
+                      ? (isDe ? 'Jetzt deaktivieren (Verstecken)' : 'Deactivate (Hide Publicly)')
+                      : (isDe ? 'Jetzt aktivieren (Öffentlich schalten)' : 'Activate (Make Public)')}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Form Settings */}
+          <form onSubmit={handleSaveDonationSettings} className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+            <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-rose-500" />
+                  <span>{isDe ? 'Spenden- & Zahlungsdetails konfigurieren' : 'Donation & Payment Details'}</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {isDe ? 'Diese Angaben werden im Spenden-Dialog angezeigt, sobald die Option aktiv ist.' : 'These details are shown in the donation dialog when active.'}
+                </p>
+              </div>
+              {donationSaveMsg && (
+                <div className="px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold animate-fade-in flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{donationSaveMsg}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Section 1: Texts */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">1. Allgemeine Texte & Aufruf</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    {isDe ? 'Titel des Spendenaufrufs' : 'Donation Title'}
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.title || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, title: e.target.value })}
+                    placeholder="Unterstütze das Badminton-Team der TU Chemnitz"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    {isDe ? 'Untertitel / Slogan' : 'Subtitle'}
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.subtitle || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, subtitle: e.target.value })}
+                    placeholder="Gemeinsam für Training, Ausrüstung & Turniere"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="font-bold text-slate-700 block mb-1 text-xs">
+                  {isDe ? 'Beschreibung / Verwendungszweck (Warum spenden?)' : 'Description (Why donate?)'}
+                </label>
+                <textarea
+                  rows={2}
+                  value={donationSettings.description || ''}
+                  onChange={(e) => setDonationSettings({ ...donationSettings, description: e.target.value })}
+                  placeholder="Deine Spende fließt zu 100 % in neue Federbälle, Trainingsausrüstung, Hallenkosten und Startgebühren für studentische Turniere."
+                  className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Section 2: PayPal */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">2. PayPal Spendenoption</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    PayPal.me Link
+                  </label>
+                  <input
+                    type="url"
+                    value={donationSettings.paypal_me_link || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, paypal_me_link: e.target.value })}
+                    placeholder="https://paypal.me/TUCChemnitzBadminton"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400">Ermöglicht Spenden per Klick über PayPal.</span>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    PayPal E-Mail-Adresse
+                  </label>
+                  <input
+                    type="email"
+                    value={donationSettings.paypal_email || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, paypal_email: e.target.value })}
+                    placeholder="spenden@tu-chemnitz-badminton.de"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400">Für manuelle PayPal-Überweisungen.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Bank Transfer (SEPA) */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">3. Banküberweisung (SEPA)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Kontoinhaber / Empfänger
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.bank_recipient || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, bank_recipient: e.target.value })}
+                    placeholder="TU Chemnitz Badminton Community"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Bankname
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.bank_name || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, bank_name: e.target.value })}
+                    placeholder="Sparkasse Chemnitz"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    IBAN
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.bank_iban || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, bank_iban: e.target.value })}
+                    placeholder="DE89 3705 0198 1234 5678 90"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    BIC / SWIFT
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.bank_bic || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, bank_bic: e.target.value })}
+                    placeholder="CHEMDEDDXXX"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none font-mono"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Empfohlener Verwendungszweck
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.bank_reference || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, bank_reference: e.target.value })}
+                    placeholder="Spende Badminton TU Chemnitz"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Section 4: Sponsor Partnerships */}
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">4. Unternehmenssponsoring & Partnerschaften</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Ansprechpartner / Sponsoring E-Mail
+                  </label>
+                  <input
+                    type="email"
+                    value={donationSettings.sponsor_email || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, sponsor_email: e.target.value })}
+                    placeholder="gandupradeep2026@gmail.com"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Sponsoring-Pakete / Hinweise
+                  </label>
+                  <input
+                    type="text"
+                    value={donationSettings.sponsor_info || ''}
+                    onChange={(e) => setDonationSettings({ ...donationSettings, sponsor_info: e.target.value })}
+                    placeholder="z.B. Trikot-Sponsoring, Turniersponsoring, Ausrüstungspartnerschaften"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#005A36] focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="submit"
+                disabled={savingDonation}
+                className="px-6 py-2.5 bg-[#005A36] hover:bg-[#00472A] text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50 text-xs"
+              >
+                {savingDonation ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Wird gespeichert...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>{isDe ? 'Spenden-Einstellungen speichern' : 'Save Donation Settings'}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

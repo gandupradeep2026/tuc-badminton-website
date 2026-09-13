@@ -15,7 +15,9 @@ import {
   ArrowRight,
   Sparkles,
   School,
-  Check
+  Check,
+  Wrench,
+  Package
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getApiUrl, safeFetchJson, saveOfflineSubmission, fileToDataUrl, getUploadUrl } from '../api/client';
@@ -64,6 +66,32 @@ export default function RegistrationPage({ onNavigate }) {
   const [trainerPhotoFile, setTrainerPhotoFile] = useState(null);
   const [trainerPhotoPreview, setTrainerPhotoPreview] = useState('');
   const [trainerPhotoUrl, setTrainerPhotoUrl] = useState('');
+
+  // -------------------------------------------------------------
+  // Service Provider Form State (Stringers & Sellers)
+  // -------------------------------------------------------------
+  const [serviceName, setServiceName] = useState('');
+  const [serviceEmail, setServiceEmail] = useState('');
+  const [servicePhone, setServicePhone] = useState('');
+  const [serviceShowPhone, setServiceShowPhone] = useState(true);
+  const [serviceTypes, setServiceTypes] = useState(['Schläger-Besaitungsservice']);
+  const [servicePricing, setServicePricing] = useState('');
+  const [serviceItems, setServiceItems] = useState('');
+  const [serviceLocation, setServiceLocation] = useState('Sporthalle Thüringer Weg 11');
+  const [serviceExperience, setServiceExperience] = useState('');
+  const [servicePhotoFile, setServicePhotoFile] = useState(null);
+  const [servicePhotoPreview, setServicePhotoPreview] = useState('');
+  const [servicePhotoUrl, setServicePhotoUrl] = useState('');
+
+  const toggleServiceType = (type) => {
+    if (serviceTypes.includes(type)) {
+      if (serviceTypes.length > 1) {
+        setServiceTypes(serviceTypes.filter((t) => t !== type));
+      }
+    } else {
+      setServiceTypes([...serviceTypes, type]);
+    }
+  };
 
   // Discipline toggle helper
   const toggleDiscipline = (disc) => {
@@ -237,6 +265,70 @@ export default function RegistrationPage({ onNavigate }) {
     }
   };
 
+  // -------------------------------------------------------------
+  // Handle Service Provider Submit (Stringers & Sellers)
+  // -------------------------------------------------------------
+  const handleSubmitService = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSubmitting(true);
+
+    if (!serviceName.trim() || !serviceEmail.trim() || !servicePhone.trim()) {
+      setErrorMsg(isDe ? 'Bitte fülle alle Pflichtfelder (Name, E-Mail, Telefon) aus.' : 'Please fill in all required fields (Name, Email, Phone).');
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      const payload = {
+        name: serviceName.trim(),
+        service_type: serviceTypes.join(', '),
+        email: serviceEmail.trim().toLowerCase(),
+        phone: servicePhone.trim(),
+        show_phone: serviceShowPhone ? 1 : 0,
+        pricing_details: servicePricing.trim(),
+        available_items: serviceItems.trim(),
+        location_note: serviceLocation.trim(),
+        experience_years: serviceExperience.trim(),
+      };
+
+      let photoDataUrl = servicePhotoUrl.trim();
+      if (servicePhotoFile) {
+        photoDataUrl = await fileToDataUrl(servicePhotoFile);
+      }
+
+      const formData = new FormData();
+      Object.entries(payload).forEach(([k, v]) => formData.append(k, v));
+      if (servicePhotoFile) {
+        formData.append('photo', servicePhotoFile);
+      } else if (photoDataUrl) {
+        formData.append('photo_url_input', photoDataUrl);
+      }
+
+      const result = await safeFetchJson('/api/register/equipment-service', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!result.ok) {
+        if (result.status === 409) {
+          setErrorMsg(result.error || (isDe 
+            ? 'Diese E-Mail-Adresse ist bereits als Ausrüster/Besaiter registriert. Keine doppelten Einträge möglich.' 
+            : 'This email address is already registered as an equipment provider. Duplicate entries are not allowed.'));
+          return;
+        }
+        throw new Error(result.error || (isDe ? 'Fehler beim Übermitteln der Ausrüster-Registrierung.' : 'Error submitting equipment service registration.'));
+      }
+
+      setIsOfflineSaved(false);
+      setSubmittedType('service');
+    } catch (err) {
+      setErrorMsg(err.message || (isDe ? 'Übermittlung fehlgeschlagen.' : 'Submission failed.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleResetForm = () => {
     setSubmittedType(null);
     setIsOfflineSaved(false);
@@ -251,7 +343,7 @@ export default function RegistrationPage({ onNavigate }) {
       setPlayerPhotoFile(null);
       setPlayerPhotoPreview('');
       setPlayerPhotoUrl('');
-    } else {
+    } else if (activeTab === 'trainer') {
       setTrainerName('');
       setTrainerEmail('');
       setTrainerPhone('');
@@ -263,6 +355,19 @@ export default function RegistrationPage({ onNavigate }) {
       setTrainerPhotoFile(null);
       setTrainerPhotoPreview('');
       setTrainerPhotoUrl('');
+    } else {
+      setServiceName('');
+      setServiceEmail('');
+      setServicePhone('');
+      setServiceShowPhone(true);
+      setServiceTypes(['Schläger-Besaitungsservice']);
+      setServicePricing('');
+      setServiceItems('');
+      setServiceLocation('Sporthalle Thüringer Weg 11');
+      setServiceExperience('');
+      setServicePhotoFile(null);
+      setServicePhotoPreview('');
+      setServicePhotoUrl('');
     }
   };
 
@@ -280,7 +385,11 @@ export default function RegistrationPage({ onNavigate }) {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-center gap-2">
               <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-[#005A36] border border-emerald-200">
-                {submittedType === 'player' ? (reg.badgePlayerSubmitted || '🏸 Spieler-Registrierung') : (reg.badgeTrainerSubmitted || '👥 Badminton-Trainer Registrierung')}
+                {submittedType === 'player' 
+                  ? (reg.badgePlayerSubmitted || '🏸 Spieler-Registrierung') 
+                  : (submittedType === 'trainer' 
+                      ? (reg.badgeTrainerSubmitted || '👥 Badminton-Trainer Registrierung')
+                      : (isDe ? '🏸 Ausrüster & Besaiter Registrierung' : '🏸 Stringer & Equipment Registration'))}
               </span>
               {isOfflineSaved && (
                 <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
@@ -294,7 +403,11 @@ export default function RegistrationPage({ onNavigate }) {
             <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
               {isOfflineSaved
                 ? (submittedType === 'player' ? (reg.msgOfflinePlayer || 'Ihre Spieler-Registrierung wurde sicher auf diesem Gerät gespeichert!') : (reg.msgOfflineTrainer || 'Ihre Trainer-Registrierung wurde sicher auf diesem Gerät gespeichert!'))
-                : (submittedType === 'player' ? reg.successPlayerDesc : reg.successTrainerDesc)
+                : (submittedType === 'player' 
+                    ? reg.successPlayerDesc 
+                    : (submittedType === 'trainer' 
+                        ? reg.successTrainerDesc 
+                        : (isDe ? 'Ihre Registrierung als Ausrüster / Besaiter wurde erfolgreich übermittelt! Nach redaktioneller Prüfung durch den Admin wird Ihr Profil im Ausrüstungsbereich freigeschaltet.' : 'Your equipment provider registration was successfully submitted! Once verified by the admin, your profile will be published.')))
               }
             </p>
           </div>
@@ -311,11 +424,15 @@ export default function RegistrationPage({ onNavigate }) {
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005A36] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                <span>{reg.step2}</span>
+                <span>{submittedType === 'service' 
+                  ? (isDe ? 'Der Admin prüft deine Angaben und schaltet deinen Service im Ausrüstungsbereich frei.' : 'The admin reviews your details and publishes your service in the equipment section.') 
+                  : reg.step2}</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005A36] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                <span>{reg.step3}</span>
+                <span>{submittedType === 'service'
+                  ? (isDe ? 'Spieler und Studierende der TU Chemnitz können dich für Besaitungen und Bälle direkt kontaktieren!' : 'Students and players can contact you directly for racket stringing and shuttles!')
+                  : reg.step3}</span>
               </li>
             </ul>
           </div>
@@ -331,9 +448,9 @@ export default function RegistrationPage({ onNavigate }) {
             </button>
             <button
               onClick={handleResetForm}
-              className="w-full sm:w-auto px-5 py-3 min-h-[46px] rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+              className="w-full sm:w-auto px-6 py-3 min-h-[46px] rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
             >
-              {reg.btnAnother}
+              {reg.btnNewRegistration}
             </button>
           </div>
         </div>
@@ -362,7 +479,7 @@ export default function RegistrationPage({ onNavigate }) {
       </div>
 
       {/* Role Selection Tabs */}
-      <div className="grid grid-cols-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 text-xs sm:text-sm font-bold shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 text-xs sm:text-sm font-bold shadow-xs">
         <button
           type="button"
           onClick={() => { setActiveTab('player'); setErrorMsg(''); }}
@@ -384,6 +501,17 @@ export default function RegistrationPage({ onNavigate }) {
           }`}
         >
           <span>{reg.tabTrainer}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { setActiveTab('service'); setErrorMsg(''); }}
+          className={`py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[46px] ${
+            activeTab === 'service'
+              ? 'bg-[#005A36] text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+          }`}
+        >
+          <span>🏸 {isDe ? 'Besaitung & Ausrüstung' : 'Stringing & Gear'}</span>
         </button>
       </div>
 
@@ -955,6 +1083,242 @@ export default function RegistrationPage({ onNavigate }) {
             >
               <ShieldCheck className="w-5 h-5" />
               <span>{submitting ? reg.submitting : reg.submitTrainerBtn}</span>
+            </button>
+          </div>
+
+        </form>
+      )}
+
+      {/* ========================================================= */}
+      {/* 3. EQUIPMENT SERVICE PROVIDER REGISTRATION FORM            */}
+      {/* ========================================================= */}
+      {activeTab === 'service' && (
+        <form onSubmit={handleSubmitService} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
+          
+          <div className="border-b border-slate-100 pb-4">
+            <h2 className="font-display font-black text-xl text-slate-900 flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-[#005A36]" />
+              <span>{isDe ? 'Besaitungsservice & Ausrüstungs-Anbieter' : 'Equipment & Stringing Provider Registration'}</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {isDe 
+                ? 'Trage dich als Besaiter oder Material-Anbieter für die Badminton-Community der TU Chemnitz ein. Nach Prüfung durch den Admin wird dein Profil veröffentlicht.'
+                : 'Register as a racket stringer or equipment provider for the TU Chemnitz badminton community.'}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-xs sm:text-sm">
+            
+            {/* Full Name */}
+            <div>
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {isDe ? 'Vollständiger Name / Anbietername' : 'Full Name / Provider Name'} *
+              </label>
+              <input
+                type="text"
+                required
+                value={serviceName}
+                onChange={(e) => setServiceName(e.target.value)}
+                placeholder={isDe ? 'z. B. Max Mustermann' : 'e.g. John Doe'}
+                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+              />
+            </div>
+
+            {/* Email Address */}
+            <div>
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {reg.emailLabel} *
+              </label>
+              <input
+                type="email"
+                required
+                value={serviceEmail}
+                onChange={(e) => setServiceEmail(e.target.value)}
+                placeholder="ihre.email@s2022.tu-chemnitz.de"
+                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs"
+              />
+            </div>
+
+            {/* Phone / WhatsApp */}
+            <div>
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {reg.phoneLabel} (WhatsApp) *
+              </label>
+              <input
+                type="tel"
+                required
+                value={servicePhone}
+                onChange={(e) => setServicePhone(e.target.value)}
+                placeholder="+49 176 12345678"
+                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs"
+              />
+              <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={serviceShowPhone}
+                  onChange={(e) => setServiceShowPhone(e.target.checked)}
+                  className="rounded text-[#005A36] focus:ring-[#005A36] w-4 h-4"
+                />
+                <span className="text-xs text-slate-600">
+                  {isDe ? 'Telefonnummer & WhatsApp öffentlich auf der Website für Anfragen anzeigen' : 'Show phone & WhatsApp publicly for player inquiries'}
+                </span>
+              </label>
+            </div>
+
+            {/* Handoff Location / Campus presence */}
+            <div>
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {isDe ? 'Übergabeort / Campus-Präsenz' : 'Handoff Location / Campus presence'}
+              </label>
+              <input
+                type="text"
+                value={serviceLocation}
+                onChange={(e) => setServiceLocation(e.target.value)}
+                placeholder={isDe ? 'z. B. Sporthalle Thüringer Weg 11 (Mo & Fr)' : 'e.g. Sporthalle Thüringer Weg (Mon & Fri)'}
+                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+              />
+            </div>
+
+            {/* Services Offered Checkboxes */}
+            <div className="sm:col-span-2">
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {isDe ? 'Angebotene Leistungen (mehrere wählbar)' : 'Services Offered (select all that apply)'}
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: 'Schläger-Besaitungsservice', label: isDe ? '🏸 Besaitungsservice' : '🏸 Racket Stringing' },
+                  { id: 'Federball-Verkauf', label: isDe ? '🪶 Federball-Verkauf' : '🪶 Shuttlecocks' },
+                  { id: 'Schläger-Verkauf & Beratung', label: isDe ? '🎾 Schläger-Verkauf' : '🎾 Rackets' },
+                  { id: 'Griffbänder & Zubehör', label: isDe ? '🔧 Griffbänder & Zubehör' : '🔧 Grips & Accessories' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => toggleServiceType(item.id)}
+                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center ${
+                      serviceTypes.includes(item.id)
+                        ? 'bg-[#005A36] text-white border-[#005A36] shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pricing / Rates Details */}
+            <div className="sm:col-span-2">
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {isDe ? 'Preise & Gebühren (z. B. Besaitungslohn, Bälle)' : 'Pricing & Service Rates'}
+              </label>
+              <textarea
+                rows={2}
+                value={servicePricing}
+                onChange={(e) => setServicePricing(e.target.value)}
+                placeholder={isDe 
+                  ? 'z. B. 12€ Bespannung bei mitgebrachter Saite; 18€ inkl. Yonex BG80 / Aerobite; 28€ Rolle Victor Federbälle'
+                  : 'e.g. 12€ stringing with own string; 18€ incl. Yonex BG80; 28€ Victor shuttles tube'}
+                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium text-xs leading-relaxed"
+              />
+            </div>
+
+            {/* Available Strings, Shuttles & Gear */}
+            <div>
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {isDe ? 'Verfügbare Saiten & Ballmarken' : 'Available Strings & Shuttle Brands'}
+              </label>
+              <input
+                type="text"
+                value={serviceItems}
+                onChange={(e) => setServiceItems(e.target.value)}
+                placeholder={isDe ? 'z. B. Yonex BG80, BG65, Aerobite; Victor Champion Shuttles' : 'e.g. Yonex BG80, Aerobite, Victor Champion'}
+                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium text-xs"
+              />
+            </div>
+
+            {/* Machine & Experience */}
+            <div>
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {isDe ? 'Besaitungsmaschine / Erfahrung' : 'Stringing Machine / Experience'}
+              </label>
+              <input
+                type="text"
+                value={serviceExperience}
+                onChange={(e) => setServiceExperience(e.target.value)}
+                placeholder={isDe ? 'z. B. Elektronische 6-Punkt-Maschine / 4 Jahre Erfahrung' : 'e.g. Electronic constant pull machine / 4 years exp'}
+                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium text-xs"
+              />
+            </div>
+
+            {/* Photo / Logo Upload */}
+            <div className="sm:col-span-2">
+              <label className="font-bold text-slate-700 block mb-1.5">
+                {isDe ? 'Profilfoto oder Logo (optional)' : 'Profile Photo or Logo (optional)'}
+              </label>
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                  {servicePhotoPreview || (servicePhotoUrl && getUploadUrl(servicePhotoUrl)) ? (
+                    <img
+                      src={servicePhotoPreview || getUploadUrl(servicePhotoUrl)}
+                      alt="Service Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Wrench className="w-6 h-6 text-slate-400" />
+                  )}
+                </div>
+
+                <div className="space-y-2 flex-1 w-full">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setServicePhotoFile(file);
+                        const reader = new FileReader();
+                        reader.onload = () => setServicePhotoPreview(reader.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#005A36] file:text-white hover:file:bg-[#00472A] cursor-pointer"
+                  />
+                  <input
+                    type="url"
+                    value={servicePhotoUrl}
+                    onChange={(e) => {
+                      setServicePhotoUrl(e.target.value);
+                      if (e.target.value) setServicePhotoPreview('');
+                    }}
+                    placeholder={reg.photoUrlPlaceholder}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Admin Approval Notice Banner */}
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex items-center gap-3">
+            <ShieldCheck className="w-5 h-5 text-[#005A36] flex-shrink-0" />
+            <p>
+              <strong>{isDe ? 'Admin-Freigabe:' : 'Admin Verification:'}</strong> {isDe
+                ? 'Deine Angaben werden vom Administrator geprüft und anschließend im Bereich "Besaitung & Ausrüstung" für alle sichtbar geschaltet.'
+                : 'Your registration will be verified by the admin and then published in the "Equipment & Stringing" directory.'}
+            </p>
+          </div>
+
+          {/* Submit Button */}
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3.5 px-6 rounded-2xl font-black text-sm sm:text-base text-white bg-[#005A36] hover:bg-[#00472A] active:bg-[#003820] transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Wrench className="w-5 h-5" />
+              <span>{submitting ? reg.submitting : (isDe ? 'Als Ausrüster / Besaiter registrieren' : 'Submit Equipment Registration')}</span>
             </button>
           </div>
 

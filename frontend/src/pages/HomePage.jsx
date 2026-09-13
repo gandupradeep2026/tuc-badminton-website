@@ -160,6 +160,13 @@ export default function HomePage({ onNavigate }) {
               <span>{h.ctaTournaments}</span>
               <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
             </button>
+            <button
+              onClick={() => onNavigate('services')}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-[#00472A] border border-white/20 text-white hover:bg-white/10 active:bg-white/20 transition-colors"
+            >
+              <span>{isDe ? '🏸 Besaitung & Ausrüstung' : '🏸 Stringing & Gear'}</span>
+              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+            </button>
           </div>
         </div>
 

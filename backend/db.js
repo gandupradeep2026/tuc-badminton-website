@@ -146,6 +146,56 @@ export function initDatabase() {
     );
   `);
 
+  // 0f. Equipment Services & Stringers / Shuttle Sellers Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS equipment_services (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      service_type TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      show_phone INTEGER DEFAULT 1,
+      pricing_details TEXT,
+      available_items TEXT,
+      location_note TEXT,
+      experience_years TEXT,
+      photo_url TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // 0g. Donation & Sponsorship Settings Table (Default: INACTIVE / Hidden for public)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS donation_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      is_active INTEGER DEFAULT 0,
+      title TEXT NOT NULL DEFAULT 'Unterstütze das Badminton-Team der TU Chemnitz',
+      subtitle TEXT DEFAULT 'Gemeinsam für Training, Ausrüstung & Turniere',
+      description TEXT DEFAULT 'Als universitäre Badminton-Gemeinschaft finanzieren wir Trainingsbälle, Ausrüstung und Turnierfahrten für Studierende. Deine Unterstützung hilft uns, den Badmintonsport an der TU Chemnitz weiterzuentwickeln!',
+      paypal_me_link TEXT DEFAULT '',
+      paypal_email TEXT DEFAULT '',
+      bank_recipient TEXT DEFAULT 'TU Chemnitz Badminton Community',
+      bank_iban TEXT DEFAULT '',
+      bank_bic TEXT DEFAULT '',
+      bank_name TEXT DEFAULT '',
+      bank_reference TEXT DEFAULT 'Spende Badminton TU Chemnitz',
+      sponsor_email TEXT DEFAULT 'gandupradeep2026@gmail.com',
+      sponsor_info TEXT DEFAULT 'Möchten Sie oder Ihr Unternehmen das Badminton-Team der TU Chemnitz als offizieller Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.',
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Seed default donation settings if empty (with is_active = 0)
+  const existingDonation = db.prepare('SELECT id FROM donation_settings WHERE id = 1').get();
+  if (!existingDonation) {
+    db.prepare(`
+      INSERT INTO donation_settings (id, is_active, title, subtitle, description, paypal_me_link, paypal_email, bank_recipient, bank_iban, bank_bic, bank_name, bank_reference, sponsor_email, sponsor_info)
+      VALUES (1, 0, 'Unterstütze das Badminton-Team der TU Chemnitz', 'Gemeinsam für Training, Ausrüstung & Turniere', 'Als universitäre Badminton-Gemeinschaft finanzieren wir Trainingsbälle, Ausrüstung und Turnierfahrten für Studierende. Deine Unterstützung hilft uns, den Badmintonsport an der TU Chemnitz weiterzuentwickeln!', '', '', 'TU Chemnitz Badminton Community', '', '', '', 'Spende Badminton TU Chemnitz', 'gandupradeep2026@gmail.com', 'Möchten Sie oder Ihr Unternehmen das Badminton-Team der TU Chemnitz als offizieller Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.')
+    `).run();
+  }
+
   // Seed default admin password if empty (default: tuc-badminton-admin)
   const existingAdmin = db.prepare('SELECT id FROM admin_settings WHERE id = 1').get();
   if (!existingAdmin) {
@@ -1377,6 +1427,267 @@ export function createPartnerRequest({
 
 export function getAllPartnerRequests() {
   return db.prepare('SELECT * FROM partner_requests ORDER BY created_at DESC').all();
+}
+
+// -------------------------------------------------------------
+// Equipment Services (Stringers, Shuttles, Rackets & Accessories)
+// -------------------------------------------------------------
+export function getAllEquipmentServices() {
+  return db.prepare("SELECT * FROM equipment_services WHERE status = 'approved' ORDER BY id ASC").all();
+}
+
+export function getPendingEquipmentServices() {
+  return db.prepare("SELECT * FROM equipment_services WHERE status = 'pending' ORDER BY created_at DESC").all();
+}
+
+export function getEquipmentServiceById(id) {
+  if (!id) return null;
+  return db.prepare('SELECT * FROM equipment_services WHERE id = ?').get(id);
+}
+
+export function getEquipmentServiceByEmail(email) {
+  if (!email) return null;
+  return db.prepare('SELECT * FROM equipment_services WHERE LOWER(email) = LOWER(?)').get(email.trim());
+}
+
+export function registerEquipmentServiceSubmission({
+  name,
+  service_type,
+  email,
+  phone,
+  show_phone,
+  pricing_details,
+  available_items,
+  location_note,
+  experience_years,
+  photo_url,
+}) {
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = getEquipmentServiceByEmail(cleanEmail);
+  if (existing) {
+    if (existing.status === 'approved') {
+      throw new Error('Ein Dienstleister- oder Besaiterprofil mit dieser E-Mail-Adresse existiert bereits.');
+    }
+    // Update existing pending application while retaining original created_at timestamp
+    const updateStmt = db.prepare(`
+      UPDATE equipment_services SET
+        name = ?,
+        service_type = ?,
+        phone = ?,
+        show_phone = ?,
+        pricing_details = ?,
+        available_items = ?,
+        location_note = ?,
+        experience_years = ?,
+        photo_url = CASE WHEN ? != '' THEN ? ELSE photo_url END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    updateStmt.run(
+      name ? name.trim() : existing.name,
+      service_type ? service_type.trim() : existing.service_type,
+      phone ? phone.trim() : existing.phone,
+      show_phone !== undefined ? (show_phone ? 1 : 0) : existing.show_phone,
+      pricing_details ? pricing_details.trim() : existing.pricing_details,
+      available_items ? available_items.trim() : existing.available_items,
+      location_note ? location_note.trim() : existing.location_note,
+      experience_years ? experience_years.trim() : existing.experience_years,
+      photo_url || '',
+      photo_url || '',
+      existing.id
+    );
+    return db.prepare('SELECT * FROM equipment_services WHERE id = ?').get(existing.id);
+  }
+
+  const stmt = db.prepare(`
+    INSERT INTO equipment_services (
+      name, service_type, email, phone, show_phone,
+      pricing_details, available_items, location_note, experience_years, photo_url, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+  `);
+  const result = stmt.run(
+    name.trim(),
+    service_type ? service_type.trim() : 'Besaitungsservice & Ausrüstung',
+    cleanEmail,
+    phone ? phone.trim() : '',
+    show_phone !== undefined ? (show_phone ? 1 : 0) : 1,
+    pricing_details ? pricing_details.trim() : '',
+    available_items ? available_items.trim() : '',
+    location_note ? location_note.trim() : '',
+    experience_years ? experience_years.trim() : '',
+    photo_url || ''
+  );
+  return db.prepare('SELECT * FROM equipment_services WHERE id = ?').get(result.lastInsertRowid);
+}
+
+export function approveEquipmentService(id) {
+  db.prepare("UPDATE equipment_services SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
+  return db.prepare('SELECT * FROM equipment_services WHERE id = ?').get(id);
+}
+
+export function rejectEquipmentService(id) {
+  return db.prepare('DELETE FROM equipment_services WHERE id = ?').run(id);
+}
+
+export function createEquipmentService({
+  name,
+  service_type,
+  email,
+  phone,
+  show_phone,
+  pricing_details,
+  available_items,
+  location_note,
+  experience_years,
+  photo_url,
+  status,
+}) {
+  const stmt = db.prepare(`
+    INSERT INTO equipment_services (
+      name, service_type, email, phone, show_phone,
+      pricing_details, available_items, location_note, experience_years, photo_url, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const result = stmt.run(
+    name.trim(),
+    service_type || 'Besaitungsservice',
+    email.trim().toLowerCase(),
+    phone ? phone.trim() : '',
+    show_phone !== undefined ? (show_phone ? 1 : 0) : 1,
+    pricing_details || '',
+    available_items || '',
+    location_note || '',
+    experience_years || '',
+    photo_url || '',
+    status || 'approved'
+  );
+  return db.prepare('SELECT * FROM equipment_services WHERE id = ?').get(result.lastInsertRowid);
+}
+
+export function updateEquipmentService(id, data) {
+  const existing = db.prepare('SELECT * FROM equipment_services WHERE id = ?').get(id);
+  if (!existing) throw new Error(`Equipment Service #${id} not found`);
+  const stmt = db.prepare(`
+    UPDATE equipment_services SET
+      name = ?,
+      service_type = ?,
+      email = ?,
+      phone = ?,
+      show_phone = ?,
+      pricing_details = ?,
+      available_items = ?,
+      location_note = ?,
+      experience_years = ?,
+      photo_url = CASE WHEN ? != '' THEN ? ELSE photo_url END,
+      status = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  stmt.run(
+    data.name !== undefined ? data.name.trim() : existing.name,
+    data.service_type !== undefined ? data.service_type.trim() : existing.service_type,
+    data.email !== undefined ? data.email.trim().toLowerCase() : existing.email,
+    data.phone !== undefined ? data.phone.trim() : existing.phone,
+    data.show_phone !== undefined ? (data.show_phone ? 1 : 0) : existing.show_phone,
+    data.pricing_details !== undefined ? data.pricing_details.trim() : existing.pricing_details,
+    data.available_items !== undefined ? data.available_items.trim() : existing.available_items,
+    data.location_note !== undefined ? data.location_note.trim() : existing.location_note,
+    data.experience_years !== undefined ? data.experience_years.trim() : existing.experience_years,
+    data.photo_url || '',
+    data.photo_url || '',
+    data.status !== undefined ? data.status : existing.status,
+    id
+  );
+  return db.prepare('SELECT * FROM equipment_services WHERE id = ?').get(id);
+}
+
+export function deleteEquipmentService(id) {
+  return db.prepare('DELETE FROM equipment_services WHERE id = ?').run(id);
+}
+
+// -------------------------------------------------------------
+// Donation & Sponsorship Settings
+// -------------------------------------------------------------
+export function getDonationSettings() {
+  const row = db.prepare('SELECT * FROM donation_settings WHERE id = 1').get();
+  if (!row) {
+    return {
+      id: 1,
+      is_active: 0,
+      title: 'Unterstütze das Badminton-Team der TU Chemnitz',
+      subtitle: 'Gemeinsam für Training, Ausrüstung & Turniere',
+      description: 'Als universitäre Badminton-Gemeinschaft finanzieren wir Trainingsbälle, Ausrüstung und Turnierfahrten für Studierende. Deine Unterstützung hilft uns, den Badmintonsport an der TU Chemnitz weiterzuentwickeln!',
+      paypal_me_link: '',
+      paypal_email: '',
+      bank_recipient: 'TU Chemnitz Badminton Community',
+      bank_iban: '',
+      bank_bic: '',
+      bank_name: '',
+      bank_reference: 'Spende Badminton TU Chemnitz',
+      sponsor_email: 'gandupradeep2026@gmail.com',
+      sponsor_info: 'Möchten Sie oder Ihr Unternehmen das Badminton-Team der TU Chemnitz als offizieller Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.',
+    };
+  }
+  return {
+    ...row,
+    is_active: Boolean(row.is_active),
+  };
+}
+
+export function updateDonationSettings({
+  is_active,
+  title,
+  subtitle,
+  description,
+  paypal_me_link,
+  paypal_email,
+  bank_recipient,
+  bank_iban,
+  bank_bic,
+  bank_name,
+  bank_reference,
+  sponsor_email,
+  sponsor_info,
+}) {
+  const existing = getDonationSettings();
+  const stmt = db.prepare(`
+    INSERT INTO donation_settings (
+      id, is_active, title, subtitle, description, paypal_me_link, paypal_email,
+      bank_recipient, bank_iban, bank_bic, bank_name, bank_reference,
+      sponsor_email, sponsor_info, updated_at
+    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      is_active = excluded.is_active,
+      title = excluded.title,
+      subtitle = excluded.subtitle,
+      description = excluded.description,
+      paypal_me_link = excluded.paypal_me_link,
+      paypal_email = excluded.paypal_email,
+      bank_recipient = excluded.bank_recipient,
+      bank_iban = excluded.bank_iban,
+      bank_bic = excluded.bank_bic,
+      bank_name = excluded.bank_name,
+      bank_reference = excluded.bank_reference,
+      sponsor_email = excluded.sponsor_email,
+      sponsor_info = excluded.sponsor_info,
+      updated_at = CURRENT_TIMESTAMP
+  `);
+  stmt.run(
+    is_active !== undefined ? (is_active ? 1 : 0) : (existing.is_active ? 1 : 0),
+    title !== undefined ? title.trim() : existing.title,
+    subtitle !== undefined ? subtitle.trim() : existing.subtitle,
+    description !== undefined ? description.trim() : existing.description,
+    paypal_me_link !== undefined ? paypal_me_link.trim() : (existing.paypal_me_link || ''),
+    paypal_email !== undefined ? paypal_email.trim().toLowerCase() : (existing.paypal_email || ''),
+    bank_recipient !== undefined ? bank_recipient.trim() : (existing.bank_recipient || ''),
+    bank_iban !== undefined ? bank_iban.trim().toUpperCase() : (existing.bank_iban || ''),
+    bank_bic !== undefined ? bank_bic.trim().toUpperCase() : (existing.bank_bic || ''),
+    bank_name !== undefined ? bank_name.trim() : (existing.bank_name || ''),
+    bank_reference !== undefined ? bank_reference.trim() : (existing.bank_reference || ''),
+    sponsor_email !== undefined ? sponsor_email.trim().toLowerCase() : (existing.sponsor_email || ''),
+    sponsor_info !== undefined ? sponsor_info.trim() : (existing.sponsor_info || '')
+  );
+  return getDonationSettings();
 }
 
 export { db };

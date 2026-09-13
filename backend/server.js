@@ -66,6 +66,17 @@ import {
   registerPlayerSubmission,
   createPartnerRequest,
   getAllPartnerRequests,
+  getAllEquipmentServices,
+  getPendingEquipmentServices,
+  getEquipmentServiceById,
+  registerEquipmentServiceSubmission,
+  approveEquipmentService,
+  rejectEquipmentService,
+  createEquipmentService,
+  updateEquipmentService,
+  deleteEquipmentService,
+  getDonationSettings,
+  updateDonationSettings,
 } from './db.js';
 import { sendPasswordResetEmail, sendPartnerRequestEmail } from './mailer.js';
 
@@ -337,6 +348,39 @@ app.put('/api/admin/announcement', requireAdmin, (req, res) => {
     res.json({ success: true, announcement: updated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update announcement' });
+  }
+});
+
+// Public: Get Donation & Sponsorship Settings (returns is_active, details only if is_active is true)
+app.get('/api/donation-settings', (req, res) => {
+  try {
+    const settings = getDonationSettings();
+    if (!settings.is_active) {
+      return res.json({ is_active: false });
+    }
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve donation settings' });
+  }
+});
+
+// Admin: Get Donation & Sponsorship Settings (always returns full settings)
+app.get('/api/admin/donation-settings', requireAdmin, (req, res) => {
+  try {
+    const settings = getDonationSettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve donation settings' });
+  }
+});
+
+// Admin: Update Donation & Sponsorship Settings (toggle is_active and details)
+app.put('/api/admin/donation-settings', requireAdmin, (req, res) => {
+  try {
+    const updated = updateDonationSettings(req.body);
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update donation settings' });
   }
 });
 
@@ -634,6 +678,109 @@ app.put('/api/players/:id', requireAdmin, upload.single('photo'), (req, res) => 
   } catch (err) {
     console.error('Error updating player:', err);
     res.status(500).json({ error: err.message || 'Failed to update player' });
+  }
+});
+
+// -------------------------------------------------------------
+// Equipment Services & Stringers / Shuttle Sellers Endpoints
+// -------------------------------------------------------------
+app.get('/api/equipment-services', (req, res) => {
+  try {
+    const services = getAllEquipmentServices();
+    res.json(services);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve equipment services' });
+  }
+});
+
+app.get('/api/admin/equipment-services', requireAdmin, (req, res) => {
+  try {
+    const services = getAllEquipmentServices();
+    res.json(services);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve admin equipment services' });
+  }
+});
+
+app.get('/api/admin/equipment-services/pending', requireAdmin, (req, res) => {
+  try {
+    const pending = getPendingEquipmentServices();
+    res.json(pending);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve pending equipment services' });
+  }
+});
+
+app.post('/api/admin/equipment-services/:id/approve', requireAdmin, (req, res) => {
+  try {
+    const approved = approveEquipmentService(Number(req.params.id));
+    res.json({ success: true, service: approved });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to approve equipment service' });
+  }
+});
+
+app.delete('/api/admin/equipment-services/:id/reject', requireAdmin, (req, res) => {
+  try {
+    rejectEquipmentService(Number(req.params.id));
+    res.json({ success: true, message: 'Equipment service registration rejected' });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to reject equipment service' });
+  }
+});
+
+app.post('/api/admin/equipment-services', requireAdmin, upload.single('photo'), (req, res) => {
+  try {
+    const {
+      name, service_type, email, phone, show_phone,
+      pricing_details, available_items, location_note, experience_years, photo_url_input
+    } = req.body;
+    let photo_url = photo_url_input || '';
+    if (req.file) photo_url = `/uploads/${req.file.filename}`;
+
+    const isShowPhone = show_phone !== undefined ? (show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0) : 1;
+
+    const created = createEquipmentService({
+      name: name.trim(),
+      service_type: service_type || 'Besaitungsservice & Ausrüstung',
+      email: email ? email.trim().toLowerCase() : '',
+      phone: phone ? phone.trim() : '',
+      show_phone: isShowPhone,
+      pricing_details,
+      available_items,
+      location_note,
+      experience_years,
+      photo_url,
+      status: 'approved',
+    });
+    res.status(201).json({ success: true, service: created });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to create equipment service' });
+  }
+});
+
+app.put('/api/admin/equipment-services/:id', requireAdmin, upload.single('photo'), (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const data = { ...req.body };
+    if (req.file) {
+      data.photo_url = `/uploads/${req.file.filename}`;
+    } else if (data.photo_url_input) {
+      data.photo_url = data.photo_url_input;
+    }
+    const updated = updateEquipmentService(id, data);
+    res.json({ success: true, service: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to update equipment service' });
+  }
+});
+
+app.delete('/api/admin/equipment-services/:id', requireAdmin, (req, res) => {
+  try {
+    deleteEquipmentService(Number(req.params.id));
+    res.json({ success: true, message: 'Equipment service removed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to delete equipment service' });
   }
 });
 
@@ -1381,6 +1528,73 @@ app.post('/api/register/trainer', upload.single('photo'), (req, res) => {
   }
 });
 
+// 2c. Public Equipment Service / Stringer Registration Submission
+app.post('/api/register/equipment-service', upload.single('photo'), (req, res) => {
+  try {
+    const {
+      name,
+      service_type,
+      email,
+      phone,
+      show_phone,
+      pricing_details,
+      available_items,
+      location_note,
+      experience_years,
+      photo_url_input,
+    } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name / Anbietername ist erforderlich.' });
+    }
+    if (!email || !email.trim() || !email.includes('@')) {
+      return res.status(400).json({ error: 'Eine gültige E-Mail-Adresse ist erforderlich.' });
+    }
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ error: 'Telefonnummer / WhatsApp ist erforderlich.' });
+    }
+
+    let photo_url = '';
+    if (req.file) {
+      photo_url = `/uploads/${req.file.filename}`;
+    } else if (photo_url_input && photo_url_input.trim()) {
+      const inputUrl = photo_url_input.trim();
+      if (inputUrl.startsWith('data:image/')) {
+        photo_url = saveBase64Image(inputUrl, 'service_photo');
+      } else {
+        photo_url = inputUrl;
+      }
+    }
+
+    const isShowPhone = show_phone === '1' || show_phone === 1 || show_phone === 'true' || show_phone === true;
+
+    const created = registerEquipmentServiceSubmission({
+      name: name.trim(),
+      service_type: service_type ? service_type.trim() : 'Besaitungsservice & Ausrüstung',
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      show_phone: isShowPhone,
+      pricing_details: pricing_details ? pricing_details.trim() : '',
+      available_items: available_items ? available_items.trim() : '',
+      location_note: location_note ? location_note.trim() : '',
+      experience_years: experience_years ? experience_years.trim() : '',
+      photo_url,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Ihre Registrierung als Ausrüster / Besaiter wurde erfolgreich eingereicht! Nach Prüfung durch den Admin wird Ihr Profil im Ausrüstungsbereich freigeschaltet.',
+      service: created,
+    });
+  } catch (err) {
+    console.error('Error in equipment service registration:', err);
+    if (err.message && err.message.includes('existiert bereits')) {
+      return res.status(409).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Fehler bei der Registrierung.' });
+  }
+});
+
 // Rate limiting map for partner requests: ip -> timestamps[]
 const partnerRequestLimits = new Map();
 
@@ -1476,15 +1690,39 @@ app.get('/api/admin/partner-requests', requireAdmin, (req, res) => {
   }
 });
 
-// 3. Admin: Get all pending registrations (players & trainers)
+// 3. Admin: Get all pending registrations (players, trainers, equipment services)
 app.get('/api/admin/registrations', requireAdmin, (req, res) => {
   try {
     const players = getPendingPlayers();
     const trainers = getPendingTrainers();
-    res.json({ players, trainers });
+    const services = getPendingEquipmentServices();
+    res.json({ players, trainers, services });
   } catch (err) {
     console.error('Error fetching pending registrations:', err);
     res.status(500).json({ error: 'Fehler beim Laden der offenen Registrierungen.' });
+  }
+});
+
+// 3b. Admin: Approve Equipment Service from registrations view
+app.post('/api/admin/registrations/services/:id/approve', requireAdmin, (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const approved = approveEquipmentService(id);
+    if (!approved) return res.status(404).json({ error: 'Ausrüster/Besaiter nicht gefunden.' });
+    res.json({ success: true, message: `Ausrüster/Besaiter ${approved.name} erfolgreich freigeschaltet!`, service: approved });
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler bei der Freigabe.' });
+  }
+});
+
+// 3c. Admin: Reject Equipment Service from registrations view
+app.post('/api/admin/registrations/services/:id/reject', requireAdmin, (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    rejectEquipmentService(id);
+    res.json({ success: true, message: 'Registrierung abgelehnt und entfernt.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Ablehnen.' });
   }
 });
 
