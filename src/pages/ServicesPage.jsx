@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { safeFetchJson, getUploadUrl } from '../api/client';
+import InquiryModal from '../components/InquiryModal';
 
 export default function ServicesPage({ onNavigate }) {
   const { language } = useLanguage();
@@ -24,6 +25,7 @@ export default function ServicesPage({ onNavigate }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'stringing' | 'shuttles' | 'rackets'
+  const [inquiryTarget, setInquiryTarget] = useState(null);
 
   const fetchServices = async () => {
     try {
@@ -269,36 +271,21 @@ export default function ServicesPage({ onNavigate }) {
                   )}
                 </div>
 
-                {/* Direct Contact Buttons */}
-                <div className="pt-3 border-t border-slate-100 space-y-1.5">
-                  <a
-                    href={`mailto:${srv.email}?subject=${encodeURIComponent(isDe ? 'Anfrage Besaitung / Badminton-Ausrüstung TU Chemnitz' : 'Inquiry Badminton Stringing / Equipment TU Chemnitz')}`}
-                    className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] transition-colors shadow-xs"
+                {/* Protected Contact / Inquiry Action (Privacy Shield: direct email/phone hidden) */}
+                <div className="pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setInquiryTarget({
+                      id: srv.id,
+                      type: 'service',
+                      name: srv.name,
+                      subtitle: srv.service_type,
+                    })}
+                    className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] active:scale-[0.98] transition-all shadow-xs cursor-pointer min-h-[44px]"
                   >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span className="truncate">{srv.email}</span>
-                  </a>
-
-                  {srv.phone && (srv.show_phone === 1 || srv.show_phone === true || srv.show_phone === '1') && (
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <a
-                        href={`https://wa.me/${srv.phone.replace(/[^0-9]/g, '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-                      >
-                        <span>WhatsApp</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                      <a
-                        href={`tel:${srv.phone}`}
-                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors"
-                      >
-                        <Phone className="w-3 h-3 text-[#005A36]" />
-                        <span>{isDe ? 'Anrufen' : 'Call'}</span>
-                      </a>
-                    </div>
-                  )}
+                    <Mail className="w-4 h-4 flex-shrink-0" />
+                    <span>{isDe ? 'Besaitung / Ausrüstung anfragen' : 'Request Service / Inquiry'}</span>
+                  </button>
                 </div>
 
               </div>
@@ -326,12 +313,19 @@ export default function ServicesPage({ onNavigate }) {
         {onNavigate && (
           <button
             onClick={() => onNavigate('register')}
-            className="px-5 py-3 rounded-xl font-black text-xs sm:text-sm text-[#005A36] bg-white hover:bg-emerald-50 transition-colors whitespace-nowrap shadow-sm flex-shrink-0"
+            className="px-5 py-3 rounded-xl font-black text-xs sm:text-sm text-[#005A36] bg-white hover:bg-emerald-50 transition-colors whitespace-nowrap shadow-sm flex-shrink-0 cursor-pointer"
           >
             {isDe ? 'Jetzt als Partner eintragen' : 'Join as Equipment Partner'}
           </button>
         )}
       </div>
+
+      {/* Inquiry Modal */}
+      <InquiryModal
+        isOpen={!!inquiryTarget}
+        onClose={() => setInquiryTarget(null)}
+        target={inquiryTarget}
+      />
 
     </div>
   );

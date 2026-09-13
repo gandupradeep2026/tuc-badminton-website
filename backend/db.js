@@ -229,6 +229,56 @@ export function initDatabase() {
     );
   `);
 
+  // Ensure trainers table has all modern fields
+  const trainerCols = db.prepare(`PRAGMA table_info(trainers)`).all().map(c => c.name);
+  if (!trainerCols.includes('trainer_type')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN trainer_type TEXT DEFAULT 'usz';`);
+  }
+  if (!trainerCols.includes('hourly_rate')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN hourly_rate TEXT DEFAULT '';`);
+  }
+  if (!trainerCols.includes('availability')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN availability TEXT DEFAULT '';`);
+  }
+  if (!trainerCols.includes('experience_years')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN experience_years TEXT DEFAULT '';`);
+  }
+  if (!trainerCols.includes('phone')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN phone TEXT DEFAULT '';`);
+  }
+  if (!trainerCols.includes('show_phone')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN show_phone INTEGER DEFAULT 0;`);
+  }
+  if (!trainerCols.includes('hochschulsport_approved')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN hochschulsport_approved INTEGER DEFAULT 1;`);
+  }
+  if (!trainerCols.includes('hochschulsport_note')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN hochschulsport_note TEXT DEFAULT '';`);
+  }
+  if (!trainerCols.includes('status')) {
+    db.exec(`ALTER TABLE trainers ADD COLUMN status TEXT DEFAULT 'approved';`);
+  }
+
+  // Contact Inquiries (Mediated via Admin)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS contact_inquiries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      target_type TEXT NOT NULL, -- 'trainer' | 'service'
+      target_id INTEGER NOT NULL,
+      target_name TEXT NOT NULL,
+      target_email TEXT NOT NULL,
+      requester_name TEXT NOT NULL,
+      requester_email TEXT NOT NULL,
+      requester_phone TEXT DEFAULT '',
+      preferred_date TEXT DEFAULT '',
+      message TEXT NOT NULL,
+      status TEXT DEFAULT 'pending_forward', -- 'pending_forward' | 'forwarded' | 'archived'
+      admin_notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      forwarded_at DATETIME
+    );
+  `);
+
   // 2. Tournaments table (Ausschreibung Board)
   db.exec(`
     CREATE TABLE IF NOT EXISTS tournaments (
@@ -607,6 +657,11 @@ export function getPendingTrainers() {
   return db.prepare("SELECT * FROM trainers WHERE status = 'pending' ORDER BY created_at DESC").all();
 }
 
+export function getTrainerById(id) {
+  if (!id) return null;
+  return db.prepare('SELECT * FROM trainers WHERE id = ?').get(Number(id));
+}
+
 export function approveTrainer(id) {
   db.prepare("UPDATE trainers SET status = 'approved' WHERE id = ?").run(id);
   return db.prepare("SELECT * FROM trainers WHERE id = ?").get(id);
@@ -621,9 +676,26 @@ export function getTrainerByEmail(email) {
   return db.prepare('SELECT * FROM trainers WHERE LOWER(email) = LOWER(?)').get(email.trim());
 }
 
-export function registerTrainerSubmission({ name, role, email, phone, show_phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url }) {
+export function registerTrainerSubmission({
+  name,
+  role,
+  email,
+  phone,
+  show_phone,
+  focus_areas,
+  hochschulsport_approved,
+  hochschulsport_note,
+  photo_url,
+  trainer_type,
+  hourly_rate,
+  availability,
+  experience_years
+}) {
   const cleanEmail = email.trim().toLowerCase();
   const existing = getTrainerByEmail(cleanEmail);
+  const type = trainer_type === 'private' ? 'private' : 'usz';
+  const finalRole = role ? role.trim() : (type === 'private' ? 'Privattrainer / Coach' : 'Trainer / Übungsleiter');
+
   if (existing) {
     if (existing.status === 'approved') {
       throw new Error('Ein Trainerprofil mit dieser E-Mail-Adresse existiert bereits.');
@@ -638,17 +710,25 @@ export function registerTrainerSubmission({ name, role, email, phone, show_phone
         focus_areas = ?,
         hochschulsport_approved = ?,
         hochschulsport_note = ?,
+        trainer_type = ?,
+        hourly_rate = ?,
+        availability = ?,
+        experience_years = ?,
         photo_url = CASE WHEN ? != '' THEN ? ELSE photo_url END
       WHERE id = ?
     `);
     updateStmt.run(
       name ? name.trim() : existing.name,
-      role ? role.trim() : existing.role,
+      finalRole,
       phone ? phone.trim() : existing.phone,
       show_phone ? 1 : 0,
       focus_areas ? focus_areas.trim() : existing.focus_areas,
       hochschulsport_approved ? 1 : 0,
       hochschulsport_note ? hochschulsport_note.trim() : existing.hochschulsport_note,
+      type,
+      hourly_rate ? hourly_rate.trim() : (existing.hourly_rate || ''),
+      availability ? availability.trim() : (existing.availability || ''),
+      experience_years ? experience_years.trim() : (existing.experience_years || ''),
       photo_url || '',
       photo_url || '',
       existing.id
@@ -657,27 +737,52 @@ export function registerTrainerSubmission({ name, role, email, phone, show_phone
   }
 
   const stmt = db.prepare(`
-    INSERT INTO trainers (name, role, email, phone, show_phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    INSERT INTO trainers (
+      name, role, email, phone, show_phone, focus_areas,
+      hochschulsport_approved, hochschulsport_note, photo_url,
+      trainer_type, hourly_rate, availability, experience_years, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `);
   const result = stmt.run(
     name ? name.trim() : 'Badminton-Trainer',
-    role ? role.trim() : 'Trainer / Coach',
+    finalRole,
     cleanEmail,
     phone ? phone.trim() : '',
     show_phone ? 1 : 0,
     focus_areas ? focus_areas.trim() : 'Allgemeines Training & Taktik',
     hochschulsport_approved ? 1 : 0,
     hochschulsport_note ? hochschulsport_note.trim() : '',
-    photo_url || ''
+    photo_url || '',
+    type,
+    hourly_rate ? hourly_rate.trim() : '',
+    availability ? availability.trim() : '',
+    experience_years ? experience_years.trim() : ''
   );
   return db.prepare('SELECT * FROM trainers WHERE id = ?').get(result.lastInsertRowid);
 }
 
-export function createTrainer({ name, role, email, focus_areas, photo_url, phone, show_phone, hochschulsport_approved, hochschulsport_note, status }) {
+export function createTrainer({
+  name,
+  role,
+  email,
+  focus_areas,
+  photo_url,
+  phone,
+  show_phone,
+  hochschulsport_approved,
+  hochschulsport_note,
+  trainer_type,
+  hourly_rate,
+  availability,
+  experience_years,
+  status
+}) {
   const stmt = db.prepare(`
-    INSERT INTO trainers (name, role, email, focus_areas, photo_url, phone, show_phone, hochschulsport_approved, hochschulsport_note, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO trainers (
+      name, role, email, focus_areas, photo_url, phone, show_phone,
+      hochschulsport_approved, hochschulsport_note,
+      trainer_type, hourly_rate, availability, experience_years, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     name,
@@ -689,6 +794,10 @@ export function createTrainer({ name, role, email, focus_areas, photo_url, phone
     show_phone !== undefined ? (show_phone ? 1 : 0) : 1,
     hochschulsport_approved !== undefined ? (hochschulsport_approved ? 1 : 0) : 1,
     hochschulsport_note || 'USZ-Zulassung vorhanden',
+    trainer_type || 'usz',
+    hourly_rate || '',
+    availability || '',
+    experience_years || '',
     status || 'approved'
   );
   return db.prepare('SELECT * FROM trainers WHERE id = ?').get(result.lastInsertRowid);
@@ -698,12 +807,29 @@ export function deleteTrainer(id) {
   return db.prepare('DELETE FROM trainers WHERE id = ?').run(id);
 }
 
-export function updateTrainer(id, { name, role, email, focus_areas, photo_url, phone, show_phone, hochschulsport_approved, hochschulsport_note, status }) {
+export function updateTrainer(id, {
+  name,
+  role,
+  email,
+  focus_areas,
+  photo_url,
+  phone,
+  show_phone,
+  hochschulsport_approved,
+  hochschulsport_note,
+  trainer_type,
+  hourly_rate,
+  availability,
+  experience_years,
+  status
+}) {
   const existing = db.prepare('SELECT * FROM trainers WHERE id = ?').get(id);
   if (!existing) throw new Error(`Trainer #${id} not found`);
   const stmt = db.prepare(`
     UPDATE trainers 
-    SET name = ?, role = ?, email = ?, focus_areas = ?, photo_url = ?, phone = ?, show_phone = ?, hochschulsport_approved = ?, hochschulsport_note = ?, status = ?
+    SET name = ?, role = ?, email = ?, focus_areas = ?, photo_url = ?,
+        phone = ?, show_phone = ?, hochschulsport_approved = ?, hochschulsport_note = ?,
+        trainer_type = ?, hourly_rate = ?, availability = ?, experience_years = ?, status = ?
     WHERE id = ?
   `);
   stmt.run(
@@ -716,10 +842,83 @@ export function updateTrainer(id, { name, role, email, focus_areas, photo_url, p
     show_phone !== undefined ? (show_phone ? 1 : 0) : (existing.show_phone !== undefined ? existing.show_phone : 1),
     hochschulsport_approved !== undefined ? (hochschulsport_approved ? 1 : 0) : (existing.hochschulsport_approved || 1),
     hochschulsport_note !== undefined ? hochschulsport_note.trim() : (existing.hochschulsport_note || ''),
+    trainer_type !== undefined ? trainer_type : (existing.trainer_type || 'usz'),
+    hourly_rate !== undefined ? hourly_rate : (existing.hourly_rate || ''),
+    availability !== undefined ? availability : (existing.availability || ''),
+    experience_years !== undefined ? experience_years : (existing.experience_years || ''),
     status !== undefined ? status : (existing.status || 'approved'),
     id
   );
   return db.prepare('SELECT * FROM trainers WHERE id = ?').get(id);
+}
+
+// -------------------------------------------------------------
+// Contact Inquiries (Mediated via Admin)
+// -------------------------------------------------------------
+export function createContactInquiry({
+  target_type,
+  target_id,
+  target_name,
+  target_email,
+  requester_name,
+  requester_email,
+  requester_phone,
+  preferred_date,
+  message
+}) {
+  const stmt = db.prepare(`
+    INSERT INTO contact_inquiries (
+      target_type, target_id, target_name, target_email,
+      requester_name, requester_email, requester_phone,
+      preferred_date, message, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_forward')
+  `);
+  const res = stmt.run(
+    target_type,
+    Number(target_id),
+    target_name.trim(),
+    target_email.trim().toLowerCase(),
+    requester_name.trim(),
+    requester_email.trim().toLowerCase(),
+    requester_phone ? requester_phone.trim() : '',
+    preferred_date ? preferred_date.trim() : '',
+    message.trim()
+  );
+  return db.prepare('SELECT * FROM contact_inquiries WHERE id = ?').get(res.lastInsertRowid);
+}
+
+export function getAllContactInquiries() {
+  return db.prepare('SELECT * FROM contact_inquiries ORDER BY created_at DESC').all();
+}
+
+export function getPendingContactInquiries() {
+  return db.prepare("SELECT * FROM contact_inquiries WHERE status = 'pending_forward' ORDER BY created_at DESC").all();
+}
+
+export function getContactInquiryById(id) {
+  return db.prepare('SELECT * FROM contact_inquiries WHERE id = ?').get(Number(id));
+}
+
+export function markContactInquiryForwarded(id) {
+  db.prepare(`
+    UPDATE contact_inquiries 
+    SET status = 'forwarded', forwarded_at = CURRENT_TIMESTAMP 
+    WHERE id = ?
+  `).run(Number(id));
+  return db.prepare('SELECT * FROM contact_inquiries WHERE id = ?').get(Number(id));
+}
+
+export function updateContactInquiryStatus(id, status, admin_notes) {
+  db.prepare(`
+    UPDATE contact_inquiries 
+    SET status = ?, admin_notes = COALESCE(?, admin_notes)
+    WHERE id = ?
+  `).run(status, admin_notes !== undefined ? admin_notes : null, Number(id));
+  return db.prepare('SELECT * FROM contact_inquiries WHERE id = ?').get(Number(id));
+}
+
+export function deleteContactInquiry(id) {
+  return db.prepare('DELETE FROM contact_inquiries WHERE id = ?').run(Number(id));
 }
 
 // Tournaments

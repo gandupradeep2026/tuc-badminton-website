@@ -77,8 +77,21 @@ import {
   deleteEquipmentService,
   getDonationSettings,
   updateDonationSettings,
+  getTrainerById,
+  createContactInquiry,
+  getAllContactInquiries,
+  getPendingContactInquiries,
+  getContactInquiryById,
+  markContactInquiryForwarded,
+  updateContactInquiryStatus,
+  deleteContactInquiry,
 } from './db.js';
-import { sendPasswordResetEmail, sendPartnerRequestEmail } from './mailer.js';
+import {
+  sendPasswordResetEmail,
+  sendPartnerRequestEmail,
+  sendInquiryToAdminEmail,
+  sendForwardedInquiryToTarget
+} from './mailer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -464,7 +477,20 @@ app.post('/api/admin/change-password', requireAdmin, (req, res) => {
 app.get('/api/trainers', (req, res) => {
   try {
     const trainers = getAllTrainers();
-    res.json(trainers);
+    // Privacy Shield: Exclude private email and phone numbers from public response!
+    const sanitized = trainers.map(t => ({
+      id: t.id,
+      name: t.name,
+      role: t.role,
+      trainer_type: t.trainer_type || 'usz',
+      hourly_rate: t.hourly_rate || '',
+      availability: t.availability || '',
+      experience_years: t.experience_years || '',
+      focus_areas: t.focus_areas,
+      photo_url: t.photo_url,
+      created_at: t.created_at,
+    }));
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve trainers' });
   }
@@ -687,7 +713,19 @@ app.put('/api/players/:id', requireAdmin, upload.single('photo'), (req, res) => 
 app.get('/api/equipment-services', (req, res) => {
   try {
     const services = getAllEquipmentServices();
-    res.json(services);
+    // Privacy Shield: Exclude private email and phone numbers from public response!
+    const sanitized = services.map(s => ({
+      id: s.id,
+      name: s.name,
+      service_type: s.service_type,
+      pricing_details: s.pricing_details,
+      available_items: s.available_items,
+      location_note: s.location_note,
+      experience_years: s.experience_years,
+      photo_url: s.photo_url,
+      created_at: s.created_at,
+    }));
+    res.json(sanitized);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve equipment services' });
   }
@@ -1469,6 +1507,10 @@ app.post('/api/register/trainer', upload.single('photo'), (req, res) => {
       focus_areas,
       hochschulsport_approved,
       hochschulsport_note,
+      trainer_type,
+      hourly_rate,
+      availability,
+      experience_years,
       photo_url_input,
     } = req.body;
 
@@ -1482,16 +1524,18 @@ app.post('/api/register/trainer', upload.single('photo'), (req, res) => {
       return res.status(400).json({ error: 'Telefonnummer ist erforderlich.' });
     }
 
-    // Strict check: Trainer MUST have Hochschulsport training approval
+    const type = trainer_type === 'private' ? 'private' : 'usz';
+
+    // Strict check only for USZ trainers: USZ agreement is required
     const isApproved =
       hochschulsport_approved === true ||
       hochschulsport_approved === 'true' ||
       hochschulsport_approved === 1 ||
       hochschulsport_approved === '1';
 
-    if (!isApproved) {
+    if (type === 'usz' && !isApproved) {
       return res.status(400).json({
-        error: 'Für die Trainer-Registrierung ist die vorherige Genehmigung / Vereinbarung mit dem Hochschulsport (USZ) zwingend erforderlich.',
+        error: 'Für die USZ-Trainer-Registrierung ist die vorherige Genehmigung / Vereinbarung mit dem Hochschulsport (USZ) erforderlich.',
       });
     }
 
@@ -1502,21 +1546,29 @@ app.post('/api/register/trainer', upload.single('photo'), (req, res) => {
 
     const isShowPhone = show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0;
 
+    const defaultRole = type === 'private' ? 'Privattrainer / Individual Coach' : 'Badminton-Trainer (USZ)';
+
     const created = registerTrainerSubmission({
       name: name.trim(),
-      role: role ? role.trim() : 'Badminton-Trainer (USZ)',
+      role: role ? role.trim() : defaultRole,
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       show_phone: isShowPhone,
-      focus_areas: focus_areas ? focus_areas.trim() : 'Allgemeine Trainingslehre & Taktik',
-      hochschulsport_approved: true,
-      hochschulsport_note: hochschulsport_note ? hochschulsport_note.trim() : 'USZ-Genehmigung bestätigt',
+      focus_areas: focus_areas ? focus_areas.trim() : 'Allgemeine Trainingslehre & Technik',
+      hochschulsport_approved: type === 'usz' ? 1 : 0,
+      hochschulsport_note: hochschulsport_note ? hochschulsport_note.trim() : (type === 'usz' ? 'USZ-Genehmigung bestätigt' : 'Privattraining'),
+      trainer_type: type,
+      hourly_rate: hourly_rate ? hourly_rate.trim() : '',
+      availability: availability ? availability.trim() : '',
+      experience_years: experience_years ? experience_years.trim() : '',
       photo_url,
     });
 
     res.status(201).json({
       success: true,
-      message: 'Ihre Trainer-Bewerbung wurde erfolgreich eingereicht! Nach verwaltungsseitiger Prüfung der Hochschulsport-Genehmigung durch den Admin wird Ihr Profil freigeschaltet.',
+      message: type === 'private'
+        ? 'Deine Registrierung als Privattrainer wurde erfolgreich eingereicht! Nach Prüfung durch den Admin wird dein Profil freigeschaltet.'
+        : 'Ihre Trainer-Bewerbung wurde erfolgreich eingereicht! Nach verwaltungsseitiger Prüfung der Hochschulsport-Genehmigung durch den Admin wird Ihr Profil freigeschaltet.',
       trainer: created,
     });
   } catch (err) {
@@ -1687,6 +1739,174 @@ app.get('/api/admin/partner-requests', requireAdmin, (req, res) => {
     res.json(requests);
   } catch (err) {
     res.status(500).json({ error: 'Fehler beim Laden der Partner-Anfragen.' });
+  }
+});
+
+// -------------------------------------------------------------
+// Contact Inquiries (Mediated via Admin for Trainers & Stringers)
+// -------------------------------------------------------------
+const inquiryLimits = new Map();
+
+// Public: Submit Contact Inquiry
+app.post('/api/inquiries', async (req, res) => {
+  try {
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const now = Date.now();
+    const timestamps = (inquiryLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000);
+    if (timestamps.length >= 5) {
+      return res.status(429).json({
+        error: 'Zu viele Anfragen. Bitte warte einige Minuten, bevor du weitere Anfragen sendest.'
+      });
+    }
+    timestamps.push(now);
+    inquiryLimits.set(clientIp, timestamps);
+
+    const {
+      target_type,
+      target_id,
+      requester_name,
+      requester_email,
+      requester_phone,
+      preferred_date,
+      message,
+    } = req.body;
+
+    if (!target_type || !['trainer', 'service'].includes(target_type)) {
+      return res.status(400).json({ error: 'Ungültiger Anfragetyp (trainer oder service).' });
+    }
+    if (!target_id) {
+      return res.status(400).json({ error: 'Ziel-ID ist erforderlich.' });
+    }
+    if (!requester_name || !requester_name.trim()) {
+      return res.status(400).json({ error: 'Dein Name ist erforderlich.' });
+    }
+    if (!requester_email || !requester_email.trim() || !requester_email.includes('@')) {
+      return res.status(400).json({ error: 'Eine gültige E-Mail-Adresse ist erforderlich.' });
+    }
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Bitte gib eine Nachricht oder Beschreibung deiner Anfrage ein.' });
+    }
+
+    // Lookup target to get target name and private email
+    let target = null;
+    if (target_type === 'trainer') {
+      target = getTrainerById(Number(target_id));
+    } else if (target_type === 'service') {
+      target = getEquipmentServiceById(Number(target_id));
+    }
+
+    if (!target) {
+      return res.status(404).json({ error: 'Der angefragte Trainer oder Dienstleister existiert nicht.' });
+    }
+
+    const inquiry = createContactInquiry({
+      target_type,
+      target_id: Number(target_id),
+      target_name: target.name,
+      target_email: target.email,
+      requester_name: requester_name.trim(),
+      requester_email: requester_email.trim().toLowerCase(),
+      requester_phone: requester_phone ? requester_phone.trim() : '',
+      preferred_date: preferred_date ? preferred_date.trim() : '',
+      message: message.trim(),
+    });
+
+    // Notify admin via email
+    await sendInquiryToAdminEmail({
+      inquiry,
+      target: {
+        name: target.name,
+        email: target.email,
+        phone: target.phone || '',
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Deine Anfrage für ${target.name} wurde erfolgreich an das Admin-Team übermittelt! Wir prüfen die Anfrage und leiten sie schnellstmöglich weiter.`,
+      inquiryId: inquiry.id,
+    });
+  } catch (err) {
+    console.error('Error in /api/inquiries:', err);
+    res.status(500).json({ error: err.message || 'Fehler beim Übermitteln der Anfrage' });
+  }
+});
+
+// Admin: Get all inquiries
+app.get('/api/admin/inquiries', requireAdmin, (req, res) => {
+  try {
+    const inquiries = getAllContactInquiries();
+    res.json(inquiries);
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Laden der Anfragen' });
+  }
+});
+
+// Admin: Forward inquiry to target trainer or stringer
+app.post('/api/admin/inquiries/:id/forward', requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const inquiry = getContactInquiryById(id);
+    if (!inquiry) {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden.' });
+    }
+
+    let target = null;
+    if (inquiry.target_type === 'trainer') {
+      target = getTrainerById(inquiry.target_id);
+    } else if (inquiry.target_type === 'service') {
+      target = getEquipmentServiceById(inquiry.target_id);
+    }
+
+    const targetEmail = target?.email || inquiry.target_email;
+    const targetName = target?.name || inquiry.target_name;
+
+    if (!targetEmail) {
+      return res.status(400).json({ error: 'Keine Ziel-E-Mail-Adresse für diesen Anbieter hinterlegt.' });
+    }
+
+    const mailRes = await sendForwardedInquiryToTarget({
+      inquiry,
+      target: {
+        name: targetName,
+        email: targetEmail,
+        phone: target?.phone || '',
+      }
+    });
+
+    const updated = markContactInquiryForwarded(id);
+    res.json({
+      success: true,
+      message: `Anfrage erfolgreich an ${targetName} (${targetEmail}) weitergeleitet!`,
+      inquiry: updated,
+      emailSent: mailRes.success,
+    });
+  } catch (err) {
+    console.error('Error forwarding inquiry:', err);
+    res.status(500).json({ error: err.message || 'Fehler beim Weiterleiten der Anfrage' });
+  }
+});
+
+// Admin: Update inquiry status / notes
+app.put('/api/admin/inquiries/:id', requireAdmin, (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { status, admin_notes } = req.body;
+    const updated = updateContactInquiryStatus(id, status, admin_notes);
+    res.json({ success: true, inquiry: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Fehler beim Aktualisieren der Anfrage' });
+  }
+});
+
+// Admin: Delete inquiry
+app.delete('/api/admin/inquiries/:id', requireAdmin, (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    deleteContactInquiry(id);
+    res.json({ success: true, message: 'Anfrage gelöscht' });
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Löschen der Anfrage' });
   }
 });
 

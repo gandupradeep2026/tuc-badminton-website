@@ -41,7 +41,8 @@ import {
   Package,
   Building2,
   CreditCard,
-  Copy
+  Copy,
+  Send
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import DisciplineSelector from '../components/DisciplineSelector';
@@ -268,6 +269,13 @@ export default function AdminPage() {
   const [donationSaveMsg, setDonationSaveMsg] = useState('');
 
   // -----------------------------------------------------------------
+  // 12. Contact & Mediation Inquiries State
+  // -----------------------------------------------------------------
+  const [inquiriesList, setInquiriesList] = useState([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
+  const [forwardingId, setForwardingId] = useState(null);
+
+  // -----------------------------------------------------------------
   // Data Fetching
   // -----------------------------------------------------------------
   const fetchAllAdminData = () => {
@@ -282,6 +290,7 @@ export default function AdminPage() {
     fetchPendingRegistrations();
     fetchServices();
     fetchDonationSettings();
+    fetchInquiries();
   };
 
   const fetchGallery = async () => {
@@ -632,6 +641,89 @@ export default function AdminPage() {
     } catch (e) {
       console.error('Error loading donation settings:', e);
     }
+  };
+
+  const fetchInquiries = async () => {
+    try {
+      setInquiriesLoading(true);
+      const res = await safeFetchJson('/api/admin/inquiries', { headers: getAdminHeaders() });
+      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.ok && Array.isArray(res.data)) {
+        setInquiriesList(res.data);
+      } else {
+        setInquiriesList([]);
+      }
+    } catch (err) {
+      console.error('Error loading contact inquiries:', err);
+      setInquiriesList([]);
+    } finally {
+      setInquiriesLoading(false);
+    }
+  };
+
+  const handleForwardInquiry = async (id) => {
+    try {
+      setForwardingId(id);
+      const res = await safeFetchJson(`/api/admin/inquiries/${id}/forward`, {
+        method: 'POST',
+        headers: getAdminHeaders(),
+      });
+      if (res.ok) {
+        setFeedback({ 
+          type: 'success', 
+          message: isDe 
+            ? 'Anfrage erfolgreich per E-Mail an den Trainer / Anbieter weitergeleitet!' 
+            : 'Inquiry successfully forwarded via email to the coach/provider!' 
+        });
+        fetchInquiries();
+      } else {
+        setFeedback({ 
+          type: 'error', 
+          message: res.error || (isDe ? 'Fehler beim Weiterleiten der Anfrage.' : 'Error forwarding inquiry.') 
+        });
+      }
+    } catch (err) {
+      setFeedback({ 
+        type: 'error', 
+        message: err.message || (isDe ? 'Verbindungsfehler beim Weiterleiten.' : 'Network error forwarding.') 
+      });
+    } finally {
+      setForwardingId(null);
+    }
+  };
+
+  const handleDeleteInquiry = async (id) => {
+    if (!window.confirm(isDe ? 'Möchtest du diese Vermittlungsanfrage wirklich löschen?' : 'Are you sure you want to delete this contact inquiry?')) return;
+    try {
+      const res = await safeFetchJson(`/api/admin/inquiries/${id}`, {
+        method: 'DELETE',
+        headers: getAdminHeaders(),
+      });
+      if (res.ok) {
+        setFeedback({ type: 'info', message: isDe ? 'Anfrage gelöscht.' : 'Inquiry removed.' });
+        fetchInquiries();
+      } else {
+        setFeedback({ type: 'error', message: res.error || 'Fehler beim Löschen' });
+      }
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.message || 'Fehler beim Löschen' });
+    }
+  };
+
+  const getInquiryMailto = (inq) => {
+    const subject = encodeURIComponent(`[TUC Badminton] Neue Vermittlungsanfrage von ${inq.requester_name}`);
+    const body = encodeURIComponent(
+      `Hallo ${inq.target_name},\n\n` +
+      `wir haben über die Website der TUC Badminton Community eine neue Kontaktanfrage für dich erhalten:\n\n` +
+      `Anfragender: ${inq.requester_name}\n` +
+      `E-Mail: ${inq.requester_email}\n` +
+      (inq.requester_phone ? `Telefon / WhatsApp: ${inq.requester_phone}\n` : '') +
+      (inq.preferred_date ? `Wunschtermin / Zeiten: ${inq.preferred_date}\n` : '') +
+      `\nNachricht des Interessenten:\n"${inq.message}"\n\n` +
+      `Du kannst dem Interessenten direkt auf diese E-Mail antworten (${inq.requester_email}).\n\n` +
+      `Sportliche Grüße,\nAdmin - TUC Badminton Community`
+    );
+    return `mailto:${inq.target_email}?subject=${subject}&body=${body}`;
   };
 
   const handleApproveService = async (id, name) => {
@@ -1829,7 +1921,8 @@ export default function AdminPage() {
 
   const pendingCount = galleryItems.filter((i) => i.status === 'pending').length;
   const approvedCount = galleryItems.filter((i) => i.status === 'approved').length;
-  const pendingRegistrationsCount = pendingPlayers.length + pendingTrainers.length;
+  const pendingRegistrationsCount = pendingPlayers.length + pendingTrainers.length + (pendingServices ? pendingServices.length : 0);
+  const pendingInquiriesCount = inquiriesList.filter((i) => i.status === 'pending').length;
 
   // -----------------------------------------------------------------
   // View 1: Protected Login View
@@ -2030,6 +2123,24 @@ export default function AdminPage() {
           {pendingRegistrationsCount > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-400 text-amber-950 animate-pulse">
               {pendingRegistrationsCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('inquiries')}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'inquiries' ? 'bg-[#005A36] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <span>📬 {isDe ? 'Vermittlung' : 'Inquiries'}</span>
+          {pendingInquiriesCount > 0 ? (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-500 text-white animate-pulse">
+              {pendingInquiriesCount}
+            </span>
+          ) : (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+              {inquiriesList.length}
             </span>
           )}
         </button>
@@ -2485,18 +2596,41 @@ export default function AdminPage() {
                         </div>
                       </div>
 
-                      {/* Mandatory Hochschulsport Verification Box */}
-                      <div className="p-3 bg-emerald-50 border border-emerald-300/80 rounded-xl space-y-1.5 text-xs">
-                        <div className="flex items-center gap-1.5 text-[#005A36] font-black">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                          <span>{adm.registrationsTab?.detailsUszBadge || 'Hochschulsport-Genehmigung bestätigt ✓'}</span>
+                      {/* Verification Box: Private vs USZ */}
+                      {trainer.trainer_type === 'private' ? (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1.5 text-xs">
+                          <div className="flex items-center gap-1.5 text-blue-900 font-black">
+                            <span>🏸 Privattrainer (Einzeltraining & Coaching)</span>
+                          </div>
+                          {trainer.hourly_rate && (
+                            <p className="text-[11px] text-blue-950">
+                              <strong>Stundensatz / Honorar:</strong> {trainer.hourly_rate}
+                            </p>
+                          )}
+                          {trainer.availability && (
+                            <p className="text-[11px] text-blue-950">
+                              <strong>Verfügbare Zeiten:</strong> {trainer.availability}
+                            </p>
+                          )}
+                          {trainer.experience_years && (
+                            <p className="text-[11px] text-blue-950">
+                              <strong>Erfahrung:</strong> {trainer.experience_years}
+                            </p>
+                          )}
                         </div>
-                        {trainer.hochschulsport_note && (
-                          <p className="text-[11px] text-emerald-950/80">
-                            <strong>Nachweis / Notiz:</strong> {trainer.hochschulsport_note}
-                          </p>
-                        )}
-                      </div>
+                      ) : (
+                        <div className="p-3 bg-emerald-50 border border-emerald-300/80 rounded-xl space-y-1.5 text-xs">
+                          <div className="flex items-center gap-1.5 text-[#005A36] font-black">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                            <span>{adm.registrationsTab?.detailsUszBadge || 'Hochschulsport-Genehmigung bestätigt ✓'}</span>
+                          </div>
+                          {trainer.hochschulsport_note && (
+                            <p className="text-[11px] text-emerald-950/80">
+                              <strong>Nachweis / Notiz:</strong> {trainer.hochschulsport_note}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Trainer Bio & Focus */}
                       <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5 text-xs text-slate-700">
@@ -2652,6 +2786,219 @@ export default function AdminPage() {
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* =====================================================================
+          TAB: Contact Inquiries & Mediation
+      ===================================================================== */}
+      {activeTab === 'inquiries' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-black text-slate-900">
+                  {isDe ? '📬 Vermittlungs- & Kontaktanfragen' : '📬 Mediation & Contact Inquiries'}
+                </h2>
+                {pendingInquiriesCount > 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-[#005A36] border border-emerald-300 animate-pulse">
+                    {pendingInquiriesCount} {isDe ? 'neu ausstehend' : 'pending'}
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    {isDe ? 'Alle weitergeleitet ✓' : 'All forwarded ✓'}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                {isDe
+                  ? 'Hier laufen alle Vermittlungsanfragen von Spielern an Trainer und Besaiter ein. Kontaktdaten bleiben privat. Leite Anfragen per 1-Klick E-Mail oder über deinen Mail-Client an den Anbieter weiter.'
+                  : 'All player inquiries for coaches and stringers arrive here. Provider contact details remain shielded. Forward inquiries with 1-click email or via your email client.'}
+              </p>
+            </div>
+
+            <button
+              onClick={fetchInquiries}
+              disabled={inquiriesLoading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 transition-colors self-start sm:self-auto shadow-xs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${inquiriesLoading ? 'animate-spin' : ''}`} />
+              <span>{isDe ? 'Aktualisieren' : 'Refresh'}</span>
+            </button>
+          </div>
+
+          {inquiriesLoading && (
+            <p className="text-xs text-slate-400">{isDe ? 'Lade Kontaktanfragen...' : 'Loading inquiries...'}</p>
+          )}
+
+          {!inquiriesLoading && inquiriesList.length === 0 && (
+            <div className="p-10 text-center bg-white border border-slate-200 rounded-3xl space-y-3 shadow-xs">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                <Mail className="w-7 h-7" />
+              </div>
+              <h3 className="font-black text-base text-slate-900">
+                {isDe ? 'Noch keine Kontaktanfragen eingegangen' : 'No contact inquiries received yet'}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                {isDe
+                  ? 'Sobald ein Spieler über die Trainer- oder Serviceseite eine Vermittlungsanfrage stellt, wird sie hier aufgeführt und du erhältst zeitgleich eine Benachrichtigungs-E-Mail.'
+                  : 'As soon as a player submits a request, it will appear here and an admin notification will be sent to your email.'}
+              </p>
+            </div>
+          )}
+
+          {!inquiriesLoading && inquiriesList.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {inquiriesList.map((inq) => {
+                const isForwarded = inq.status === 'forwarded';
+                return (
+                  <div
+                    key={inq.id}
+                    className={`bg-white rounded-2xl border transition-all overflow-hidden shadow-sm flex flex-col justify-between ${
+                      isForwarded ? 'border-slate-200 opacity-95' : 'border-[#005A36]/40 ring-2 ring-[#005A36]/10'
+                    }`}
+                  >
+                    <div className="p-5 space-y-3.5">
+                      {/* Top Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                              inq.target_type === 'trainer'
+                                ? 'bg-emerald-100 text-[#005A36] border border-emerald-300'
+                                : 'bg-blue-100 text-blue-900 border border-blue-300'
+                            }`}>
+                              {inq.target_type === 'trainer' ? '🏸 Trainer-Anfrage' : '🔧 Besaiter / Ausrüster'}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">#{inq.id}</span>
+                          </div>
+                          <h4 className="font-display font-black text-base text-slate-900">
+                            {isDe ? 'Für:' : 'Target:'} {inq.target_name}
+                          </h4>
+                          <div className="text-[11px] font-mono text-slate-500">
+                            {isDe ? 'Vertrauliche Empfänger-E-Mail:' : 'Confidential recipient email:'} <strong className="text-slate-700">{inq.target_email}</strong>
+                          </div>
+                        </div>
+
+                        <div>
+                          {isForwarded ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>{isDe ? 'Weitergeleitet' : 'Forwarded'}</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              <span>{isDe ? 'Ausstehend' : 'Pending'}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Requester Info Box */}
+                      <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2 text-xs text-slate-700">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 text-xs">
+                            👤 {inq.requester_name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {inq.created_at}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                          <div className="flex items-center gap-1.5 text-slate-600 truncate">
+                            <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <a href={`mailto:${inq.requester_email}`} className="text-[#005A36] hover:underline truncate">
+                              {inq.requester_email}
+                            </a>
+                          </div>
+                          {inq.requester_phone && (
+                            <div className="flex items-center gap-1.5 text-slate-600 truncate">
+                              <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                              <a href={`tel:${inq.requester_phone}`} className="hover:underline truncate">
+                                {inq.requester_phone}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+
+                        {inq.preferred_date && (
+                          <div className="text-[11px] text-slate-600 pt-1 border-t border-slate-200/60 flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <span><strong>{isDe ? 'Wunschtermin / Zeiten:' : 'Preferred date / time:'}</strong> {inq.preferred_date}</span>
+                          </div>
+                        )}
+
+                        {/* Message Content */}
+                        <div className="pt-2 border-t border-slate-200/60">
+                          <span className="font-bold text-slate-800 text-[11px] block mb-1">
+                            {isDe ? 'Nachricht des Spielers:' : 'Player message:'}
+                          </span>
+                          <p className="text-slate-700 text-xs bg-white p-2.5 rounded-lg border border-slate-200 whitespace-pre-wrap italic leading-relaxed">
+                            "{inq.message}"
+                          </p>
+                        </div>
+
+                        {inq.forwarded_at && (
+                          <div className="text-[10px] text-emerald-800 font-semibold pt-1">
+                            ✓ {isDe ? 'Zuletzt weitergeleitet am:' : 'Last forwarded on:'} {inq.forwarded_at}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteInquiry(inq.id)}
+                        className="px-3 py-1.5 text-xs font-bold text-red-700 bg-white border border-red-200 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>{isDe ? 'Löschen' : 'Delete'}</span>
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        {/* Fallback Client Mailto */}
+                        <a
+                          href={getInquiryMailto(inq)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-colors flex items-center gap-1"
+                          title={isDe ? 'Im lokalen E-Mail-Programm öffnen' : 'Open in email app'}
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{isDe ? 'Mail-App' : 'Mail App'}</span>
+                        </a>
+
+                        {/* 1-Click Automated Email Forward */}
+                        <button
+                          type="button"
+                          disabled={forwardingId === inq.id}
+                          onClick={() => handleForwardInquiry(inq.id)}
+                          className={`px-4 py-1.5 text-xs font-bold text-white rounded-xl shadow-xs transition-colors flex items-center gap-1.5 ${
+                            isForwarded
+                              ? 'bg-slate-700 hover:bg-slate-800'
+                              : 'bg-[#005A36] hover:bg-[#00472A]'
+                          } disabled:opacity-50`}
+                        >
+                          <Send className={`w-3.5 h-3.5 ${forwardingId === inq.id ? 'animate-pulse' : ''}`} />
+                          <span>
+                            {forwardingId === inq.id
+                              ? (isDe ? 'Sende...' : 'Sending...')
+                              : isForwarded
+                              ? (isDe ? 'Erneut weiterleiten' : 'Forward Again')
+                              : (isDe ? 'Per E-Mail weiterleiten' : 'Forward via Email')}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

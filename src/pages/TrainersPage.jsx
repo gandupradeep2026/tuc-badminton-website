@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Mail, Phone, UserPlus, ShieldCheck } from 'lucide-react';
+import { Shield, Mail, Phone, UserPlus, ShieldCheck, Sparkles, Clock, DollarSign, Award } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getApiUrl, getUploadUrl, safeFetchJson } from '../api/client';
 import { DEFAULT_TRAINERS } from '../data/mockData';
+import InquiryModal from '../components/InquiryModal';
 
 export default function TrainersPage({ onNavigate }) {
   const [trainers, setTrainers] = useState(DEFAULT_TRAINERS);
   const [loading, setLoading] = useState(true);
+  const [inquiryTarget, setInquiryTarget] = useState(null);
   const { language, t } = useLanguage();
   const tr = t.trainers;
   const isDe = language === 'de';
@@ -145,8 +147,47 @@ export default function TrainersPage({ onNavigate }) {
                   </div>
                 </div>
 
-                {/* Details Body */}
+                  {/* Details Body */}
                 <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
+                  {/* Badge Row: Trainer Type */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {trainer.trainer_type === 'private' ? (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200 inline-flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-600" />
+                        <span>{isDe ? 'Privattrainer (Einzeltraining & Coaching)' : 'Private Coach'}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 inline-flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-700" />
+                        <span>{isDe ? 'USZ Hochschulsport Trainer' : 'USZ University Coach'}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Hourly rate / Availability / Experience (if present) */}
+                  {(trainer.hourly_rate || trainer.availability || trainer.experience_years) && (
+                    <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5 text-xs text-slate-700">
+                      {trainer.hourly_rate && (
+                        <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                          <span className="text-emerald-700 font-extrabold">💰 {isDe ? 'Tarif / Stundensatz:' : 'Rate:'}</span>
+                          <span>{trainer.hourly_rate}</span>
+                        </div>
+                      )}
+                      {trainer.availability && (
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                          <span><strong>{isDe ? 'Zeiten:' : 'Availability:'}</strong> {trainer.availability}</span>
+                        </div>
+                      )}
+                      {trainer.experience_years && (
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <Award className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                          <span><strong>{isDe ? 'Erfahrung:' : 'Experience:'}</strong> {trainer.experience_years}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Focus / Specialties */}
                   <div className="space-y-2">
                     <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -166,30 +207,34 @@ export default function TrainersPage({ onNavigate }) {
                 </div>
               </div>
 
-              {/* Direct Contact Footer - Mobile friendly touch target */}
+              {/* Protected Inquiry Action - Privacy Shield (No direct email/phone exposed) */}
               <div className="p-4 sm:p-5 pt-0 space-y-2">
-                <a
-                  href={`mailto:${trainer.email}?subject=${encodeURIComponent(tr.emailPrefix)}`}
-                  className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 hover:text-white bg-slate-100 hover:bg-[#005A36] active:bg-[#00472A] transition-colors border border-slate-200 min-h-[44px]"
+                <button
+                  type="button"
+                  onClick={() => setInquiryTarget({
+                    id: trainer.id,
+                    type: 'trainer',
+                    name: trainer.name,
+                    subtitle: `${localizedRole} • ${trainer.trainer_type === 'private' ? (isDe ? 'Privattraining' : 'Private Coaching') : 'USZ Hochschulsport'}`,
+                  })}
+                  className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] active:scale-[0.98] transition-all shadow-xs cursor-pointer min-h-[44px]"
                 >
                   <Mail className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{trainer.email}</span>
-                </a>
-                {trainer.phone && (trainer.show_phone === 1 || trainer.show_phone === true || trainer.show_phone === '1' || trainer.show_phone === undefined) && (
-                  <a
-                    href={`tel:${trainer.phone}`}
-                    className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200/80 min-h-[40px]"
-                  >
-                    <Phone className="w-3.5 h-3.5 flex-shrink-0 text-[#005A36]" />
-                    <span className="truncate">{trainer.phone}</span>
-                  </a>
-                )}
+                  <span>{isDe ? 'Training anfragen / Kontakt aufnehmen' : 'Request Coaching / Inquire'}</span>
+                </button>
               </div>
             </div>
           );
         })}
       </div>
       )}
+
+      {/* Inquiry Modal */}
+      <InquiryModal
+        isOpen={!!inquiryTarget}
+        onClose={() => setInquiryTarget(null)}
+        target={inquiryTarget}
+      />
 
     </div>
   );

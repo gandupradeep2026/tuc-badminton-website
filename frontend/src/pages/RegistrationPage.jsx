@@ -55,11 +55,15 @@ export default function RegistrationPage({ onNavigate }) {
   // -------------------------------------------------------------
   // Trainer Form State
   // -------------------------------------------------------------
+  const [trainerType, setTrainerType] = useState('usz'); // 'usz' | 'private'
   const [trainerName, setTrainerName] = useState('');
   const [trainerEmail, setTrainerEmail] = useState('');
   const [trainerPhone, setTrainerPhone] = useState('');
   const [trainerShowPhone, setTrainerShowPhone] = useState(false);
   const [trainerRole, setTrainerRole] = useState('');
+  const [trainerHourlyRate, setTrainerHourlyRate] = useState('');
+  const [trainerAvailability, setTrainerAvailability] = useState('');
+  const [trainerExperience, setTrainerExperience] = useState('');
   const [trainerFocus, setTrainerFocus] = useState('');
   const [trainerUszApproved, setTrainerUszApproved] = useState(false);
   const [trainerUszNote, setTrainerUszNote] = useState('');
@@ -200,7 +204,7 @@ export default function RegistrationPage({ onNavigate }) {
       return;
     }
 
-    if (!trainerUszApproved) {
+    if (trainerType === 'usz' && !trainerUszApproved) {
       setErrorMsg(reg.errUszApproval);
       setSubmitting(false);
       return;
@@ -208,14 +212,18 @@ export default function RegistrationPage({ onNavigate }) {
 
     try {
       const payload = {
+        trainer_type: trainerType,
         name: trainerName.trim(),
         role: trainerRole.trim(),
         email: trainerEmail.trim().toLowerCase(),
         phone: trainerPhone.trim(),
         show_phone: trainerShowPhone ? 1 : 0,
         focus_areas: trainerFocus.trim(),
-        hochschulsport_approved: 'true',
-        hochschulsport_note: trainerUszNote.trim() || 'USZ Genehmigung bestätigt',
+        hourly_rate: trainerHourlyRate.trim(),
+        availability: trainerAvailability.trim(),
+        experience_years: trainerExperience.trim(),
+        hochschulsport_approved: trainerType === 'usz' ? 'true' : 'false',
+        hochschulsport_note: trainerType === 'usz' ? (trainerUszNote.trim() || 'USZ Genehmigung bestätigt') : 'Privattrainer',
       };
 
       let photoDataUrl = trainerPhotoUrl.trim();
@@ -348,6 +356,10 @@ export default function RegistrationPage({ onNavigate }) {
       setTrainerEmail('');
       setTrainerPhone('');
       setTrainerShowPhone(false);
+      setTrainerType('usz');
+      setTrainerHourlyRate('');
+      setTrainerAvailability('');
+      setTrainerExperience('');
       setTrainerRole('');
       setTrainerFocus('');
       setTrainerUszApproved(false);
@@ -893,28 +905,101 @@ export default function RegistrationPage({ onNavigate }) {
             </p>
           </div>
 
-          {/* Mandatory USZ Approval Notice Box */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 space-y-3 shadow-xs">
-            <div className="flex items-center gap-2 font-black text-xs sm:text-sm text-amber-900">
-              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-              <span>{reg.uszApprovalRequired}</span>
-            </div>
-            <p className="text-xs leading-relaxed text-amber-900/90">
-              {reg.uszApprovalNotice}
-            </p>
-            <label className="flex items-start gap-3 cursor-pointer pt-1 bg-white/80 p-3 rounded-xl border border-amber-200">
-              <input
-                type="checkbox"
-                required
-                checked={trainerUszApproved}
-                onChange={(e) => setTrainerUszApproved(e.target.checked)}
-                className="mt-0.5 w-4 h-4 text-[#005A36] rounded border-amber-400 focus:ring-[#005A36]"
-              />
-              <span className="text-xs font-bold text-slate-900 leading-snug">
-                {reg.uszCheckboxLabel}
-              </span>
+          {/* Trainer Category: USZ Trainer vs Privattrainer */}
+          <div className="space-y-2">
+            <label className="font-bold text-slate-800 block text-xs sm:text-sm">
+              {isDe ? 'Trainer-Kategorie' : 'Coach Category'}
             </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setTrainerType('usz')}
+                className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+                  trainerType === 'usz'
+                    ? 'bg-emerald-50 border-[#005A36] text-[#005A36] shadow-xs ring-2 ring-[#005A36]/10'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center border mt-0.5 ${
+                  trainerType === 'usz' ? 'border-[#005A36] bg-[#005A36] text-white' : 'border-slate-300'
+                }`}>
+                  {trainerType === 'usz' && <div className="w-2 h-2 bg-white rounded-full" />}
+                </div>
+                <div>
+                  <div className="font-bold text-xs sm:text-sm text-slate-900">
+                    {isDe ? 'USZ Hochschulsport-Trainer' : 'USZ University Coach'}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {isDe ? 'Offizielle Betreuung von USZ-Kursen an der TU Chemnitz (USZ-Bestätigung erforderlich)' : 'Official university sports classes (USZ confirmation required)'}
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTrainerType('private')}
+                className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
+                  trainerType === 'private'
+                    ? 'bg-emerald-50 border-[#005A36] text-[#005A36] shadow-xs ring-2 ring-[#005A36]/10'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center border mt-0.5 ${
+                  trainerType === 'private' ? 'border-[#005A36] bg-[#005A36] text-white' : 'border-slate-300'
+                }`}>
+                  {trainerType === 'private' && <div className="w-2 h-2 bg-white rounded-full" />}
+                </div>
+                <div>
+                  <div className="font-bold text-xs sm:text-sm text-slate-900">
+                    {isDe ? 'Privattrainer / Individual Coach' : 'Private Coach / 1-on-1'}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {isDe ? 'Bietet privates Einzeltraining, Sparring & Technik-Coaching für Spieler an' : 'Offers private 1-on-1 coaching, sparring & individual technique training'}
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
+
+          {/* Privacy Shield Notice */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 text-xs flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-[#005A36] flex-shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold text-slate-900 block mb-0.5">
+                {isDe ? '🛡️ Diskretion & Kontaktschutz:' : '🛡️ Privacy Shield & Mediation:'}
+              </span>
+              <span className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
+                {isDe
+                  ? 'Deine E-Mail-Adresse und Telefonnummer bleiben geschützt und werden nicht öffentlich auf der Website angezeigt. Interessierte Spieler stellen eine Vermittlungsanfrage über den Admin, der diese nach kurzer Prüfung an dich weiterleitet.'
+                  : 'Your contact details (email and phone) remain confidential and will not be displayed on the public site. Players submit requests to the admin, who forwards them to you.'}
+              </span>
+            </div>
+          </div>
+
+          {/* Mandatory USZ Approval Notice Box (USZ Only) */}
+          {trainerType === 'usz' && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 font-black text-xs sm:text-sm text-amber-900">
+                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <span>{reg.uszApprovalRequired}</span>
+              </div>
+              <p className="text-xs leading-relaxed text-amber-900/90">
+                {reg.uszApprovalNotice}
+              </p>
+              <label className="flex items-start gap-3 cursor-pointer pt-1 bg-white/80 p-3 rounded-xl border border-amber-200">
+                <input
+                  type="checkbox"
+                  required
+                  checked={trainerUszApproved}
+                  onChange={(e) => setTrainerUszApproved(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 text-[#005A36] rounded border-amber-400 focus:ring-[#005A36]"
+                />
+                <span className="text-xs font-bold text-slate-900 leading-snug">
+                  {reg.uszCheckboxLabel}
+                </span>
+              </label>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-xs sm:text-sm">
             
@@ -990,20 +1075,64 @@ export default function RegistrationPage({ onNavigate }) {
               </label>
             </div>
 
-            {/* USZ Reference Note */}
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.uszNoteLabel}
-              </label>
-              <input
-                type="text"
-                required
-                value={trainerUszNote}
-                onChange={(e) => setTrainerUszNote(e.target.value)}
-                placeholder={reg.uszNotePlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
+            {/* USZ Reference Note (Only for USZ Trainers) */}
+            {trainerType === 'usz' && (
+              <div className="sm:col-span-2">
+                <label className="font-bold text-slate-700 block mb-1.5">
+                  {reg.uszNoteLabel}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={trainerUszNote}
+                  onChange={(e) => setTrainerUszNote(e.target.value)}
+                  placeholder={reg.uszNotePlaceholder}
+                  className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+                />
+              </div>
+            )}
+
+            {/* Private Trainer Specific Fields */}
+            {trainerType === 'private' && (
+              <>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">
+                    {isDe ? 'Stundensatz / Honorar' : 'Hourly Rate / Fee'}
+                  </label>
+                  <input
+                    type="text"
+                    value={trainerHourlyRate}
+                    onChange={(e) => setTrainerHourlyRate(e.target.value)}
+                    placeholder={isDe ? 'z. B. 25 € / Std. oder nach Vereinbarung' : 'e.g. 25 € / hr or negotiable'}
+                    className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">
+                    {isDe ? 'Trainererfahrung / Referenzen' : 'Coaching Experience / References'}
+                  </label>
+                  <input
+                    type="text"
+                    value={trainerExperience}
+                    onChange={(e) => setTrainerExperience(e.target.value)}
+                    placeholder={isDe ? 'z. B. 5 Jahre Vereinserfahrung, C-Lizenz' : 'e.g. 5 yrs club coach, C-license'}
+                    className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1.5">
+                    {isDe ? 'Verfügbare Trainingszeiten' : 'Availability / Time Slots'}
+                  </label>
+                  <input
+                    type="text"
+                    value={trainerAvailability}
+                    onChange={(e) => setTrainerAvailability(e.target.value)}
+                    placeholder={isDe ? 'z. B. Di & Do ab 17:00 Uhr, Sa vormittags' : 'e.g. Tue & Thu from 5pm, Sat mornings'}
+                    className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Focus / Bio */}
             <div className="sm:col-span-2">
