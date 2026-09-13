@@ -1325,7 +1325,7 @@ export default function AdminPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Passwort / Passcode
+                {isDe ? 'Passwort / Passcode' : 'Password / Passcode'}
               </label>
               <div className="relative">
                 <input
@@ -1349,12 +1349,12 @@ export default function AdminPage() {
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full py-3 px-4 rounded-xl bg-[#005A36] hover:bg-[#004328] active:bg-[#003B23] text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-xl bg-[#005A36] hover:bg-[#004328] active:bg-[#003B23] text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               {authLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Anmelden...</span>
+                  <span>{isDe ? 'Anmelden...' : 'Signing in...'}</span>
                 </>
               ) : (
                 <>
@@ -1373,10 +1373,12 @@ export default function AdminPage() {
               className="text-xs text-[#005A36] hover:text-[#004328] hover:underline font-bold flex items-center gap-1.5 cursor-pointer"
             >
               <Key className="w-3.5 h-3.5 text-[#005A36]" />
-              <span>{adm.forgotPassword?.link || 'Passwort vergessen? (Reset-Link per E-Mail)'}</span>
+              <span>{adm.forgotPassword?.link || (isDe ? 'Passwort vergessen?' : 'Forgot Password?')}</span>
             </button>
             <span className="text-[10px] text-slate-400 text-center">
-              Sendet sicheren Wiederherstellungslink an gandupradeep2026@gmail.com
+              {isDe 
+                ? 'Sendet einen einmaligen 6-stelligen Bestätigungscode an die autorisierte Admin-E-Mail.' 
+                : 'Sends a one-time 6-digit approval code to the authorized admin email.'}
             </span>
           </div>
 
