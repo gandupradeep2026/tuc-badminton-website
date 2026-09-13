@@ -1,4 +1,3 @@
-import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -20,10 +19,38 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Database file: badminton_community.db
 const dbPath = path.join(dataDir, 'badminton_community.db');
-const db = new Database(dbPath);
 
-// Enable WAL mode for high concurrency
-db.pragma('journal_mode = WAL');
+// Crash-proof SQLite Driver Loader:
+// 1. Tries Node.js built-in node:sqlite (zero native dependencies, 100% immune to SIGSEGV status 139 on Render/Linux)
+// 2. Falls back to better-sqlite3
+let db;
+try {
+  const { DatabaseSync } = await import('node:sqlite');
+  db = new DatabaseSync(dbPath);
+  try {
+    db.exec('PRAGMA journal_mode = WAL;');
+  } catch (e) {}
+  if (!db.pragma) {
+    db.pragma = (str) => {
+      try {
+        db.exec(`PRAGMA ${str};`);
+      } catch (e) {}
+    };
+  }
+  console.log('[DB] Connected via built-in node:sqlite (crash-proof)');
+} catch (nodeSqliteErr) {
+  try {
+    const { default: BetterDatabase } = await import('better-sqlite3');
+    db = new BetterDatabase(dbPath);
+    try {
+      db.pragma('journal_mode = WAL');
+    } catch (e) {}
+    console.log('[DB] Connected via better-sqlite3');
+  } catch (betterSqliteErr) {
+    console.error('[DB FATAL] Failed to initialize SQLite engine:', nodeSqliteErr, betterSqliteErr);
+    throw betterSqliteErr;
+  }
+}
 
 export function initDatabase() {
   // 0. Admin Settings Table (Salted Scrypt Password Hash)
