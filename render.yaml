@@ -8,10 +8,10 @@ services:
     region: frankfurt
     rootDir: backend
     buildCommand: npm install
-    startCommand: node --experimental-sqlite server.js
+    startCommand: node server.js
     envVars:
       - key: NODE_VERSION
-        value: 20
+        value: 22
       - key: ADMIN_EMAIL
         value: gandupradeep2026@gmail.com
       - key: ALLOWED_ORIGINS
