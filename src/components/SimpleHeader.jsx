@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Menu, X, Globe, Lock, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import ServerStatusBadge from './ServerStatusBadge';
 
 export default function SimpleHeader({ activePage, onNavigate }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -54,8 +53,6 @@ export default function SimpleHeader({ activePage, onNavigate }) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-          <ServerStatusBadge />
-
           <div className="hidden lg:block text-white/80 font-mono text-xs">
             {t.topbar.venue}
           </div>

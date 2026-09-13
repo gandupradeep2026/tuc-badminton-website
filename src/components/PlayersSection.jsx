@@ -7,15 +7,18 @@ import {
   ShieldCheck, 
   Sparkles,
   UserCheck,
-  Award
+  Award,
+  Trophy
 } from 'lucide-react';
 import { getApiUrl, getUploadUrl, safeFetchJson } from '../api/client';
 import { DEFAULT_PLAYERS } from '../data/mockData';
+import PartnerRequestModal from './PartnerRequestModal';
 
 export default function PlayersSection({ refreshTrigger = 0 }) {
   const [players, setPlayers] = useState(DEFAULT_PLAYERS);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'men' | 'women'
   const [loading, setLoading] = useState(true);
+  const [partnerModalPlayer, setPartnerModalPlayer] = useState(null);
 
   const fetchPlayers = async () => {
     try {
@@ -118,11 +121,19 @@ export default function PlayersSection({ refreshTrigger = 0 }) {
           </div>
         </div>
 
-        {/* Email Contact Button */}
-        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800">
+        {/* Partner Request & Email Buttons */}
+        <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <button
+            type="button"
+            onClick={() => setPartnerModalPlayer(player)}
+            className="flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#005A36] to-emerald-700 hover:from-[#00472A] hover:to-emerald-800 shadow-xs hover:shadow transition-all"
+          >
+            <Trophy className="w-3.5 h-3.5 text-amber-300" />
+            <span>🏸 Turnierpartner anfragen</span>
+          </button>
           <a
             href={`mailto:${player.email}?subject=TU%20Chemnitz%20Badminton%20Kontakt`}
-            className="flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-50 hover:bg-tuc-50 hover:text-tuc-800 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 px-3 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-50 hover:bg-tuc-50 hover:text-tuc-800 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
           >
             <Mail className="w-3.5 h-3.5 text-[#005A36] dark:text-emerald-400" />
             <span className="truncate">{player.email}</span>
@@ -236,6 +247,13 @@ export default function PlayersSection({ refreshTrigger = 0 }) {
             </div>
           </div>
         )}
+
+        {/* Partner Request Modal */}
+        <PartnerRequestModal
+          isOpen={!!partnerModalPlayer}
+          onClose={() => setPartnerModalPlayer(null)}
+          player={partnerModalPlayer}
+        />
 
       </div>
     </section>

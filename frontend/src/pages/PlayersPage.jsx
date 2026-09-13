@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Users, GraduationCap, Target, Mail, UserPlus, Star, School, Phone } from 'lucide-react';
+import { Users, GraduationCap, Target, Mail, UserPlus, Star, School, Phone, Trophy } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { safeFetchJson, getUploadUrl } from '../api/client';
 import { DEFAULT_PLAYERS } from '../data/mockData';
+import PartnerRequestModal from '../components/PartnerRequestModal';
 
 export default function PlayersPage({ onNavigate }) {
   const [players, setPlayers] = useState(DEFAULT_PLAYERS);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'men' | 'women'
   const [loading, setLoading] = useState(true);
+  const [partnerModalPlayer, setPartnerModalPlayer] = useState(null);
   const { language, t } = useLanguage();
   const pl = t.players;
   const isDe = language === 'de';
@@ -144,11 +146,20 @@ export default function PlayersPage({ onNavigate }) {
           </div>
         </div>
 
-        {/* Email & Optional Public Phone Contact Buttons */}
+        {/* Email, Phone & Tournament Partner Request Buttons */}
         <div className="pt-2 border-t border-slate-100 space-y-1.5">
+          <button
+            type="button"
+            onClick={() => setPartnerModalPlayer(player)}
+            className="flex items-center justify-center gap-1.5 w-full py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#005A36] to-emerald-700 hover:from-[#00472A] hover:to-emerald-800 shadow-xs hover:shadow transition-all"
+          >
+            <Trophy className="w-3.5 h-3.5 flex-shrink-0 text-amber-300" />
+            <span>{isDe ? '🏸 Turnierpartner anfragen' : '🏸 Request as Partner'}</span>
+          </button>
+
           <a
             href={`mailto:${player.email}?subject=${encodeURIComponent(pl.emailPrefix)}`}
-            className="flex items-center justify-center gap-1.5 w-full py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold text-slate-700 hover:text-white bg-slate-50 hover:bg-[#005A36] active:bg-[#00472A] border border-slate-200 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 px-3 min-h-[36px] rounded-xl text-xs font-semibold text-slate-700 hover:text-white bg-slate-50 hover:bg-[#005A36] active:bg-[#00472A] border border-slate-200 transition-colors"
           >
             <Mail className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="truncate">{player.email}</span>
@@ -303,6 +314,13 @@ export default function PlayersPage({ onNavigate }) {
           )}
         </div>
       )}
+
+      {/* Partner Request Modal */}
+      <PartnerRequestModal
+        isOpen={!!partnerModalPlayer}
+        onClose={() => setPartnerModalPlayer(null)}
+        player={partnerModalPlayer}
+      />
 
     </div>
   );

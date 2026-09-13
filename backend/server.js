@@ -64,8 +64,10 @@ import {
   approvePlayer,
   rejectPlayer,
   registerPlayerSubmission,
+  createPartnerRequest,
+  getAllPartnerRequests,
 } from './db.js';
-import { sendPasswordResetEmail } from './mailer.js';
+import { sendPasswordResetEmail, sendPartnerRequestEmail } from './mailer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1301,6 +1303,9 @@ app.post('/api/register/player', upload.single('photo'), (req, res) => {
     });
   } catch (err) {
     console.error('Error in player registration:', err);
+    if (err.message && err.message.includes('existiert bereits')) {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message || 'Fehler bei der Spieler-Registrierung.' });
   }
 });
@@ -1369,7 +1374,105 @@ app.post('/api/register/trainer', upload.single('photo'), (req, res) => {
     });
   } catch (err) {
     console.error('Error in trainer registration:', err);
+    if (err.message && err.message.includes('existiert bereits')) {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message || 'Fehler bei der Trainer-Registrierung.' });
+  }
+});
+
+// Rate limiting map for partner requests: ip -> timestamps[]
+const partnerRequestLimits = new Map();
+
+// 2b. Tournament Partner Request (Send Email to Player)
+app.post('/api/players/:id/partner-request', async (req, res) => {
+  try {
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const now = Date.now();
+    const timestamps = (partnerRequestLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000); // 10 min window
+    if (timestamps.length >= 5) {
+      return res.status(429).json({
+        error: 'Zu viele Anfragen. Bitte warten Sie einige Minuten, bevor Sie weitere Partneranfragen senden.'
+      });
+    }
+    timestamps.push(now);
+    partnerRequestLimits.set(clientIp, timestamps);
+
+    const playerId = Number(req.params.id);
+    const player = getPlayerById(playerId);
+    if (!player || player.status !== 'approved') {
+      return res.status(404).json({ error: 'Spieler nicht gefunden oder Profil noch nicht freigeschaltet.' });
+    }
+    if (!player.email || !player.email.includes('@')) {
+      return res.status(400).json({ error: 'Für diesen Spieler ist keine gültige Kontakt-E-Mail hinterlegt.' });
+    }
+
+    const {
+      requester_name,
+      requester_email,
+      requester_phone,
+      tournament_name,
+      discipline,
+      message,
+    } = req.body;
+
+    if (!requester_name || !requester_name.trim()) {
+      return res.status(400).json({ error: 'Dein Name ist erforderlich.' });
+    }
+    if (!requester_email || !requester_email.trim() || !requester_email.includes('@')) {
+      return res.status(400).json({ error: 'Eine gültige E-Mail-Adresse ist erforderlich.' });
+    }
+    if (!tournament_name || !tournament_name.trim()) {
+      return res.status(400).json({ error: 'Bitte gib das gewünschte Turnier an.' });
+    }
+    if (!discipline || !discipline.trim()) {
+      return res.status(400).json({ error: 'Bitte wähle die gewünschte Disziplin (z. B. Doppel oder Mixed) aus.' });
+    }
+
+    // 1. Send Email to the target player
+    const mailRes = await sendPartnerRequestEmail({
+      to: player.email,
+      toPlayerName: player.name,
+      requesterName: requester_name.trim(),
+      requesterEmail: requester_email.trim().toLowerCase(),
+      requesterPhone: requester_phone ? requester_phone.trim() : '',
+      tournamentName: tournament_name.trim(),
+      discipline: discipline.trim(),
+      message: message ? message.trim() : '',
+    });
+
+    // 2. Persist in database
+    const record = createPartnerRequest({
+      player_id: player.id,
+      player_name: player.name,
+      player_email: player.email,
+      requester_name: requester_name.trim(),
+      requester_email: requester_email.trim().toLowerCase(),
+      requester_phone: requester_phone ? requester_phone.trim() : '',
+      tournament_name: tournament_name.trim(),
+      discipline: discipline.trim(),
+      message: message ? message.trim() : '',
+    });
+
+    res.json({
+      success: true,
+      message: `Deine Partner-Anfrage wurde erfolgreich per E-Mail an ${player.name} gesendet!`,
+      request: record,
+      emailSent: mailRes.success,
+    });
+  } catch (err) {
+    console.error('Error in partner-request endpoint:', err);
+    res.status(500).json({ error: err.message || 'Fehler beim Senden der Partner-Anfrage.' });
+  }
+});
+
+// Admin: Get all partner requests
+app.get('/api/admin/partner-requests', requireAdmin, (req, res) => {
+  try {
+    const requests = getAllPartnerRequests();
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Laden der Partner-Anfragen.' });
   }
 });
 

@@ -128,6 +128,24 @@ export function initDatabase() {
     );
   `);
 
+  // 0e. Tournament Partner Requests Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS partner_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id INTEGER NOT NULL,
+      player_name TEXT NOT NULL,
+      player_email TEXT NOT NULL,
+      requester_name TEXT NOT NULL,
+      requester_email TEXT NOT NULL,
+      requester_phone TEXT,
+      tournament_name TEXT NOT NULL,
+      discipline TEXT NOT NULL,
+      message TEXT,
+      status TEXT DEFAULT 'sent',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
   // Seed default admin password if empty (default: tuc-badminton-admin)
   const existingAdmin = db.prepare('SELECT id FROM admin_settings WHERE id = 1').get();
   if (!existingAdmin) {
@@ -548,7 +566,46 @@ export function rejectTrainer(id) {
   return db.prepare("DELETE FROM trainers WHERE id = ?").run(id);
 }
 
+export function getTrainerByEmail(email) {
+  if (!email) return null;
+  return db.prepare('SELECT * FROM trainers WHERE LOWER(email) = LOWER(?)').get(email.trim());
+}
+
 export function registerTrainerSubmission({ name, role, email, phone, show_phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url }) {
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = getTrainerByEmail(cleanEmail);
+  if (existing) {
+    if (existing.status === 'approved') {
+      throw new Error('Ein Trainerprofil mit dieser E-Mail-Adresse existiert bereits.');
+    }
+    // Update existing pending application without creating a duplicate row or altering created_at
+    const updateStmt = db.prepare(`
+      UPDATE trainers SET
+        name = ?,
+        role = ?,
+        phone = ?,
+        show_phone = ?,
+        focus_areas = ?,
+        hochschulsport_approved = ?,
+        hochschulsport_note = ?,
+        photo_url = CASE WHEN ? != '' THEN ? ELSE photo_url END
+      WHERE id = ?
+    `);
+    updateStmt.run(
+      name ? name.trim() : existing.name,
+      role ? role.trim() : existing.role,
+      phone ? phone.trim() : existing.phone,
+      show_phone ? 1 : 0,
+      focus_areas ? focus_areas.trim() : existing.focus_areas,
+      hochschulsport_approved ? 1 : 0,
+      hochschulsport_note ? hochschulsport_note.trim() : existing.hochschulsport_note,
+      photo_url || '',
+      photo_url || '',
+      existing.id
+    );
+    return db.prepare('SELECT * FROM trainers WHERE id = ?').get(existing.id);
+  }
+
   const stmt = db.prepare(`
     INSERT INTO trainers (name, role, email, phone, show_phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
@@ -556,7 +613,7 @@ export function registerTrainerSubmission({ name, role, email, phone, show_phone
   const result = stmt.run(
     name ? name.trim() : 'Badminton-Trainer',
     role ? role.trim() : 'Trainer / Coach',
-    email.trim().toLowerCase(),
+    cleanEmail,
     phone ? phone.trim() : '',
     show_phone ? 1 : 0,
     focus_areas ? focus_areas.trim() : 'Allgemeines Training & Taktik',
@@ -732,6 +789,11 @@ export function rejectPlayer(id) {
   return db.prepare("DELETE FROM players WHERE id = ?").run(id);
 }
 
+export function getPlayerByEmail(email) {
+  if (!email) return null;
+  return db.prepare('SELECT * FROM players WHERE LOWER(email) = LOWER(?)').get(email.trim());
+}
+
 export function registerPlayerSubmission({
   name,
   gender,
@@ -747,6 +809,48 @@ export function registerPlayerSubmission({
   university_name,
   photo_url,
 }) {
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = getPlayerByEmail(cleanEmail);
+  if (existing) {
+    if (existing.status === 'approved') {
+      throw new Error('Ein Spielerprofil mit dieser E-Mail-Adresse existiert bereits.');
+    }
+    // Update existing pending registration without creating a duplicate row or altering created_at timestamp
+    const updateStmt = db.prepare(`
+      UPDATE players SET
+        name = ?,
+        gender = ?,
+        study_program = ?,
+        specialization = ?,
+        team = ?,
+        phone = ?,
+        show_phone = ?,
+        favorite_player = ?,
+        skill_level = ?,
+        university_type = ?,
+        university_name = ?,
+        photo_url = CASE WHEN ? != '' THEN ? ELSE photo_url END
+      WHERE id = ?
+    `);
+    updateStmt.run(
+      name ? name.trim() : existing.name,
+      gender || existing.gender,
+      study_program ? study_program.trim() : existing.study_program,
+      specialization ? specialization.trim() : existing.specialization,
+      team ? team.trim() : existing.team,
+      phone ? phone.trim() : existing.phone,
+      show_phone ? 1 : 0,
+      favorite_player ? favorite_player.trim() : existing.favorite_player,
+      skill_level ? skill_level.trim() : existing.skill_level,
+      university_type ? university_type.trim() : existing.university_type,
+      university_name ? university_name.trim() : existing.university_name,
+      photo_url || '',
+      photo_url || '',
+      existing.id
+    );
+    return db.prepare('SELECT * FROM players WHERE id = ?').get(existing.id);
+  }
+
   const stmt = db.prepare(`
     INSERT INTO players (
       name, gender, study_program, specialization, team, email, phone, show_phone, favorite_player, skill_level, university_type, university_name, photo_url, status
@@ -759,7 +863,7 @@ export function registerPlayerSubmission({
     study_program ? study_program.trim() : 'TU Chemnitz',
     specialization ? specialization.trim() : 'Einzel & Doppel',
     team ? team.trim() : 'Hochschulsport & Spielbetrieb',
-    email.trim().toLowerCase(),
+    cleanEmail,
     phone ? phone.trim() : '',
     show_phone ? 1 : 0,
     favorite_player ? favorite_player.trim() : '',
@@ -1236,6 +1340,43 @@ export function updateTrainingSchedule(id, fields) {
 
 export function deleteTrainingSchedule(id) {
   return db.prepare('DELETE FROM training_schedules WHERE id = ?').run(id);
+}
+
+// -------------------------------------------------------------
+// Tournament Partner Requests
+// -------------------------------------------------------------
+export function createPartnerRequest({
+  player_id,
+  player_name,
+  player_email,
+  requester_name,
+  requester_email,
+  requester_phone,
+  tournament_name,
+  discipline,
+  message,
+}) {
+  const stmt = db.prepare(`
+    INSERT INTO partner_requests (
+      player_id, player_name, player_email, requester_name, requester_email, requester_phone, tournament_name, discipline, message, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent')
+  `);
+  const result = stmt.run(
+    player_id,
+    player_name,
+    player_email,
+    requester_name.trim(),
+    requester_email.trim().toLowerCase(),
+    requester_phone ? requester_phone.trim() : '',
+    tournament_name.trim(),
+    discipline.trim(),
+    message ? message.trim() : ''
+  );
+  return db.prepare('SELECT * FROM partner_requests WHERE id = ?').get(result.lastInsertRowid);
+}
+
+export function getAllPartnerRequests() {
+  return db.prepare('SELECT * FROM partner_requests ORDER BY created_at DESC').all();
 }
 
 export { db };

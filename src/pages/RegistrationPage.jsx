@@ -130,6 +130,12 @@ export default function RegistrationPage({ onNavigate }) {
       });
 
       if (!result.ok) {
+        if (result.status === 409) {
+          setErrorMsg(result.error || (isDe 
+            ? 'Diese E-Mail-Adresse ist bereits als aktiver Spieler registriert. Keine doppelten Einträge möglich.' 
+            : 'This email address is already registered as an active player. Duplicate entries are not allowed.'));
+          return;
+        }
         if (result.isOffline) {
           saveOfflineSubmission({
             type: 'player',
@@ -203,6 +209,12 @@ export default function RegistrationPage({ onNavigate }) {
       });
 
       if (!result.ok) {
+        if (result.status === 409) {
+          setErrorMsg(result.error || (isDe 
+            ? 'Diese E-Mail-Adresse ist bereits als Trainer registriert. Keine doppelten Einträge möglich.' 
+            : 'This email address is already registered as a coach/trainer. Duplicate entries are not allowed.'));
+          return;
+        }
         if (result.isOffline) {
           saveOfflineSubmission({
             type: 'trainer',
