@@ -23,7 +23,7 @@ import { useLanguage } from '../context/LanguageContext';
 import StadiumCarousel from '../components/StadiumCarousel';
 import YouTubeSection from '../components/YouTubeSection';
 import TrainingTimingsModal from '../components/TrainingTimingsModal';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, safeFetchJson } from '../api/client';
 
 export default function HomePage({ onNavigate }) {
   const { t, language } = useLanguage();
@@ -45,12 +45,9 @@ export default function HomePage({ onNavigate }) {
 
   const fetchSchedules = async () => {
     try {
-      const res = await fetch(getApiUrl('/api/training-schedules'));
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setSchedules(data);
-        }
+      const res = await safeFetchJson('/api/training-schedules');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setSchedules(res.data);
       }
     } catch (err) {
       console.error('Failed to load training schedules:', err);
@@ -69,11 +66,10 @@ export default function HomePage({ onNavigate }) {
   }, []);
 
   useEffect(() => {
-    fetch(getApiUrl('/api/announcement'))
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data && data.is_active) {
-          setAnnouncement(data);
+    safeFetchJson('/api/announcement')
+      .then(res => {
+        if (res.ok && res.data && res.data.is_active) {
+          setAnnouncement(res.data);
         }
       })
       .catch(err => console.error('Failed to load announcement:', err));

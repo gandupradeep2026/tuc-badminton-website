@@ -9,10 +9,11 @@ import {
   Mail, 
   Award, 
   MessageSquare, 
-  HelpCircle,
-  Sparkles,
-  Database
+  HelpCircle, 
+  Sparkles, 
+  Database 
 } from 'lucide-react';
+import { safeFetchJson, saveOfflineSubmission } from '../api/client';
 
 export default function RegistrationModal({ 
   isOpen, 
@@ -71,53 +72,77 @@ export default function RegistrationModal({
 
     try {
       if (activeTab === 'inquiry') {
-        const response = await fetch('/api/inquiries', {
+        const payload = {
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject || 'Badminton Question',
+          message: formData.message,
+        };
+
+        const result = await safeFetchJson('/api/inquiries', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            subject: formData.subject || 'Badminton Question',
-            message: formData.message,
-          }),
+          body: JSON.stringify(payload),
         });
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to submit inquiry');
+        if (!result.ok) {
+          if (result.isOffline) {
+            saveOfflineSubmission({ type: 'inquiry', data: payload });
+            setSubmittedData({
+              type: 'inquiry',
+              record: { ...payload, id: 'OFFLINE-QUEUED' },
+            });
+            if (onSuccess) onSuccess();
+            return;
+          }
+          throw new Error(result.error || 'Failed to submit inquiry');
+        }
 
         setSubmittedData({
           type: 'inquiry',
-          record: result.inquiry,
+          record: result.data?.inquiry || { ...payload, id: 'LOCAL-OK' },
         });
       } else {
         // Registration (trial or tournament)
-        const response = await fetch('/api/registrations', {
+        const payload = {
+          name: formData.name,
+          email: formData.email,
+          affiliation: formData.affiliation,
+          session_type: activeTab, // 'trial' or 'tournament'
+          skill_level: formData.skill_level,
+          preferred_day: formData.preferred_day,
+          racket_needed: formData.racket_needed,
+          message: formData.message,
+        };
+
+        const result = await safeFetchJson('/api/registrations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            affiliation: formData.affiliation,
-            session_type: activeTab, // 'trial' or 'tournament'
-            skill_level: formData.skill_level,
-            preferred_day: formData.preferred_day,
-            racket_needed: formData.racket_needed,
-            message: formData.message,
-          }),
+          body: JSON.stringify(payload),
         });
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to submit registration');
+        if (!result.ok) {
+          if (result.isOffline) {
+            saveOfflineSubmission({ type: 'registration', data: payload });
+            setSubmittedData({
+              type: 'registration',
+              record: { ...payload, id: 'OFFLINE-QUEUED' },
+            });
+            if (onSuccess) onSuccess();
+            return;
+          }
+          throw new Error(result.error || 'Failed to submit registration');
+        }
 
         setSubmittedData({
           type: 'registration',
-          record: result.registration,
+          record: result.data?.registration || { ...payload, id: 'LOCAL-OK' },
         });
       }
 
       if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.message || 'An error occurred while connecting to the local SQLite server.');
+      setError(err.message || 'An error occurred while connecting to the server.');
     } finally {
       setLoading(false);
     }

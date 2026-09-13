@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Mail, Sparkles, User, Target, ShieldCheck } from 'lucide-react';
+import { safeFetchJson, getUploadUrl } from '../api/client';
+import { DEFAULT_TRAINERS } from '../data/mockData';
 
 export default function TrainersSection({ refreshTrigger = 0 }) {
-  const [trainers, setTrainers] = useState([]);
+  const [trainers, setTrainers] = useState(DEFAULT_TRAINERS);
   const [loading, setLoading] = useState(true);
 
   const fetchTrainers = async () => {
     try {
-      const res = await fetch('/api/trainers');
-      if (res.ok) {
-        const data = await res.json();
-        setTrainers(data);
+      const res = await safeFetchJson('/api/trainers');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setTrainers(res.data);
+      } else {
+        setTrainers(DEFAULT_TRAINERS);
       }
     } catch (err) {
-      console.error('Error fetching trainers:', err);
+      console.error('Error fetching trainers, using fallback:', err);
+      setTrainers(DEFAULT_TRAINERS);
     } finally {
       setLoading(false);
     }
@@ -68,7 +72,7 @@ export default function TrainersSection({ refreshTrigger = 0 }) {
                     <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border-2 border-tuc-800/20 dark:border-emerald-500/30 flex-shrink-0">
                       {coach.photo_url ? (
                         <img
-                          src={coach.photo_url}
+                          src={getUploadUrl(coach.photo_url)}
                           alt={coach.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {

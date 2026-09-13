@@ -13,6 +13,7 @@ import {
   Layers,
   AlertCircle
 } from 'lucide-react';
+import { safeFetchJson, getOfflineSubmissions } from '../api/client';
 
 export default function DbInspectorModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('registrations'); // 'registrations' | 'inquiries'
@@ -27,19 +28,31 @@ export default function DbInspectorModal({ isOpen, onClose }) {
     setError(null);
     try {
       const [regRes, inqRes] = await Promise.all([
-        fetch('/api/registrations'),
-        fetch('/api/inquiries'),
+        safeFetchJson('/api/registrations'),
+        safeFetchJson('/api/inquiries'),
       ]);
 
-      if (!regRes.ok || !inqRes.ok) throw new Error('Failed to retrieve SQLite database records');
+      const offlineItems = getOfflineSubmissions();
 
-      const regData = await regRes.json();
-      const inqData = await inqRes.json();
+      if (regRes.ok && Array.isArray(regRes.data)) {
+        setRegistrations(regRes.data);
+      } else {
+        const queuedRegs = offlineItems
+          .filter(i => i.type === 'registration' || i.type === 'player' || i.type === 'trainer')
+          .map(i => ({ id: i.id, name: i.data?.name, email: i.data?.email, session_type: `${i.type} (Offline-Warteschlange)`, created_at: i.createdAt }));
+        setRegistrations(queuedRegs);
+      }
 
-      setRegistrations(regData);
-      setInquiries(inqData);
+      if (inqRes.ok && Array.isArray(inqRes.data)) {
+        setInquiries(inqRes.data);
+      } else {
+        const queuedInqs = offlineItems
+          .filter(i => i.type === 'inquiry')
+          .map(i => ({ id: i.id, name: i.data?.name, email: i.data?.email, subject: i.data?.subject || 'Offline Inquiry', message: i.data?.message, created_at: i.createdAt }));
+        setInquiries(queuedInqs);
+      }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Error loading records');
     } finally {
       setLoading(false);
     }

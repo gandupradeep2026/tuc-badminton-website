@@ -1,4 +1,4 @@
-import { getApiUrl, getBaseApiUrl } from './client.js';
+import { getApiUrl, getBaseApiUrl, safeParseJson, syncOfflineSubmissions } from './client.js';
 
 let currentStatus = {
   state: 'checking', // 'online' | 'offline' | 'checking'
@@ -41,8 +41,9 @@ export async function checkServerHealth() {
     });
     clearTimeout(timer);
 
-    if (res.ok) {
-      const data = await res.json();
+    const { isJson, data } = await safeParseJson(res);
+
+    if (res.ok && isJson && data && data.status === 'ok') {
       currentStatus = {
         state: 'online',
         latency: Date.now() - startTime,
@@ -51,13 +52,15 @@ export async function checkServerHealth() {
         error: null,
         backendUrl: getBaseApiUrl(),
       };
+      // Trigger background sync for any queued submissions
+      syncOfflineSubmissions().catch(() => {});
     } else {
       currentStatus = {
         state: 'offline',
         latency: null,
         timestamp: null,
         venue: null,
-        error: `HTTP ${res.status}`,
+        error: res.status === 404 ? 'Server offline (404)' : `HTTP ${res.status}`,
         backendUrl: getBaseApiUrl(),
       };
     }

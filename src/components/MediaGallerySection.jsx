@@ -10,9 +10,37 @@ import {
   Sparkles,
   Play
 } from 'lucide-react';
+import { safeFetchJson, getUploadUrl } from '../api/client';
+
+const DEFAULT_MEDIA_ITEMS = [
+  {
+    id: 1,
+    title: 'UNI Badminton Team Cup 2026 - Siegerehrung Gold',
+    type: 'photo',
+    file_url: '/uploads/tournament_2026/teamcup_2026_winners_gold.jpeg',
+    thumbnail_url: '/uploads/tournament_2026/teamcup_2026_winners_gold.jpeg',
+    caption: 'Goldmedaille für die TUC Shuttlers in der Sporthalle Thüringer Weg 11.',
+  },
+  {
+    id: 2,
+    title: 'TUC Challengers Bronze & MVP Feier',
+    type: 'photo',
+    file_url: '/uploads/tournament_2026/teamcup_2026_challengers_bronze.jpeg',
+    thumbnail_url: '/uploads/tournament_2026/teamcup_2026_challengers_bronze.jpeg',
+    caption: 'Erfolgreiche Bronzemedaille und Auszeichnung als MVP-Team.',
+  },
+  {
+    id: 3,
+    title: 'Doppel-Ballwechsel - Thüringer Weg 11',
+    type: 'photo',
+    file_url: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80',
+    thumbnail_url: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=400&q=80',
+    caption: 'Intensives Training auf den 12 Hallenfeldern.',
+  }
+];
 
 export default function MediaGallerySection({ refreshTrigger = 0 }) {
-  const [mediaItems, setMediaItems] = useState([]);
+  const [mediaItems, setMediaItems] = useState(DEFAULT_MEDIA_ITEMS);
   const [activeCategory, setActiveCategory] = useState('all'); // 'all' | 'photo' | 'video'
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,13 +48,15 @@ export default function MediaGallerySection({ refreshTrigger = 0 }) {
   const fetchMedia = async () => {
     try {
       const url = activeCategory === 'all' ? '/api/media' : `/api/media?type=${activeCategory}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        setMediaItems(data);
+      const res = await safeFetchJson(url);
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setMediaItems(res.data);
+      } else {
+        setMediaItems(DEFAULT_MEDIA_ITEMS);
       }
     } catch (err) {
       console.error('Error fetching media:', err);
+      setMediaItems(DEFAULT_MEDIA_ITEMS);
     } finally {
       setLoading(false);
     }
@@ -112,7 +142,7 @@ export default function MediaGallerySection({ refreshTrigger = 0 }) {
               <div className="relative aspect-video bg-slate-900 overflow-hidden">
                 {item.type === 'video' ? (
                   <video
-                    src={item.file_url}
+                    src={getUploadUrl(item.file_url)}
                     controls
                     preload="metadata"
                     className="w-full h-full object-cover"
@@ -125,7 +155,7 @@ export default function MediaGallerySection({ refreshTrigger = 0 }) {
                     onClick={() => setSelectedPhoto(item)}
                   >
                     <img
-                      src={item.file_url}
+                      src={getUploadUrl(item.file_url)}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       loading="lazy"

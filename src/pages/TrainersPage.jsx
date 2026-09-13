@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Mail, Phone, UserPlus, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getApiUrl, getUploadUrl } from '../api/client';
+import { getApiUrl, getUploadUrl, safeFetchJson } from '../api/client';
+import { DEFAULT_TRAINERS } from '../data/mockData';
 
 export default function TrainersPage({ onNavigate }) {
-  const [trainers, setTrainers] = useState([]);
+  const [trainers, setTrainers] = useState(DEFAULT_TRAINERS);
   const [loading, setLoading] = useState(true);
   const { language, t } = useLanguage();
   const tr = t.trainers;
@@ -12,13 +13,15 @@ export default function TrainersPage({ onNavigate }) {
 
   const fetchTrainers = async () => {
     try {
-      const res = await fetch(getApiUrl('/api/trainers'));
-      if (res.ok) {
-        const data = await res.json();
-        setTrainers(data);
+      const res = await safeFetchJson('/api/trainers');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setTrainers(res.data);
+      } else {
+        setTrainers(DEFAULT_TRAINERS);
       }
     } catch (err) {
-      console.error('Failed to load trainers:', err);
+      console.error('Failed to load trainers, using fallback:', err);
+      setTrainers(DEFAULT_TRAINERS);
     } finally {
       setLoading(false);
     }

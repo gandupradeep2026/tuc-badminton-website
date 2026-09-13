@@ -16,10 +16,11 @@ import {
   Award
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getApiUrl, getUploadUrl } from '../api/client';
+import { getApiUrl, getUploadUrl, safeFetchJson, saveOfflineSubmission, fileToDataUrl } from '../api/client';
+import { DEFAULT_GALLERY } from '../data/mockData';
 
 export default function GalleryPage() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(DEFAULT_GALLERY);
   const [loading, setLoading] = useState(true);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null); // Lightbox zoom
@@ -42,13 +43,15 @@ export default function GalleryPage() {
 
   const fetchGallery = async () => {
     try {
-      const res = await fetch(getApiUrl('/api/gallery'));
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data);
+      const res = await safeFetchJson('/api/gallery');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setItems(res.data);
+      } else {
+        setItems(DEFAULT_GALLERY);
       }
     } catch (err) {
-      console.error('Failed to load gallery items:', err);
+      console.error('Failed to load gallery items, using fallback:', err);
+      setItems(DEFAULT_GALLERY);
     } finally {
       setLoading(false);
     }
@@ -73,30 +76,61 @@ export default function GalleryPage() {
     setFeedback(null);
 
     try {
-      const formData = new FormData();
-      formData.append('tournament_name', tournamentName);
-      formData.append('result', result);
-      formData.append('date', date || new Date().toLocaleDateString('de-DE'));
-      formData.append('player_name', playerName);
-      formData.append('caption', caption);
-      formData.append('submitted_by', submitter || playerName);
+      const payload = {
+        tournament_name: tournamentName,
+        result,
+        date: date || new Date().toLocaleDateString('de-DE'),
+        player_name: playerName,
+        caption,
+        submitted_by: submitter || playerName,
+      };
 
+      let photoDataUrl = photoUrlInput.trim();
       if (photoFile) {
-        formData.append('photo', photoFile);
-      } else if (photoUrlInput) {
-        formData.append('photo_url_input', photoUrlInput);
-      } else {
+        photoDataUrl = await fileToDataUrl(photoFile);
+      } else if (!photoDataUrl) {
         throw new Error('Bitte lade ein Foto hoch oder gib eine Bild-URL an.');
       }
 
-      const res = await fetch('/api/gallery/submit', {
+      const formData = new FormData();
+      Object.entries(payload).forEach(([k, v]) => formData.append(k, v));
+      if (photoFile) {
+        formData.append('photo', photoFile);
+      } else if (photoDataUrl) {
+        formData.append('photo_url_input', photoDataUrl);
+      }
+
+      const res = await safeFetchJson('/api/gallery/submit', {
         method: 'POST',
         body: formData,
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || g.errorMsg);
+        if (res.isOffline) {
+          saveOfflineSubmission({
+            type: 'gallery',
+            data: payload,
+            photoDataUrl,
+          });
+          setFeedback({
+            type: 'success',
+            message: isDe 
+              ? 'Foto-Einreichung offline gespeichert! Sobald der Server aktiv ist, wird sie automatisch synchronisiert.'
+              : 'Photo submission saved offline! It will synchronize automatically when the server is online.',
+          });
+          setTournamentName('');
+          setResult('');
+          setDate('');
+          setPlayerName('');
+          setCaption('');
+          setSubmitter('');
+          setPhotoFile(null);
+          setPhotoPreview('');
+          setPhotoUrlInput('');
+          setTimeout(() => setIsSubmitModalOpen(false), 2500);
+          return;
+        }
+        throw new Error(res.error || g.errorMsg);
       }
 
       setFeedback({ type: 'success', message: g.successMsg });

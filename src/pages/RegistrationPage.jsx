@@ -18,7 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, safeFetchJson, saveOfflineSubmission, fileToDataUrl } from '../api/client';
 
 export default function RegistrationPage({ onNavigate }) {
   const { language, t } = useLanguage();
@@ -28,6 +28,7 @@ export default function RegistrationPage({ onNavigate }) {
   const [activeTab, setActiveTab] = useState('player'); // 'player' | 'trainer'
   const [submitting, setSubmitting] = useState(false);
   const [submittedType, setSubmittedType] = useState(null); // 'player' | 'trainer' | null
+  const [isOfflineSaved, setIsOfflineSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   // -------------------------------------------------------------
@@ -103,37 +104,55 @@ export default function RegistrationPage({ onNavigate }) {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('name', playerName.trim());
-      formData.append('gender', playerGender);
-      formData.append('specialization', playerDisciplines.join(', '));
-      formData.append('skill_level', playerLevel);
-      formData.append('favorite_player', playerFav.trim());
-      formData.append('email', playerEmail.trim().toLowerCase());
-      formData.append('phone', playerPhone.trim());
-      formData.append('university_type', playerUniType);
-      formData.append('university_name', playerUniType === 'other' ? playerUniName.trim() : 'TU Chemnitz');
-      formData.append('study_program', playerStudy.trim());
+      const payload = {
+        name: playerName.trim(),
+        gender: playerGender,
+        specialization: playerDisciplines.join(', '),
+        skill_level: playerLevel,
+        favorite_player: playerFav.trim(),
+        email: playerEmail.trim().toLowerCase(),
+        phone: playerPhone.trim(),
+        university_type: playerUniType,
+        university_name: playerUniType === 'other' ? playerUniName.trim() : 'TU Chemnitz',
+        study_program: playerStudy.trim(),
+      };
 
+      let photoDataUrl = playerPhotoUrl.trim();
       if (playerPhotoFile) {
-        formData.append('photo', playerPhotoFile);
-      } else if (playerPhotoUrl.trim()) {
-        formData.append('photo_url_input', playerPhotoUrl.trim());
+        photoDataUrl = await fileToDataUrl(playerPhotoFile);
       }
 
-      const res = await fetch(getApiUrl('/api/register/player'), {
+      const formData = new FormData();
+      Object.entries(payload).forEach(([k, v]) => formData.append(k, v));
+      if (playerPhotoFile) {
+        formData.append('photo', playerPhotoFile);
+      } else if (photoDataUrl) {
+        formData.append('photo_url_input', photoDataUrl);
+      }
+
+      const result = await safeFetchJson('/api/register/player', {
         method: 'POST',
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Fehler beim Übermitteln der Spieler-Registrierung.');
+      if (!result.ok) {
+        if (result.isOffline) {
+          saveOfflineSubmission({
+            type: 'player',
+            data: payload,
+            photoDataUrl,
+          });
+          setIsOfflineSaved(true);
+          setSubmittedType('player');
+          return;
+        }
+        throw new Error(result.error || 'Fehler beim Übermitteln der Spieler-Registrierung.');
       }
 
+      setIsOfflineSaved(false);
       setSubmittedType('player');
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || 'Übermittlung fehlgeschlagen.');
     } finally {
       setSubmitting(false);
     }
@@ -160,34 +179,52 @@ export default function RegistrationPage({ onNavigate }) {
     }
 
     try {
-      const formData = new FormData();
-      formData.append('name', trainerName.trim());
-      formData.append('role', trainerRole.trim());
-      formData.append('email', trainerEmail.trim().toLowerCase());
-      formData.append('phone', trainerPhone.trim());
-      formData.append('focus_areas', trainerFocus.trim());
-      formData.append('hochschulsport_approved', 'true');
-      formData.append('hochschulsport_note', trainerUszNote.trim() || 'USZ Genehmigung bestätigt');
+      const payload = {
+        name: trainerName.trim(),
+        role: trainerRole.trim(),
+        email: trainerEmail.trim().toLowerCase(),
+        phone: trainerPhone.trim(),
+        focus_areas: trainerFocus.trim(),
+        hochschulsport_approved: 'true',
+        hochschulsport_note: trainerUszNote.trim() || 'USZ Genehmigung bestätigt',
+      };
 
+      let photoDataUrl = trainerPhotoUrl.trim();
       if (trainerPhotoFile) {
-        formData.append('photo', trainerPhotoFile);
-      } else if (trainerPhotoUrl.trim()) {
-        formData.append('photo_url_input', trainerPhotoUrl.trim());
+        photoDataUrl = await fileToDataUrl(trainerPhotoFile);
       }
 
-      const res = await fetch(getApiUrl('/api/register/trainer'), {
+      const formData = new FormData();
+      Object.entries(payload).forEach(([k, v]) => formData.append(k, v));
+      if (trainerPhotoFile) {
+        formData.append('photo', trainerPhotoFile);
+      } else if (photoDataUrl) {
+        formData.append('photo_url_input', photoDataUrl);
+      }
+
+      const result = await safeFetchJson('/api/register/trainer', {
         method: 'POST',
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Fehler beim Übermitteln der Trainer-Bewerbung.');
+      if (!result.ok) {
+        if (result.isOffline) {
+          saveOfflineSubmission({
+            type: 'trainer',
+            data: payload,
+            photoDataUrl,
+          });
+          setIsOfflineSaved(true);
+          setSubmittedType('trainer');
+          return;
+        }
+        throw new Error(result.error || 'Fehler beim Übermitteln der Trainer-Bewerbung.');
       }
 
+      setIsOfflineSaved(false);
       setSubmittedType('trainer');
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || 'Übermittlung fehlgeschlagen.');
     } finally {
       setSubmitting(false);
     }
@@ -195,6 +232,7 @@ export default function RegistrationPage({ onNavigate }) {
 
   const handleResetForm = () => {
     setSubmittedType(null);
+    setIsOfflineSaved(false);
     setErrorMsg('');
     if (activeTab === 'player') {
       setPlayerName('');
@@ -231,14 +269,26 @@ export default function RegistrationPage({ onNavigate }) {
           </div>
 
           <div className="space-y-2">
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-[#005A36] border border-emerald-200">
-              {submittedType === 'player' ? '🏸 Spieler-Registrierung' : '👥 Trainer-Bewerbung'}
-            </span>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-[#005A36] border border-emerald-200">
+                {submittedType === 'player' ? '🏸 Spieler-Registrierung' : '👥 Trainer-Bewerbung'}
+              </span>
+              {isOfflineSaved && (
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                  ⚡ Offline gespeichert (Warteschlange)
+                </span>
+              )}
+            </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               {reg.successTitle}
             </h2>
             <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
-              {submittedType === 'player' ? reg.successPlayerDesc : reg.successTrainerDesc}
+              {isOfflineSaved
+                ? (isDe 
+                    ? 'Ihre Registrierung wurde sicher auf diesem Gerät gespeichert! Sobald der TU Chemnitz Badminton Server online ist, wird sie automatisch synchronisiert. Ihre Daten gehen garantiert nicht verloren.'
+                    : 'Your registration was securely saved to this device! As soon as the TU Chemnitz Badminton Server is online, it will automatically synchronize. None of your data is lost.')
+                : (submittedType === 'player' ? reg.successPlayerDesc : reg.successTrainerDesc)
+              }
             </p>
           </div>
 

@@ -9,22 +9,25 @@ import {
   UserCheck,
   Award
 } from 'lucide-react';
-import { getApiUrl, getUploadUrl } from '../api/client';
+import { getApiUrl, getUploadUrl, safeFetchJson } from '../api/client';
+import { DEFAULT_PLAYERS } from '../data/mockData';
 
 export default function PlayersSection({ refreshTrigger = 0 }) {
-  const [players, setPlayers] = useState([]);
+  const [players, setPlayers] = useState(DEFAULT_PLAYERS);
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'men' | 'women'
   const [loading, setLoading] = useState(true);
 
   const fetchPlayers = async () => {
     try {
-      const res = await fetch(getApiUrl('/api/players'));
-      if (res.ok) {
-        const data = await res.json();
-        setPlayers(data);
+      const res = await safeFetchJson('/api/players');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setPlayers(res.data);
+      } else {
+        setPlayers(DEFAULT_PLAYERS);
       }
     } catch (err) {
-      console.error('Error fetching players:', err);
+      console.error('Error fetching players, using fallback:', err);
+      setPlayers(DEFAULT_PLAYERS);
     } finally {
       setLoading(false);
     }

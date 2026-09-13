@@ -13,7 +13,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, safeFetchJson } from '../api/client';
 
 export default function ForgotPasswordModal({ 
   isOpen, 
@@ -42,20 +42,24 @@ export default function ForgotPasswordModal({
     setFeedback(null);
 
     try {
-      const res = await fetch(getApiUrl('/api/admin/forgot-password'), {
+      const res = await safeFetchJson('/api/admin/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || (isDe ? 'Fehler beim Anfordern des Codes.' : 'Failed to request approval code.'));
+        if (res.isOffline) {
+          throw new Error(isDe 
+            ? 'Der Laptop-Server ist derzeit offline. Bitte starten Sie start-server.bat auf Ihrem Laptop und verbinden Sie den Tunnel.'
+            : 'The laptop home server is currently offline. Please run start-server.bat and connect the tunnel.');
+        }
+        throw new Error(res.error || (isDe ? 'Fehler beim Anfordern des Codes.' : 'Failed to request approval code.'));
       }
 
       setFeedback({ 
         type: 'success', 
-        message: data.message || (isDe 
+        message: res.data?.message || (isDe 
           ? '6-stelliger Bestätigungscode wurde an Ihre autorisierte E-Mail gesendet.' 
           : 'A 6-digit approval code was sent to your authorized email.')
       });
@@ -101,7 +105,7 @@ export default function ForgotPasswordModal({
     }
 
     try {
-      const res = await fetch(getApiUrl('/api/admin/reset-password'), {
+      const res = await safeFetchJson('/api/admin/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -111,14 +115,18 @@ export default function ForgotPasswordModal({
         })
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || (isDe ? 'Passwortänderung verweigert: Ungültiger Code.' : 'Password change refused: Invalid code.'));
+        if (res.isOffline) {
+          throw new Error(isDe 
+            ? 'Der Laptop-Server ist derzeit offline. Bitte stellen Sie sicher, dass start-server.bat aktiv ist.'
+            : 'The laptop home server is currently offline. Please ensure start-server.bat is active.');
+        }
+        throw new Error(res.error || (isDe ? 'Passwortänderung verweigert: Ungültiger Code.' : 'Password change refused: Invalid code.'));
       }
 
       setFeedback({ 
         type: 'success', 
-        message: data.message || (isDe ? 'Ihr Passwort wurde erfolgreich aktualisiert!' : 'Your password has been updated successfully!') 
+        message: res.data?.message || (isDe ? 'Ihr Passwort wurde erfolgreich aktualisiert!' : 'Your password has been updated successfully!') 
       });
       
       setTimeout(() => {

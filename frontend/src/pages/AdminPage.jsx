@@ -40,6 +40,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import DisciplineSelector from '../components/DisciplineSelector';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
+import { safeFetchJson, getApiUrl, getUploadUrl, getOfflineSubmissions, syncOfflineSubmissions } from '../api/client';
 
 export default function AdminPage() {
   const { t, language } = useLanguage();
@@ -230,11 +231,10 @@ export default function AdminPage() {
   const fetchGallery = async () => {
     setGalleryLoading(true);
     try {
-      const res = await fetch('/api/admin/gallery', { headers: getAdminHeaders() });
+      const res = await safeFetchJson('/api/admin/gallery', { headers: getAdminHeaders() });
       if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        const data = await res.json();
-        setGalleryItems(data);
+      if (res.ok && res.data) {
+        setGalleryItems(res.data);
       }
     } catch (err) {
       console.error('Failed to load gallery items:', err);
@@ -246,10 +246,9 @@ export default function AdminPage() {
   const fetchPlayers = async () => {
     setPlayersLoading(true);
     try {
-      const res = await fetch('/api/players');
-      if (res.ok) {
-        const data = await res.json();
-        setPlayersList(data);
+      const res = await safeFetchJson('/api/players');
+      if (res.ok && res.data) {
+        setPlayersList(res.data);
       }
     } catch (err) {
       console.error('Failed to load players:', err);
@@ -261,10 +260,9 @@ export default function AdminPage() {
   const fetchTrainers = async () => {
     setTrainersLoading(true);
     try {
-      const res = await fetch('/api/trainers');
-      if (res.ok) {
-        const data = await res.json();
-        setTrainersList(data);
+      const res = await safeFetchJson('/api/trainers');
+      if (res.ok && res.data) {
+        setTrainersList(res.data);
       }
     } catch (err) {
       console.error('Failed to load trainers:', err);
@@ -276,11 +274,10 @@ export default function AdminPage() {
   const fetchTournaments = async () => {
     setTourneysLoading(true);
     try {
-      const res = await fetch('/api/admin/tournaments', { headers: getAdminHeaders() });
+      const res = await safeFetchJson('/api/admin/tournaments', { headers: getAdminHeaders() });
       if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        const data = await res.json();
-        setTournamentsList(data);
+      if (res.ok && res.data) {
+        setTournamentsList(res.data);
       }
     } catch (err) {
       console.error('Failed to load tournaments:', err);
@@ -292,10 +289,9 @@ export default function AdminPage() {
   const fetchAnnouncement = async () => {
     setAnnounceLoading(true);
     try {
-      const res = await fetch('/api/announcement');
-      if (res.ok) {
-        const data = await res.json();
-        setAnnouncement(data);
+      const res = await safeFetchJson('/api/announcement');
+      if (res.ok && res.data) {
+        setAnnouncement(res.data);
       }
     } catch (err) {
       console.error('Failed to load announcement:', err);
@@ -307,13 +303,12 @@ export default function AdminPage() {
   const fetchYouTubeVideos = async () => {
     setYoutubeLoading(true);
     try {
-      const res = await fetch('/api/videos');
-      if (res.ok) {
-        const data = await res.json();
-        setYoutubeVideos(data.videos || []);
-        if (data.youtube_channel_url) {
-          setYoutubeChannelUrl(data.youtube_channel_url);
-          setChannelUrlInput(data.youtube_channel_url);
+      const res = await safeFetchJson('/api/videos');
+      if (res.ok && res.data) {
+        setYoutubeVideos(res.data.videos || []);
+        if (res.data.youtube_channel_url) {
+          setYoutubeChannelUrl(res.data.youtube_channel_url);
+          setChannelUrlInput(res.data.youtube_channel_url);
         }
       }
     } catch (err) {
@@ -326,10 +321,9 @@ export default function AdminPage() {
   const fetchAdminSchedules = async () => {
     setSchedulesLoading(true);
     try {
-      const res = await fetch('/api/training-schedules');
-      if (res.ok) {
-        const data = await res.json();
-        setAdminSchedules(data || []);
+      const res = await safeFetchJson('/api/training-schedules');
+      if (res.ok && res.data) {
+        setAdminSchedules(res.data || []);
       }
     } catch (err) {
       console.error('Failed to load training schedules:', err);
@@ -341,12 +335,11 @@ export default function AdminPage() {
   const fetchPendingRegistrations = async () => {
     setRegistrationsLoading(true);
     try {
-      const res = await fetch('/api/admin/registrations', { headers: getAdminHeaders() });
+      const res = await safeFetchJson('/api/admin/registrations', { headers: getAdminHeaders() });
       if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        const data = await res.json();
-        setPendingPlayers(data.players || []);
-        setPendingTrainers(data.trainers || []);
+      if (res.ok && res.data) {
+        setPendingPlayers(res.data.players || []);
+        setPendingTrainers(res.data.trainers || []);
       }
     } catch (err) {
       console.error('Failed to load pending registrations:', err);
@@ -454,23 +447,28 @@ export default function AdminPage() {
     setAuthError('');
 
     try {
-      const res = await fetch('/api/admin/login', {
+      const res = await safeFetchJson('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
 
-      const data = await res.json();
-      if (res.ok && data.success && data.token) {
-        localStorage.setItem('tuc_admin_token', data.token);
-        setToken(data.token);
+      if (res.ok && res.data?.success && res.data?.token) {
+        localStorage.setItem('tuc_admin_token', res.data.token);
+        setToken(res.data.token);
         setIsAuthenticated(true);
         setPassword('');
       } else {
-        setAuthError(data.error || adm.wrongPassword);
+        if (res.isOffline) {
+          setAuthError(isDe 
+            ? 'Der Laptop-Server ist derzeit offline. Bitte stellen Sie sicher, dass start-server.bat auf dem Server-Laptop läuft und der Tunnel verbunden ist.'
+            : 'Laptop home server is offline. Please run start-server.bat and connect the tunnel.');
+        } else {
+          setAuthError(res.error || adm.wrongPassword);
+        }
       }
     } catch (err) {
-      setAuthError(adm.wrongPassword);
+      setAuthError(err.message || adm.wrongPassword);
     } finally {
       setAuthLoading(false);
     }
@@ -633,7 +631,7 @@ export default function AdminPage() {
         formData.append('photo_url_input', playerPhotoUrl.trim());
       }
 
-      const res = await fetch('/api/players', {
+      const res = await safeFetchJson('/api/players', {
         method: 'POST',
         headers: getAdminHeaders(),
         body: formData,
@@ -641,8 +639,7 @@ export default function AdminPage() {
 
       if (res.status === 401) return handleUnauthorized();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Fehler beim Erstellen des Spielers');
+        throw new Error(res.error || 'Fehler beim Erstellen des Spielers');
       }
 
       setFeedback({ type: 'success', message: adm.playerCreatedSuccess });
@@ -738,7 +735,7 @@ export default function AdminPage() {
         formData.append('photo_url_input', trainerPhotoUrl.trim());
       }
 
-      const res = await fetch('/api/trainers', {
+      const res = await safeFetchJson('/api/trainers', {
         method: 'POST',
         headers: getAdminHeaders(),
         body: formData,
@@ -746,8 +743,7 @@ export default function AdminPage() {
 
       if (res.status === 401) return handleUnauthorized();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Fehler beim Anlegen des Trainers');
+        throw new Error(res.error || 'Fehler beim Anlegen des Trainers');
       }
 
       setFeedback({ type: 'success', message: adm.trainerCreatedSuccess });
@@ -929,7 +925,7 @@ export default function AdminPage() {
     setFeedback(null);
 
     try {
-      const res = await fetch('/api/admin/announcement', {
+      const res = await safeFetchJson('/api/admin/announcement', {
         method: 'PUT',
         headers: {
           ...getAdminHeaders(),
@@ -939,10 +935,9 @@ export default function AdminPage() {
       });
 
       if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Speichern der Mitteilung');
+      if (!res.ok) throw new Error(res.error || 'Fehler beim Speichern der Mitteilung');
 
-      const data = await res.json();
-      setAnnouncement(data.announcement);
+      setAnnouncement(res.data?.announcement || announcement);
       setFeedback({ type: 'success', message: adm.announceSavedSuccess });
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
@@ -967,7 +962,7 @@ export default function AdminPage() {
 
     setPwSubmitting(true);
     try {
-      const res = await fetch('/api/admin/change-password', {
+      const res = await safeFetchJson('/api/admin/change-password', {
         method: 'POST',
         headers: {
           ...getAdminHeaders(),
@@ -979,16 +974,15 @@ export default function AdminPage() {
         }),
       });
 
-      const data = await res.json();
-      if (res.ok && data.success && data.token) {
-        localStorage.setItem('tuc_admin_token', data.token);
-        setToken(data.token);
+      if (res.ok && res.data?.success && res.data?.token) {
+        localStorage.setItem('tuc_admin_token', res.data.token);
+        setToken(res.data.token);
         setFeedback({ type: 'success', message: adm.passwordChangedSuccess });
         setCurrPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setFeedback({ type: 'error', message: data.error || adm.invalidCurrentPassword });
+        setFeedback({ type: 'error', message: res.error || adm.invalidCurrentPassword });
       }
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
@@ -1005,7 +999,7 @@ export default function AdminPage() {
     setChannelSaving(true);
     setFeedback(null);
     try {
-      const res = await fetch('/api/admin/settings/youtube-channel', {
+      const res = await safeFetchJson('/api/admin/settings/youtube-channel', {
         method: 'PUT',
         headers: {
           ...getAdminHeaders(),
@@ -1014,9 +1008,8 @@ export default function AdminPage() {
         body: JSON.stringify({ youtube_channel_url: channelUrlInput.trim() }),
       });
       if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Speichern des YouTube-Kanal-Links');
-      const data = await res.json();
-      setYoutubeChannelUrl(data.youtube_channel_url);
+      if (!res.ok) throw new Error(res.error || 'Fehler beim Speichern des YouTube-Kanal-Links');
+      setYoutubeChannelUrl(res.data?.youtube_channel_url || channelUrlInput.trim());
       setFeedback({ type: 'success', message: 'YouTube-Kanal-Link erfolgreich aktualisiert!' });
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });

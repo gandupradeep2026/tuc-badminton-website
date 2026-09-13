@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Users, GraduationCap, Target, Mail, UserPlus, Star, School } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { safeFetchJson } from '../api/client';
+import { DEFAULT_PLAYERS } from '../data/mockData';
 
 export default function PlayersPage({ onNavigate }) {
-  const [players, setPlayers] = useState([]);
+  const [players, setPlayers] = useState(DEFAULT_PLAYERS);
   const [activeTab, setActiveTab] = useState('all'); // 'all' | 'men' | 'women'
   const [loading, setLoading] = useState(true);
   const { language, t } = useLanguage();
@@ -12,13 +14,15 @@ export default function PlayersPage({ onNavigate }) {
 
   const fetchPlayers = async () => {
     try {
-      const res = await fetch('/api/players');
-      if (res.ok) {
-        const data = await res.json();
-        setPlayers(data);
+      const res = await safeFetchJson('/api/players');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setPlayers(res.data);
+      } else {
+        setPlayers(DEFAULT_PLAYERS);
       }
     } catch (err) {
-      console.error('Failed to load players:', err);
+      console.error('Failed to load players, using fallback:', err);
+      setPlayers(DEFAULT_PLAYERS);
     } finally {
       setLoading(false);
     }

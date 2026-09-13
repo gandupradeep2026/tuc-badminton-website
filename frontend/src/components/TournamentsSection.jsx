@@ -11,20 +11,46 @@ import {
   Sparkles,
   Users
 } from 'lucide-react';
+import { safeFetchJson, getUploadUrl } from '../api/client';
+
+const DEFAULT_TOURNAMENTS_LIST = [
+  {
+    id: 1,
+    title: '32. Sächsische Hochschulmeisterschaft (SHM) Badminton 2026',
+    date: '14. November 2026 (09:00 - 18:30)',
+    deadline: '31. Oktober 2026',
+    location: 'Sporthalle Thüringer Weg 11, 09126 Chemnitz',
+    document_url: '/uploads/ausschreibung_shm_2026.pdf',
+    file_type: 'pdf',
+    description: 'Offizielle sächsische Hochschulmeisterschaft im Universitäts-Sportzentrum TU Chemnitz. Einzel, Doppel und Mixed.',
+  },
+  {
+    id: 2,
+    title: 'Chemnitzer Badminton Stadtmeisterschaften 2026',
+    date: '17. Oktober 2026',
+    deadline: '05. Oktober 2026',
+    location: 'Sporthalle Thüringer Weg 11, Chemnitz',
+    document_url: '/uploads/tournament_2026/UNI_Badminton_Team_Cup_2026_Schedule_Printable.pdf',
+    file_type: 'pdf',
+    description: 'Traditionelle Stadtmeisterschaften im Herbst für Freizeit- und Vereinsspieler.',
+  }
+];
 
 export default function TournamentsSection({ refreshTrigger = 0 }) {
-  const [tournaments, setTournaments] = useState([]);
+  const [tournaments, setTournaments] = useState(DEFAULT_TOURNAMENTS_LIST);
   const [loading, setLoading] = useState(true);
 
   const fetchTournaments = async () => {
     try {
-      const res = await fetch('/api/tournaments');
-      if (res.ok) {
-        const data = await res.json();
-        setTournaments(data);
+      const res = await safeFetchJson('/api/tournaments');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setTournaments(res.data);
+      } else {
+        setTournaments(DEFAULT_TOURNAMENTS_LIST);
       }
     } catch (err) {
-      console.error('Error fetching tournaments:', err);
+      console.error('Error fetching tournaments, using fallback:', err);
+      setTournaments(DEFAULT_TOURNAMENTS_LIST);
     } finally {
       setLoading(false);
     }
@@ -118,7 +144,7 @@ export default function TournamentsSection({ refreshTrigger = 0 }) {
               <div className="md:w-56 flex flex-col gap-2 flex-shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-200 dark:border-slate-800">
                 {tourney.document_url ? (
                   <a
-                    href={tourney.document_url}
+                    href={getUploadUrl(tourney.document_url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-xs font-bold text-white bg-tuc-800 hover:bg-tuc-700 dark:bg-tuc-700 dark:hover:bg-tuc-600 shadow-md shadow-tuc-900/20 hover:shadow-glow-tuc transition-all"

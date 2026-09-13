@@ -10,32 +10,59 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { safeFetchJson, getUploadUrl } from '../api/client';
+
+const DEFAULT_VIDEOS = [
+  {
+    id: 1,
+    youtube_id: 'lTRiuFIWV54',
+    title: 'UNI Badminton Team Cup 2026 - Finale Highlights',
+    category: 'Turnier',
+    youtube_url: 'https://www.youtube.com/watch?v=lTRiuFIWV54',
+    thumbnail_url: '/uploads/tournament_2026/teamcup_2026_winners_gold.jpeg',
+    description: 'Highlights und Ballwechsel aus dem Grand Finale des Uni Badminton Team Cups 2026.',
+  },
+  {
+    id: 2,
+    youtube_id: 'lTRiuFIWV54',
+    title: 'Training & Footwork Drills - Sporthalle Thüringer Weg',
+    category: 'Training',
+    youtube_url: 'https://www.youtube.com/watch?v=lTRiuFIWV54',
+    thumbnail_url: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=600&q=80',
+    description: 'Multi-Shuttle Footwork Speed Drills mit den Spielern der TU Chemnitz.',
+  }
+];
 
 export default function YouTubeSection() {
   const { t, language } = useLanguage();
   const y = t.home?.youtube || {};
   const isDe = language === 'de';
 
-  const [videos, setVideos] = useState([]);
+  const [videos, setVideos] = useState(DEFAULT_VIDEOS);
   const [channelUrl, setChannelUrl] = useState('https://www.youtube.com/@TUCBadminton');
-  const [activeVideo, setActiveVideo] = useState(null);
+  const [activeVideo, setActiveVideo] = useState(DEFAULT_VIDEOS[0]);
   const [loading, setLoading] = useState(true);
 
   const fetchVideos = async () => {
     try {
-      const res = await fetch('/api/videos');
-      if (res.ok) {
-        const data = await res.json();
-        setVideos(data.videos || []);
-        if (data.youtube_channel_url) {
-          setChannelUrl(data.youtube_channel_url);
+      const res = await safeFetchJson('/api/videos');
+      if (res.ok && res.data) {
+        const videoList = res.data.videos && res.data.videos.length > 0 ? res.data.videos : DEFAULT_VIDEOS;
+        setVideos(videoList);
+        if (res.data.youtube_channel_url) {
+          setChannelUrl(res.data.youtube_channel_url);
         }
-        if (data.videos && data.videos.length > 0) {
-          setActiveVideo(data.videos[0]);
+        if (videoList.length > 0) {
+          setActiveVideo(videoList[0]);
         }
+      } else {
+        setVideos(DEFAULT_VIDEOS);
+        setActiveVideo(DEFAULT_VIDEOS[0]);
       }
     } catch (err) {
-      console.error('Failed to load YouTube videos:', err);
+      console.error('Failed to load YouTube videos, using fallback:', err);
+      setVideos(DEFAULT_VIDEOS);
+      setActiveVideo(DEFAULT_VIDEOS[0]);
     } finally {
       setLoading(false);
     }

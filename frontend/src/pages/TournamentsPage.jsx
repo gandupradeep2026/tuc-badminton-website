@@ -13,10 +13,40 @@ import {
   Award
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getApiUrl, getUploadUrl } from '../api/client';
+import { getApiUrl, getUploadUrl, safeFetchJson } from '../api/client';
+
+const DEFAULT_TOURNAMENTS = [
+  {
+    id: 1,
+    title: '32. Sächsische Hochschulmeisterschaft (SHM) Badminton 2026',
+    date: '14. November 2026 (09:00 - 18:30)',
+    deadline: '31. Oktober 2026',
+    location: 'Sporthalle Thüringer Weg 11, 09126 Chemnitz',
+    document_url: '/uploads/ausschreibung_shm_2026.pdf',
+    description: 'Offizielle sächsische Hochschulmeisterschaft im Universitäts-Sportzentrum TU Chemnitz. Einzel, Doppel und Mixed für alle Studierenden und Bediensteten in Sachsen.',
+  },
+  {
+    id: 2,
+    title: 'Chemnitzer Badminton Stadtmeisterschaften 2026',
+    date: '17. Oktober 2026',
+    deadline: '05. Oktober 2026',
+    location: 'Sporthalle Thüringer Weg 11, Chemnitz',
+    document_url: '/uploads/tournament_2026/UNI_Badminton_Team_Cup_2026_Schedule_Printable.pdf',
+    description: 'Traditionelle Stadtmeisterschaften im Herbst. Offene Klassen für Freizeit- und Vereinsspieler.',
+  },
+  {
+    id: 3,
+    title: 'UNI Badminton Team Cup 2026 (Rückblick & Urkunden)',
+    date: '31. Januar 2026',
+    deadline: 'Abgeschlossen',
+    location: 'Sporthalle Thüringer Weg 11, Chemnitz',
+    document_url: '/uploads/tournament_2026/Uni_Badminton_Team_Cup_2026_Ergebnisbericht.pdf',
+    description: 'Meisterturnier mit 7 Universitäts-Teams aus Chemnitz, Mittweida und Zwickau. Sieger: TUC Shuttlers.',
+  }
+];
 
 export default function TournamentsPage() {
-  const [tournaments, setTournaments] = useState([]);
+  const [tournaments, setTournaments] = useState(DEFAULT_TOURNAMENTS);
   const [loading, setLoading] = useState(true);
   const { t, language } = useLanguage();
   const trn = t.tournaments;
@@ -24,13 +54,15 @@ export default function TournamentsPage() {
 
   const fetchTournaments = async () => {
     try {
-      const res = await fetch(getApiUrl('/api/tournaments'));
-      if (res.ok) {
-        const data = await res.json();
-        setTournaments(data);
+      const res = await safeFetchJson('/api/tournaments');
+      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
+        setTournaments(res.data);
+      } else {
+        setTournaments(DEFAULT_TOURNAMENTS);
       }
     } catch (err) {
-      console.error('Failed to load tournaments:', err);
+      console.error('Failed to load tournaments, using fallback:', err);
+      setTournaments(DEFAULT_TOURNAMENTS);
     } finally {
       setLoading(false);
     }
@@ -233,7 +265,7 @@ export default function TournamentsPage() {
               <div className="flex-shrink-0 pt-2 md:pt-0">
                 {tourney.document_url ? (
                   <a
-                    href={tourney.document_url}
+                    href={getUploadUrl(tourney.document_url)}
                     target="_blank"
                     rel="noreferrer"
                     download

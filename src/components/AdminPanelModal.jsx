@@ -17,6 +17,7 @@ import {
   LogOut,
   RefreshCw
 } from 'lucide-react';
+import { safeFetchJson } from '../api/client';
 
 export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
   // Authentication state
@@ -79,15 +80,15 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
     setLoading(true);
     try {
       const [tRes, pRes, tourRes, mRes] = await Promise.all([
-        fetch('/api/trainers'),
-        fetch('/api/players'),
-        fetch('/api/tournaments'),
-        fetch('/api/media'),
+        safeFetchJson('/api/trainers'),
+        safeFetchJson('/api/players'),
+        safeFetchJson('/api/tournaments'),
+        safeFetchJson('/api/media'),
       ]);
-      if (tRes.ok) setTrainers(await tRes.json());
-      if (pRes.ok) setPlayers(await pRes.json());
-      if (tourRes.ok) setTournaments(await tourRes.json());
-      if (mRes.ok) setMediaList(await mRes.json());
+      if (tRes.ok && tRes.data) setTrainers(tRes.data);
+      if (pRes.ok && pRes.data) setPlayers(pRes.data);
+      if (tourRes.ok && tourRes.data) setTournaments(tourRes.data);
+      if (mRes.ok && mRes.data) setMediaList(mRes.data);
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -110,17 +111,21 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
     setAuthLoading(true);
 
     try {
-      const res = await fetch('/api/admin/login', {
+      const res = await safeFetchJson('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Authentication failed');
+      if (!res.ok) {
+        if (res.isOffline) {
+          throw new Error('Der Laptop-Server ist derzeit offline. Bitte starten Sie start-server.bat auf dem Heimserver.');
+        }
+        throw new Error(res.error || 'Authentication failed');
+      }
 
-      setAuthToken(data.token);
-      localStorage.setItem('tuc_admin_token', data.token);
+      setAuthToken(res.data.token);
+      localStorage.setItem('tuc_admin_token', res.data.token);
       setPassword('');
       fetchAllData();
     } catch (err) {
@@ -153,14 +158,14 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         formData.append('photo', playerForm.photoFile);
       }
 
-      const res = await fetch('/api/players', {
+      const res = await safeFetchJson('/api/players', {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to add player');
+      if (!res.ok) throw new Error(res.error || 'Failed to add player');
+      const data = res.data;
 
       setPlayerForm({
         name: '',
@@ -214,17 +219,17 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         formData.append('photo', trainerForm.photoFile);
       }
 
-      const res = await fetch('/api/trainers', {
+      const res = await safeFetchJson('/api/trainers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to add trainer');
+      if (!res.ok) throw new Error(res.error || 'Failed to add trainer');
+      const data = res.data;
 
       setTrainerForm({ name: '', role: '', email: '', focus_areas: '', photoFile: null });
-      setFeedback({ type: 'success', message: `Trainer ${data.trainer.name} added successfully!` });
+      setFeedback({ type: 'success', message: `Trainer ${data?.trainer?.name || 'Coach'} added successfully!` });
       fetchAllData();
       if (onDataChanged) onDataChanged();
     } catch (err) {
@@ -268,14 +273,13 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         formData.append('document', tourneyForm.docFile);
       }
 
-      const res = await fetch('/api/tournaments', {
+      const res = await safeFetchJson('/api/tournaments', {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to post tournament');
+      if (!res.ok) throw new Error(res.error || 'Failed to post tournament');
 
       setTourneyForm({
         title: '',
@@ -329,14 +333,13 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         throw new Error('Please select a photo or video file to upload.');
       }
 
-      const res = await fetch('/api/media', {
+      const res = await safeFetchJson('/api/media', {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to upload media item');
+      if (!res.ok) throw new Error(res.error || 'Failed to upload media item');
 
       setMediaForm({ title: '', type: 'photo', caption: '', mediaFile: null });
       setFeedback({ type: 'success', message: 'Media item saved and published!' });
