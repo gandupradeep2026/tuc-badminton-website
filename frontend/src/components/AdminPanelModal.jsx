@@ -17,7 +17,7 @@ import {
   LogOut,
   RefreshCw
 } from 'lucide-react';
-import { safeFetchJson, fileToDataUrl } from '../api/client';
+import { safeFetchJson, fileToDataUrl, getUploadUrl } from '../api/client';
 import { DEFAULT_PLAYERS, DEFAULT_TRAINERS, TERMINE_LIST, DEFAULT_GALLERY } from '../data/mockData';
 
 export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
@@ -844,7 +844,7 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
                         >
                           <div className="flex items-center gap-3">
                             <img
-                              src={p.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
+                              src={getUploadUrl(p.photo_url) || (p.gender === 'women' ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80')}
                               alt={p.name}
                               className="w-10 h-10 rounded-lg object-cover"
                             />
@@ -967,7 +967,7 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
                         >
                           <div className="flex items-center gap-3">
                             <img
-                              src={t.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
+                              src={getUploadUrl(t.photo_url) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'}
                               alt={t.name}
                               className="w-10 h-10 rounded-lg object-cover"
                             />
@@ -1199,9 +1199,9 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
                         >
                           <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden relative">
                             {m.type === 'video' ? (
-                              <video src={m.file_url} className="w-full h-full object-cover" />
+                              <video src={getUploadUrl(m.file_url)} className="w-full h-full object-cover" />
                             ) : (
-                              <img src={m.file_url} alt={m.title} className="w-full h-full object-cover" />
+                              <img src={getUploadUrl(m.file_url)} alt={m.title} className="w-full h-full object-cover" />
                             )}
                             <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-black/70 text-white">
                               {m.type}

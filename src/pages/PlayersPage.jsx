@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, GraduationCap, Target, Mail, UserPlus, Star, School, Phone } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { safeFetchJson } from '../api/client';
+import { safeFetchJson, getUploadUrl } from '../api/client';
 import { DEFAULT_PLAYERS } from '../data/mockData';
 
 export default function PlayersPage({ onNavigate }) {
@@ -54,7 +54,9 @@ export default function PlayersPage({ onNavigate }) {
           <div className="flex items-start gap-3 sm:gap-3.5">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
               <img
-                src={player.photo_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'}
+                src={getUploadUrl(player.photo_url) || (player.gender === 'women'
+                  ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
+                  : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')}
                 alt={player.name}
                 loading="lazy"
                 decoding="async"

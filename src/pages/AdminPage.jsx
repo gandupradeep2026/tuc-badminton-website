@@ -1933,7 +1933,7 @@ export default function AdminPage() {
                         <p className="text-xs font-semibold text-[#005A36]">{item.result}</p>
                       </div>
                       {item.photo_url && (
-                        <img src={item.photo_url} alt="" className="w-16 h-16 object-cover rounded-xl border border-slate-200" />
+                        <img src={getUploadUrl(item.photo_url)} alt="" className="w-16 h-16 object-cover rounded-xl border border-slate-200" />
                       )}
                     </div>
                     <div className="text-xs text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-xl">
@@ -2049,11 +2049,17 @@ export default function AdminPage() {
                       <div className="flex items-start gap-3.5">
                         <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
                           <img
-                            src={player.photo_url || (player.gender === 'women'
+                            src={getUploadUrl(player.photo_url) || (player.gender === 'women'
                               ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
                               : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')}
                             alt={player.name}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = player.gender === 'women'
+                                ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
+                                : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
+                            }}
                           />
                         </div>
 
@@ -2191,9 +2197,13 @@ export default function AdminPage() {
                       <div className="flex items-start gap-3.5">
                         <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
                           <img
-                            src={trainer.photo_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'}
+                            src={getUploadUrl(trainer.photo_url) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'}
                             alt={trainer.name}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
+                            }}
                           />
                         </div>
 
@@ -2422,7 +2432,7 @@ export default function AdminPage() {
                 <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col justify-between">
                   <div>
                     {item.photo_url && (
-                      <img src={item.photo_url} alt="" className="w-full h-44 object-cover" />
+                      <img src={getUploadUrl(item.photo_url)} alt="" className="w-full h-44 object-cover" />
                     )}
                     <div className="p-4 space-y-2">
                       <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
@@ -2602,7 +2612,17 @@ export default function AdminPage() {
               <div key={player.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between gap-3">
                 <div className="flex items-start gap-3">
                   {player.photo_url ? (
-                    <img src={player.photo_url} alt="" className="w-12 h-12 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                    <img
+                      src={getUploadUrl(player.photo_url)}
+                      alt=""
+                      className="w-12 h-12 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = player.gender === 'women'
+                          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
+                          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80';
+                      }}
+                    />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-[#005A36]/10 text-[#005A36] font-bold flex items-center justify-center text-sm flex-shrink-0">
                       {player.name.charAt(0)}
@@ -2770,7 +2790,15 @@ export default function AdminPage() {
               <div key={coach.id} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between gap-3">
                 <div className="flex items-start gap-3">
                   {coach.photo_url ? (
-                    <img src={coach.photo_url} alt="" className="w-14 h-14 rounded-2xl object-cover border border-slate-200 flex-shrink-0" />
+                    <img
+                      src={getUploadUrl(coach.photo_url)}
+                      alt=""
+                      className="w-14 h-14 rounded-2xl object-cover border border-slate-200 flex-shrink-0"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80';
+                      }}
+                    />
                   ) : (
                     <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-[#005A36] font-bold flex items-center justify-center text-xl flex-shrink-0">
                       🏸

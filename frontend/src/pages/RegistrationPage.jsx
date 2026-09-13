@@ -18,7 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { getApiUrl, safeFetchJson, saveOfflineSubmission, fileToDataUrl } from '../api/client';
+import { getApiUrl, safeFetchJson, saveOfflineSubmission, fileToDataUrl, getUploadUrl } from '../api/client';
 
 export default function RegistrationPage({ onNavigate }) {
   const { language, t } = useLanguage();
@@ -677,7 +677,7 @@ export default function RegistrationPage({ onNavigate }) {
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
                   {playerPhotoPreview || playerPhotoUrl ? (
                     <img 
-                      src={playerPhotoPreview || playerPhotoUrl} 
+                      src={playerPhotoPreview || getUploadUrl(playerPhotoUrl)} 
                       alt="Preview" 
                       className="w-full h-full object-cover" 
                     />
@@ -889,7 +889,7 @@ export default function RegistrationPage({ onNavigate }) {
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
                   {trainerPhotoPreview || trainerPhotoUrl ? (
                     <img 
-                      src={trainerPhotoPreview || trainerPhotoUrl} 
+                      src={trainerPhotoPreview || getUploadUrl(trainerPhotoUrl)} 
                       alt="Preview" 
                       className="w-full h-full object-cover" 
                     />
