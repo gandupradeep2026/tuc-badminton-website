@@ -4,11 +4,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"cyan,green\" \"node server/index.js\" \"vite\"",
-    "server": "node server/index.js",
-    "client": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "node backend/server.js",
+    "server": "node backend/server.js",
+    "backend": "node backend/server.js",
+    "client": "npm --prefix frontend run dev",
+    "frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan,green\" \"node backend/server.js\" \"npm --prefix frontend run dev\""
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

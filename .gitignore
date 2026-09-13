@@ -1,22 +1,32 @@
 # Dependencies
 node_modules/
+frontend/node_modules/
+backend/node_modules/
 .pnp
 .pnp.js
 
-# Production build
+# Production builds
 dist/
 build/
+frontend/dist/
 
-# Environment variables & local configuration
+# Environment variables & local secrets
 .env
 .env.local
 .env.*.local
+backend/.env
+frontend/.env.local
+frontend/.env.*.local
 
 # SQLite temporary journal and WAL files
 data/*.db-wal
 data/*.db-shm
 data/*.db-journal
 data/*.sqlite
+backend/data/*.db-wal
+backend/data/*.db-shm
+backend/data/*.db-journal
+backend/data/*.sqlite
 
 # Logs
 npm-debug.log*

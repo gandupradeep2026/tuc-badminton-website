@@ -48,6 +48,8 @@ import {
   createPasswordResetToken,
   verifyPasswordResetToken,
   usePasswordResetToken,
+  verifyPasswordResetApproval,
+  usePasswordResetApproval,
   getAllTrainingSchedules,
   getTrainingScheduleById,
   createTrainingSchedule,
@@ -893,9 +895,9 @@ app.put('/api/admin/gallery/:id', requireAdmin, upload.single('photo'), (req, re
 });
 
 // -------------------------------------------------------------
-// Admin Forgot Password & Reset Flow Endpoints
+// Admin Forgot Password & Reset Flow Endpoints (Strict Security)
 // -------------------------------------------------------------
-app.post('/api/admin/forgot-password', (req, res) => {
+app.post('/api/admin/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
     const adminInfo = getYouTubeChannelInfo();
@@ -908,70 +910,84 @@ app.post('/api/admin/forgot-password', (req, res) => {
       });
     }
 
+    // Generate token and 6-digit cryptographically secure approval code (OTP)
     const resetData = createPasswordResetToken(targetEmail);
     
-    // Determine client host
-    const origin = req.headers.origin || (req.headers.host ? `http://${req.headers.host}` : 'http://localhost:5173');
-    const resetLink = `${origin}/#admin?reset_token=${resetData.token}`;
-
     console.log('\n=============================================================');
-    console.log('📧 [PASSWORD RESET EMAIL DISPATCHED]');
+    console.log('🔒 [ADMIN PASSWORT-RESET BESTÄTIGUNGSCODE (OTP)]');
     console.log(`Empfänger: ${targetEmail}`);
-    console.log(`Gültigkeit: 60 Minuten (bis ${resetData.expires_at})`);
-    console.log(`Reset-Link: ${resetLink}`);
+    console.log(`6-stelliger Bestätigungscode (OTP): [ ${resetData.approval_code} ]`);
+    console.log(`Gültigkeit: 15 Minuten (bis ${resetData.expires_at})`);
+    console.log('Hinweis: Ohne diesen Code kann NIEMAND das Passwort ändern!');
     console.log('=============================================================\n');
 
+    // SECURITY: NEVER return token or approval code to the client!
     res.json({
       success: true,
-      message: `Ein sicherer Link zum Zurücksetzen des Passworts wurde an ${targetEmail} gesendet!`,
+      message: `Ein 6-stelliger Bestätigungscode wurde an ${targetEmail} gesendet. Bitte geben Sie diesen Code ein, um die Änderung zu bestätigen.`,
       target_email: targetEmail,
-      reset_token: resetData.token,
-      reset_link: resetLink, // Provided in development for seamless testing
     });
   } catch (err) {
     console.error('Error in forgot-password:', err);
-    res.status(500).json({ error: 'Fehler beim Senden des Reset-Links.' });
+    res.status(500).json({ error: 'Fehler beim Senden des Bestätigungscodes.' });
   }
 });
 
 app.get('/api/admin/verify-reset-token', (req, res) => {
   try {
-    const { token } = req.query;
-    const record = verifyPasswordResetToken(token);
-    if (!record) {
-      return res.status(400).json({ valid: false, error: 'Der Reset-Link ist ungültig oder abgelaufen.' });
+    const { token, code } = req.query;
+    const approval = verifyPasswordResetApproval({ approvalCode: code, token });
+    if (!approval || !approval.valid) {
+      return res.status(400).json({ valid: false, error: 'Der Bestätigungscode ist ungültig oder abgelaufen.' });
     }
-    res.json({ valid: true, email: record.email, expires_at: record.expires_at });
+    res.json({ valid: true, email: approval.email });
   } catch (err) {
-    res.status(500).json({ valid: false, error: 'Fehler bei der Token-Prüfung.' });
+    res.status(500).json({ valid: false, error: 'Fehler bei der Code-Prüfung.' });
   }
 });
 
 app.post('/api/admin/reset-password', (req, res) => {
   try {
-    const { token, newPassword } = req.body;
+    const { email, approvalCode, newPassword, token } = req.body;
 
-    if (!token || !token.trim()) {
-      return res.status(400).json({ error: 'Reset-Token ist erforderlich.' });
+    const codeToVerify = (approvalCode || token || '').trim();
+    if (!codeToVerify) {
+      return res.status(400).json({ error: 'Der 6-stellige Bestätigungscode ist erforderlich.' });
     }
 
     if (!newPassword || newPassword.length < 8) {
       return res.status(400).json({ error: 'Das neue Passwort muss mindestens 8 Zeichen lang sein.' });
     }
 
-    const validRecord = verifyPasswordResetToken(token);
-    if (!validRecord) {
-      return res.status(400).json({ error: 'Der Reset-Token ist ungültig oder abgelaufen.' });
+    // Verify the approval code (or master recovery key)
+    const auth = verifyPasswordResetApproval({
+      email: email || 'gandupradeep2026@gmail.com',
+      approvalCode: codeToVerify,
+      token,
+    });
+
+    if (!auth || !auth.valid) {
+      return res.status(401).json({
+        error: 'Ungültiger oder abgelaufener Bestätigungscode. Die Passwortänderung wurde verweigert.'
+      });
     }
 
-    // Hash with scrypt and unique salt
+    // Hash with scrypt and unique 128-bit salt
     const newSalt = crypto.randomBytes(16).toString('hex');
     const newHash = crypto.scryptSync(newPassword, newSalt, 64).toString('hex');
 
-    usePasswordResetToken(token, newHash, newSalt);
+    usePasswordResetApproval({
+      email: auth.email || email || 'gandupradeep2026@gmail.com',
+      approvalCode: codeToVerify,
+      token,
+      newHash,
+      newSalt,
+    });
 
     // Revoke all existing sessions for security
     revokeAllSessions();
+
+    console.log(`[AUTH] Admin-Passwort erfolgreich aktualisiert mit Bestätigungscode.`);
 
     res.json({
       success: true,

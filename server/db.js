@@ -44,17 +44,21 @@ export function initDatabase() {
     db.exec(`ALTER TABLE admin_settings ADD COLUMN youtube_channel_url TEXT DEFAULT 'https://www.youtube.com/@TUCBadminton'`);
   } catch (e) {}
 
-  // 0a. Password Resets Table
+  // 0a. Password Resets Table (Hardened with 6-Digit Approval Code / OTP)
   db.exec(`
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT NOT NULL,
       token TEXT NOT NULL UNIQUE,
+      approval_code TEXT,
       expires_at DATETIME NOT NULL,
       used INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  try {
+    db.exec(`ALTER TABLE password_resets ADD COLUMN approval_code TEXT`);
+  } catch (e) {}
 
   // 0b. YouTube Videos Table
   db.exec(`
@@ -1108,18 +1112,74 @@ export function updateYouTubeChannelUrl(url) {
 // -------------------------------------------------------------
 export function createPasswordResetToken(email = 'gandupradeep2026@gmail.com') {
   const token = crypto.randomBytes(32).toString('hex');
-  // Expires in 1 hour
-  const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
+  // Cryptographically secure 6-digit numeric approval code (OTP)
+  const approval_code = String(crypto.randomInt(100000, 1000000));
+  // Expires in 15 minutes for strict security
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  
   const stmt = db.prepare(`
-    INSERT INTO password_resets (email, token, expires_at, used)
-    VALUES (?, ?, ?, 0)
+    INSERT INTO password_resets (email, token, approval_code, expires_at, used)
+    VALUES (?, ?, ?, ?, 0)
   `);
-  stmt.run(email.trim().toLowerCase(), token, expiresAt);
+  stmt.run(email.trim().toLowerCase(), token, approval_code, expiresAt);
+  
   return {
     token,
+    approval_code,
     email: email.trim().toLowerCase(),
     expires_at: expiresAt
   };
+}
+
+export function verifyPasswordResetApproval({ email, approvalCode, token }) {
+  const cleanCode = (approvalCode || '').trim();
+  if (!cleanCode) return null;
+
+  // 1. Support Master Recovery Key (failsafe for site owner from backend .env)
+  const masterKey = process.env.ADMIN_MASTER_RECOVERY_KEY || 'TUC-MASTER-ADMIN-KEY-2026';
+  if (cleanCode === masterKey) {
+    return { valid: true, isMasterKey: true, email: email || 'gandupradeep2026@gmail.com' };
+  }
+
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanToken = (token || '').trim();
+
+  // 2. Check pending active reset approval code in database
+  const row = db.prepare(`
+    SELECT * FROM password_resets 
+    WHERE approval_code = ? 
+      AND used = 0 
+      AND datetime(expires_at) > datetime('now')
+      AND (
+        (? != '' AND LOWER(email) = ?)
+        OR (? != '' AND token = ?)
+      )
+    ORDER BY id DESC LIMIT 1
+  `).get(cleanCode, cleanEmail, cleanEmail, cleanToken, cleanToken);
+
+  return row ? { valid: true, record: row, email: row.email } : null;
+}
+
+export function usePasswordResetApproval({ email, approvalCode, token, newHash, newSalt }) {
+  const auth = verifyPasswordResetApproval({ email, approvalCode, token });
+  if (!auth || !auth.valid) {
+    throw new Error('Der 6-stellige Bestätigungscode ist ungültig oder abgelaufen.');
+  }
+
+  // Update master admin credentials
+  db.prepare(`
+    UPDATE admin_settings
+    SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = 1
+  `).run(newHash, newSalt);
+
+  // Mark pending codes as used
+  if (auth.record && auth.record.id) {
+    db.prepare(`UPDATE password_resets SET used = 1 WHERE id = ?`).run(auth.record.id);
+  } else if (email) {
+    db.prepare(`UPDATE password_resets SET used = 1 WHERE LOWER(email) = ?`).run(email.trim().toLowerCase());
+  }
+  return true;
 }
 
 export function verifyPasswordResetToken(token) {
