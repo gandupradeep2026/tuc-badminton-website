@@ -422,7 +422,7 @@ app.get('/api/trainers', (req, res) => {
 
 app.post('/api/trainers', requireAdmin, upload.single('photo'), (req, res) => {
   try {
-    const { name, role, email, focus_areas, photo_url_input } = req.body;
+    const { name, role, email, phone, show_phone, focus_areas, photo_url_input } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Coach name is required' });
@@ -439,10 +439,14 @@ app.post('/api/trainers', requireAdmin, upload.single('photo'), (req, res) => {
       photo_url = `/uploads/${req.file.filename}`;
     }
 
+    const isShowPhone = show_phone !== undefined ? (show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0) : 1;
+
     const newTrainer = createTrainer({
       name: name.trim(),
       role: role.trim(),
       email: email.trim().toLowerCase(),
+      phone: phone ? phone.trim() : '',
+      show_phone: isShowPhone,
       focus_areas: focus_areas ? focus_areas.trim() : 'General Badminton & Footwork',
       photo_url,
     });
@@ -467,16 +471,20 @@ app.delete('/api/trainers/:id', requireAdmin, (req, res) => {
 app.put('/api/trainers/:id', requireAdmin, upload.single('photo'), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { name, role, email, focus_areas, photo_url_input } = req.body;
+    const { name, role, email, phone, show_phone, focus_areas, photo_url_input } = req.body;
     let photo_url = photo_url_input !== undefined ? photo_url_input.trim() : undefined;
     if (req.file) {
       photo_url = `/uploads/${req.file.filename}`;
     }
 
+    const isShowPhone = show_phone !== undefined ? (show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0) : undefined;
+
     const updated = updateTrainer(id, {
       name,
       role,
       email,
+      phone,
+      show_phone: isShowPhone,
       focus_areas,
       photo_url,
     });
@@ -502,7 +510,21 @@ app.get('/api/players', (req, res) => {
 
 app.post('/api/players', requireAdmin, upload.single('photo'), (req, res) => {
   try {
-    const { name, gender, study_program, specialization, team, email, photo_url_input } = req.body;
+    const {
+      name,
+      gender,
+      study_program,
+      specialization,
+      team,
+      email,
+      phone,
+      show_phone,
+      favorite_player,
+      skill_level,
+      university_type,
+      university_name,
+      photo_url_input,
+    } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Player name is required' });
@@ -525,6 +547,8 @@ app.post('/api/players', requireAdmin, upload.single('photo'), (req, res) => {
       photo_url = `/uploads/${req.file.filename}`;
     }
 
+    const isShowPhone = show_phone !== undefined ? (show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0) : 0;
+
     const newPlayer = createPlayer({
       name: name.trim(),
       gender,
@@ -532,6 +556,12 @@ app.post('/api/players', requireAdmin, upload.single('photo'), (req, res) => {
       specialization: specialization.trim(),
       team: team ? team.trim() : '1. Mannschaft (Sachsenliga)',
       email: email.trim().toLowerCase(),
+      phone: phone ? phone.trim() : '',
+      show_phone: isShowPhone,
+      favorite_player: favorite_player ? favorite_player.trim() : '',
+      skill_level: skill_level ? skill_level.trim() : 'Fortgeschritten',
+      university_type: university_type ? university_type.trim() : 'tu_chemnitz',
+      university_name: university_name ? university_name.trim() : 'TU Chemnitz',
       photo_url,
     });
 
@@ -555,11 +585,28 @@ app.delete('/api/players/:id', requireAdmin, (req, res) => {
 app.put('/api/players/:id', requireAdmin, upload.single('photo'), (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { name, gender, study_program, specialization, team, email, photo_url_input } = req.body;
+    const {
+      name,
+      gender,
+      study_program,
+      specialization,
+      team,
+      email,
+      phone,
+      show_phone,
+      favorite_player,
+      skill_level,
+      university_type,
+      university_name,
+      status,
+      photo_url_input,
+    } = req.body;
     let photo_url = photo_url_input !== undefined ? photo_url_input.trim() : undefined;
     if (req.file) {
       photo_url = `/uploads/${req.file.filename}`;
     }
+
+    const isShowPhone = show_phone !== undefined ? (show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0) : undefined;
 
     const updated = updatePlayer(id, {
       name,
@@ -568,6 +615,13 @@ app.put('/api/players/:id', requireAdmin, upload.single('photo'), (req, res) => 
       specialization,
       team,
       email,
+      phone,
+      show_phone: isShowPhone,
+      favorite_player,
+      skill_level,
+      university_type,
+      university_name,
+      status,
       photo_url,
     });
     res.json({ success: true, player: updated });
@@ -1195,6 +1249,7 @@ app.post('/api/register/player', upload.single('photo'), (req, res) => {
       team,
       email,
       phone,
+      show_phone,
       favorite_player,
       skill_level,
       university_type,
@@ -1217,6 +1272,8 @@ app.post('/api/register/player', upload.single('photo'), (req, res) => {
       photo_url = `/uploads/${req.file.filename}`;
     }
 
+    const isShowPhone = show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0;
+
     const created = registerPlayerSubmission({
       name: name.trim(),
       gender: gender === 'women' ? 'women' : 'men',
@@ -1225,6 +1282,7 @@ app.post('/api/register/player', upload.single('photo'), (req, res) => {
       team: team ? team.trim() : 'Hochschulsport & Spielbetrieb',
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
+      show_phone: isShowPhone,
       favorite_player: favorite_player ? favorite_player.trim() : '',
       skill_level: skill_level ? skill_level.trim() : 'Fortgeschritten',
       university_type: university_type ? university_type.trim() : 'tu_chemnitz',
@@ -1251,6 +1309,7 @@ app.post('/api/register/trainer', upload.single('photo'), (req, res) => {
       role,
       email,
       phone,
+      show_phone,
       focus_areas,
       hochschulsport_approved,
       hochschulsport_note,
@@ -1285,11 +1344,14 @@ app.post('/api/register/trainer', upload.single('photo'), (req, res) => {
       photo_url = `/uploads/${req.file.filename}`;
     }
 
+    const isShowPhone = show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0;
+
     const created = registerTrainerSubmission({
       name: name.trim(),
       role: role ? role.trim() : 'Badminton-Trainer (USZ)',
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
+      show_phone: isShowPhone,
       focus_areas: focus_areas ? focus_areas.trim() : 'Allgemeine Trainingslehre & Taktik',
       hochschulsport_approved: true,
       hochschulsport_note: hochschulsport_note ? hochschulsport_note.trim() : 'USZ-Genehmigung bestätigt',

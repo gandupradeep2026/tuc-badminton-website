@@ -1690,9 +1690,18 @@ export default function AdminPage() {
                             <span className="truncate">{player.email}</span>
                           </div>
                           {player.phone && (
-                            <div className="flex items-center gap-1 text-slate-600 truncate">
+                            <div className="flex items-center gap-1.5 text-slate-600 truncate">
                               <Phone className="w-3 h-3 flex-shrink-0 text-slate-400" />
                               <span className="truncate">{player.phone}</span>
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-sans font-bold flex-shrink-0 ${
+                                (player.show_phone === 1 || player.show_phone === true || player.show_phone === '1')
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {(player.show_phone === 1 || player.show_phone === true || player.show_phone === '1')
+                                  ? (isDe ? '👁️ Öffentlich' : '👁️ Public')
+                                  : (isDe ? '🔒 Privat' : '🔒 Private')}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1799,6 +1808,15 @@ export default function AdminPage() {
                           <div className="flex items-center gap-1.5 pt-1 border-t border-slate-200/60 font-mono text-[11px] text-slate-600">
                             <Phone className="w-3 h-3 flex-shrink-0 text-slate-400" />
                             <span>{trainer.phone}</span>
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded font-sans font-bold flex-shrink-0 ${
+                              (trainer.show_phone === 1 || trainer.show_phone === true || trainer.show_phone === '1')
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {(trainer.show_phone === 1 || trainer.show_phone === true || trainer.show_phone === '1')
+                                ? (isDe ? '👁️ Öffentlich' : '👁️ Public')
+                                : (isDe ? '🔒 Privat' : '🔒 Private')}
+                            </span>
                           </div>
                         )}
                         {trainer.created_at && (

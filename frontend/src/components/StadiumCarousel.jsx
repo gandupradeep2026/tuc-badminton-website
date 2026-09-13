@@ -261,6 +261,8 @@ export default function StadiumCarousel() {
             key={activeSlide.id}
             src={getUploadUrl(activeSlide.image)}
             alt={activeSlide.title}
+            loading={currentIndex === 0 ? "eager" : "lazy"}
+            decoding="async"
             className="w-full h-full object-cover animate-in fade-in zoom-in-95 duration-500 transition-transform hover:scale-105"
             onError={(e) => {
               e.target.onerror = null;
@@ -359,6 +361,8 @@ export default function StadiumCarousel() {
                 <img
                   src={getUploadUrl(slide.image)}
                   alt={slide.title}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -397,6 +401,8 @@ export default function StadiumCarousel() {
               <img
                 src={getUploadUrl(lightboxSlide.image)}
                 alt={lightboxSlide.title}
+                loading="lazy"
+                decoding="async"
                 className="max-h-[68vh] w-auto object-contain mx-auto"
               />
             </div>

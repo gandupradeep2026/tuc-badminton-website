@@ -1,14 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { LanguageProvider } from './context/LanguageContext';
 import SimpleHeader from './components/SimpleHeader';
 import SimpleFooter from './components/SimpleFooter';
-import HomePage from './pages/HomePage';
-import TrainersPage from './pages/TrainersPage';
-import PlayersPage from './pages/PlayersPage';
-import TournamentsPage from './pages/TournamentsPage';
-import GalleryPage from './pages/GalleryPage';
-import RegistrationPage from './pages/RegistrationPage';
-import AdminPage from './pages/AdminPage';
+
+// Code-splitting with React.lazy to make the initial page load ultra-fast and lightweight
+const HomePage = lazy(() => import('./pages/HomePage'));
+const TrainersPage = lazy(() => import('./pages/TrainersPage'));
+const PlayersPage = lazy(() => import('./pages/PlayersPage'));
+const TournamentsPage = lazy(() => import('./pages/TournamentsPage'));
+const GalleryPage = lazy(() => import('./pages/GalleryPage'));
+const RegistrationPage = lazy(() => import('./pages/RegistrationPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+
+function PageFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 min-h-[50vh] text-center">
+      <div className="w-10 h-10 rounded-full border-4 border-emerald-200 border-t-emerald-600 animate-spin mb-3" />
+      <p className="text-xs sm:text-sm font-semibold text-slate-500 tracking-wide animate-pulse">
+        Laden... / Loading...
+      </p>
+    </div>
+  );
+}
 
 function AppContent() {
   // Read initial page from URL hash if present
@@ -46,35 +59,37 @@ function AppContent() {
         onNavigate={navigateTo} 
       />
 
-      {/* 2. Main Page Content */}
+      {/* 2. Main Page Content with Suspense Lazy Loading */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3.5 sm:px-6 lg:px-8 pt-5 sm:pt-10">
-        {activePage === 'home' && (
-          <HomePage onNavigate={navigateTo} />
-        )}
+        <Suspense fallback={<PageFallback />}>
+          {activePage === 'home' && (
+            <HomePage onNavigate={navigateTo} />
+          )}
 
-        {activePage === 'trainers' && (
-          <TrainersPage onNavigate={navigateTo} />
-        )}
+          {activePage === 'trainers' && (
+            <TrainersPage onNavigate={navigateTo} />
+          )}
 
-        {activePage === 'players' && (
-          <PlayersPage onNavigate={navigateTo} />
-        )}
+          {activePage === 'players' && (
+            <PlayersPage onNavigate={navigateTo} />
+          )}
 
-        {activePage === 'tournaments' && (
-          <TournamentsPage />
-        )}
+          {activePage === 'tournaments' && (
+            <TournamentsPage />
+          )}
 
-        {activePage === 'gallery' && (
-          <GalleryPage />
-        )}
+          {activePage === 'gallery' && (
+            <GalleryPage />
+          )}
 
-        {activePage === 'register' && (
-          <RegistrationPage onNavigate={navigateTo} />
-        )}
+          {activePage === 'register' && (
+            <RegistrationPage onNavigate={navigateTo} />
+          )}
 
-        {activePage === 'admin' && (
-          <AdminPage />
-        )}
+          {activePage === 'admin' && (
+            <AdminPage />
+          )}
+        </Suspense>
       </main>
 
       {/* 3. Footer */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, GraduationCap, Target, Mail, UserPlus, Star, School } from 'lucide-react';
+import { Users, GraduationCap, Target, Mail, UserPlus, Star, School, Phone } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { safeFetchJson } from '../api/client';
 import { DEFAULT_PLAYERS } from '../data/mockData';
@@ -54,6 +54,8 @@ export default function PlayersPage({ onNavigate }) {
               <img
                 src={player.photo_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'}
                 alt={player.name}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   e.target.onerror = null;
@@ -133,15 +135,24 @@ export default function PlayersPage({ onNavigate }) {
           </div>
         </div>
 
-        {/* Email Contact Button (Touch-friendly 44px) */}
-        <div className="pt-2 border-t border-slate-100">
+        {/* Email & Optional Public Phone Contact Buttons */}
+        <div className="pt-2 border-t border-slate-100 space-y-1.5">
           <a
             href={`mailto:${player.email}?subject=${encodeURIComponent(pl.emailPrefix)}`}
-            className="flex items-center justify-center gap-1.5 w-full py-2.5 px-3 min-h-[44px] rounded-xl text-xs font-bold text-slate-700 hover:text-white bg-slate-50 hover:bg-[#005A36] active:bg-[#00472A] border border-slate-200 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold text-slate-700 hover:text-white bg-slate-50 hover:bg-[#005A36] active:bg-[#00472A] border border-slate-200 transition-colors"
           >
             <Mail className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="truncate">{player.email}</span>
           </a>
+          {player.phone && (player.show_phone === 1 || player.show_phone === true || player.show_phone === '1') && (
+            <a
+              href={`tel:${player.phone}`}
+              className="flex items-center justify-center gap-1.5 w-full py-1.5 px-3 min-h-[36px] rounded-xl text-xs font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+            >
+              <Phone className="w-3.5 h-3.5 flex-shrink-0 text-[#005A36]" />
+              <span className="truncate">{player.phone}</span>
+            </a>
+          )}
         </div>
       </div>
     );

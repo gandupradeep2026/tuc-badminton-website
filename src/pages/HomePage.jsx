@@ -237,7 +237,7 @@ export default function HomePage({ onNavigate }) {
                   title="Trainingszeiten bearbeiten"
                 >
                   <Edit3 className="w-3 h-3 text-[#005A36]" />
-                  <span>Bearbeiten</span>
+                  <span>{h.editScheduleBtn || 'Bearbeiten'}</span>
                 </button>
               ) : (
                 <button
@@ -276,7 +276,7 @@ export default function HomePage({ onNavigate }) {
                   <div className="flex sm:flex-col sm:items-end items-center justify-between gap-1 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200/60">
                     <span className="font-mono text-[10px] sm:text-[11px] text-slate-500">{item.hall_name || h.hallNameShort}</span>
                     <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-200">
-                      🏸 {item.courts_info || '12 Spielfelder'}
+                      🏸 {item.courts_info || h.courtsDefault || '12 Spielfelder'}
                     </span>
                   </div>
                 </div>
@@ -316,7 +316,7 @@ export default function HomePage({ onNavigate }) {
                 className="w-full mt-1.5 py-2 px-3 rounded-xl border border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
               >
                 <Edit3 className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Trainingszeiten anpassen / Termine verwalten</span>
+                <span>{h.manageScheduleBtn || 'Trainingszeiten anpassen / Termine verwalten'}</span>
               </button>
             )}
           </div>
@@ -367,8 +367,8 @@ export default function HomePage({ onNavigate }) {
                 <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-start gap-2">
                   <span className="text-base leading-none flex-shrink-0">🏸</span>
                   <div>
-                    <span className="font-bold text-[#005A36] block">12 Badminton-Spielfelder</span>
-                    <span className="text-[11px] text-slate-600 leading-tight">Wettkampf- & Trainingsfelder mit Netzanlagen</span>
+                    <span className="font-bold text-[#005A36] block">{h.courtsHighlightTitle || '12 Badminton-Spielfelder'}</span>
+                    <span className="text-[11px] text-slate-600 leading-tight">{h.courtsHighlightSub || 'Wettkampf- & Trainingsfelder mit Netzanlagen'}</span>
                   </div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-2">
@@ -385,7 +385,7 @@ export default function HomePage({ onNavigate }) {
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
                   <span className="font-bold flex items-center gap-1 text-[#005A36]">
                     <Navigation className="w-3 h-3" />
-                    <span>{h.liveLocationBadge || 'Live-Standort (Interaktive Karte)'}</span>
+                    <span>{h.liveLocationBadge || (isDe ? 'Live-Standort (Interaktive Karte)' : 'Live Location (Interactive Map)')}</span>
                   </span>
                   <span className="font-mono text-[10px] text-slate-400">50.8142° N, 12.9304° E</span>
                 </div>

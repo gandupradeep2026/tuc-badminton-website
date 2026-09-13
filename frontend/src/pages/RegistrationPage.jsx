@@ -32,6 +32,7 @@ export default function RegistrationPage({ onNavigate }) {
   const [errorMsg, setErrorMsg] = useState('');
 
   // -------------------------------------------------------------
+  // -------------------------------------------------------------
   // Player Form State
   // -------------------------------------------------------------
   const [playerName, setPlayerName] = useState('');
@@ -41,6 +42,7 @@ export default function RegistrationPage({ onNavigate }) {
   const [playerFav, setPlayerFav] = useState('');
   const [playerEmail, setPlayerEmail] = useState('');
   const [playerPhone, setPlayerPhone] = useState('');
+  const [playerShowPhone, setPlayerShowPhone] = useState(false);
   const [playerUniType, setPlayerUniType] = useState('tuc'); // 'tuc' | 'other'
   const [playerUniName, setPlayerUniName] = useState('TU Chemnitz');
   const [playerStudy, setPlayerStudy] = useState('');
@@ -54,6 +56,7 @@ export default function RegistrationPage({ onNavigate }) {
   const [trainerName, setTrainerName] = useState('');
   const [trainerEmail, setTrainerEmail] = useState('');
   const [trainerPhone, setTrainerPhone] = useState('');
+  const [trainerShowPhone, setTrainerShowPhone] = useState(false);
   const [trainerRole, setTrainerRole] = useState('');
   const [trainerFocus, setTrainerFocus] = useState('');
   const [trainerUszApproved, setTrainerUszApproved] = useState(false);
@@ -61,16 +64,6 @@ export default function RegistrationPage({ onNavigate }) {
   const [trainerPhotoFile, setTrainerPhotoFile] = useState(null);
   const [trainerPhotoPreview, setTrainerPhotoPreview] = useState('');
   const [trainerPhotoUrl, setTrainerPhotoUrl] = useState('');
-
-  // Quick chips for favorite players
-  const popularPlayers = [
-    'Viktor Axelsen', 
-    'Lin Dan', 
-    'Lee Chong Wei', 
-    'Tai Tzu Ying', 
-    'An Se-young', 
-    'Kento Momota'
-  ];
 
   // Discipline toggle helper
   const toggleDiscipline = (disc) => {
@@ -112,6 +105,7 @@ export default function RegistrationPage({ onNavigate }) {
         favorite_player: playerFav.trim(),
         email: playerEmail.trim().toLowerCase(),
         phone: playerPhone.trim(),
+        show_phone: playerShowPhone ? 1 : 0,
         university_type: playerUniType,
         university_name: playerUniType === 'other' ? playerUniName.trim() : 'TU Chemnitz',
         study_program: playerStudy.trim(),
@@ -146,13 +140,13 @@ export default function RegistrationPage({ onNavigate }) {
           setSubmittedType('player');
           return;
         }
-        throw new Error(result.error || 'Fehler beim Übermitteln der Spieler-Registrierung.');
+        throw new Error(result.error || (isDe ? 'Fehler beim Übermitteln der Spieler-Registrierung.' : 'Error submitting player registration.'));
       }
 
       setIsOfflineSaved(false);
       setSubmittedType('player');
     } catch (err) {
-      setErrorMsg(err.message || 'Übermittlung fehlgeschlagen.');
+      setErrorMsg(err.message || (isDe ? 'Übermittlung fehlgeschlagen.' : 'Submission failed.'));
     } finally {
       setSubmitting(false);
     }
@@ -184,6 +178,7 @@ export default function RegistrationPage({ onNavigate }) {
         role: trainerRole.trim(),
         email: trainerEmail.trim().toLowerCase(),
         phone: trainerPhone.trim(),
+        show_phone: trainerShowPhone ? 1 : 0,
         focus_areas: trainerFocus.trim(),
         hochschulsport_approved: 'true',
         hochschulsport_note: trainerUszNote.trim() || 'USZ Genehmigung bestätigt',
@@ -218,13 +213,13 @@ export default function RegistrationPage({ onNavigate }) {
           setSubmittedType('trainer');
           return;
         }
-        throw new Error(result.error || 'Fehler beim Übermitteln der Trainer-Bewerbung.');
+        throw new Error(result.error || (isDe ? 'Fehler beim Übermitteln der Trainer-Bewerbung.' : 'Error submitting trainer application.'));
       }
 
       setIsOfflineSaved(false);
       setSubmittedType('trainer');
     } catch (err) {
-      setErrorMsg(err.message || 'Übermittlung fehlgeschlagen.');
+      setErrorMsg(err.message || (isDe ? 'Übermittlung fehlgeschlagen.' : 'Submission failed.'));
     } finally {
       setSubmitting(false);
     }
@@ -239,6 +234,7 @@ export default function RegistrationPage({ onNavigate }) {
       setPlayerFav('');
       setPlayerEmail('');
       setPlayerPhone('');
+      setPlayerShowPhone(false);
       setPlayerStudy('');
       setPlayerPhotoFile(null);
       setPlayerPhotoPreview('');
@@ -247,6 +243,7 @@ export default function RegistrationPage({ onNavigate }) {
       setTrainerName('');
       setTrainerEmail('');
       setTrainerPhone('');
+      setTrainerShowPhone(false);
       setTrainerRole('');
       setTrainerFocus('');
       setTrainerUszApproved(false);
@@ -271,11 +268,11 @@ export default function RegistrationPage({ onNavigate }) {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-center gap-2">
               <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-[#005A36] border border-emerald-200">
-                {submittedType === 'player' ? '🏸 Spieler-Registrierung' : '👥 Trainer-Bewerbung'}
+                {submittedType === 'player' ? (reg.badgePlayerSubmitted || '🏸 Spieler-Registrierung') : (reg.badgeTrainerSubmitted || '👥 Badminton-Trainer Registrierung')}
               </span>
               {isOfflineSaved && (
                 <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
-                  ⚡ Offline gespeichert (Warteschlange)
+                  {reg.badgeOfflineQueue || '⚡ Offline gespeichert (Warteschlange)'}
                 </span>
               )}
             </div>
@@ -284,9 +281,7 @@ export default function RegistrationPage({ onNavigate }) {
             </h2>
             <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
               {isOfflineSaved
-                ? (isDe 
-                    ? 'Ihre Registrierung wurde sicher auf diesem Gerät gespeichert! Sobald der TU Chemnitz Badminton Server online ist, wird sie automatisch synchronisiert. Ihre Daten gehen garantiert nicht verloren.'
-                    : 'Your registration was securely saved to this device! As soon as the TU Chemnitz Badminton Server is online, it will automatically synchronize. None of your data is lost.')
+                ? (submittedType === 'player' ? (reg.msgOfflinePlayer || 'Ihre Spieler-Registrierung wurde sicher auf diesem Gerät gespeichert!') : (reg.msgOfflineTrainer || 'Ihre Trainer-Registrierung wurde sicher auf diesem Gerät gespeichert!'))
                 : (submittedType === 'player' ? reg.successPlayerDesc : reg.successTrainerDesc)
               }
             </p>
@@ -385,7 +380,7 @@ export default function RegistrationPage({ onNavigate }) {
         <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm flex items-start gap-3 shadow-xs">
           <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600 mt-0.5" />
           <div className="space-y-0.5">
-            <span className="font-bold">Eingabefehler:</span>
+            <span className="font-bold">{reg.validationError || (isDe ? 'Eingabefehler:' : 'Validation Error:')}</span>
             <p>{errorMsg}</p>
           </div>
         </div>
@@ -529,7 +524,7 @@ export default function RegistrationPage({ onNavigate }) {
               </select>
             </div>
 
-            {/* Favorite Player / Idol with quick suggestions */}
+            {/* Favorite Player / Idol (Clean text input without preset recommendations) */}
             <div>
               <label className="font-bold text-slate-700 block mb-1.5">
                 {reg.favPlayerLabel}
@@ -541,20 +536,6 @@ export default function RegistrationPage({ onNavigate }) {
                 placeholder={reg.favPlayerPlaceholder}
                 className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
               />
-              {/* Quick suggestions */}
-              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Vorschläge:</span>
-                {popularPlayers.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPlayerFav(p)}
-                    className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-[#005A36] transition-colors"
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Email Address */}
@@ -572,7 +553,7 @@ export default function RegistrationPage({ onNavigate }) {
               />
             </div>
 
-            {/* Phone Number / WhatsApp */}
+            {/* Phone Number / WhatsApp & Show/Hide Toggle */}
             <div>
               <label className="font-bold text-slate-700 block mb-1.5">
                 {reg.phoneLabel}
@@ -585,6 +566,18 @@ export default function RegistrationPage({ onNavigate }) {
                 placeholder={reg.phonePlaceholder}
                 className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
               />
+              <label className="flex items-start gap-2.5 mt-2 cursor-pointer select-none p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={playerShowPhone}
+                  onChange={(e) => setPlayerShowPhone(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-300 text-[#005A36] focus:ring-[#005A36]"
+                />
+                <div className="text-xs">
+                  <span className="text-slate-800 font-semibold block">{reg.showPhoneLabel}</span>
+                  <span className="text-slate-400 text-[11px] block">{reg.phonePrivacyHint}</span>
+                </div>
+              </label>
             </div>
 
             {/* University Status Radio Group */}
@@ -830,7 +823,7 @@ export default function RegistrationPage({ onNavigate }) {
               />
             </div>
 
-            {/* Phone Number */}
+            {/* Phone Number & Show/Hide Toggle */}
             <div>
               <label className="font-bold text-slate-700 block mb-1.5">
                 {reg.phoneLabel}
@@ -843,6 +836,18 @@ export default function RegistrationPage({ onNavigate }) {
                 placeholder={reg.phonePlaceholder}
                 className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
               />
+              <label className="flex items-start gap-2.5 mt-2 cursor-pointer select-none p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={trainerShowPhone}
+                  onChange={(e) => setTrainerShowPhone(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-300 text-[#005A36] focus:ring-[#005A36]"
+                />
+                <div className="text-xs">
+                  <span className="text-slate-800 font-semibold block">{reg.showPhoneLabel}</span>
+                  <span className="text-slate-400 text-[11px] block">{reg.phonePrivacyHint}</span>
+                </div>
+              </label>
             </div>
 
             {/* USZ Reference Note */}

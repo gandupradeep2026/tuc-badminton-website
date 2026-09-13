@@ -210,19 +210,21 @@ export function initDatabase() {
     );
   `);
 
-  // Schema upgrades for players (phone, favorite_player, skill_level, university_type, university_name, status)
+  // Schema upgrades for players (phone, favorite_player, skill_level, university_type, university_name, status, show_phone)
   try { db.exec("ALTER TABLE players ADD COLUMN phone TEXT;"); } catch (e) {}
   try { db.exec("ALTER TABLE players ADD COLUMN favorite_player TEXT;"); } catch (e) {}
   try { db.exec("ALTER TABLE players ADD COLUMN skill_level TEXT DEFAULT 'Fortgeschritten';"); } catch (e) {}
   try { db.exec("ALTER TABLE players ADD COLUMN university_type TEXT DEFAULT 'tu_chemnitz';"); } catch (e) {}
   try { db.exec("ALTER TABLE players ADD COLUMN university_name TEXT DEFAULT 'TU Chemnitz';"); } catch (e) {}
   try { db.exec("ALTER TABLE players ADD COLUMN status TEXT DEFAULT 'approved';"); } catch (e) {}
+  try { db.exec("ALTER TABLE players ADD COLUMN show_phone INTEGER DEFAULT 0;"); } catch (e) {}
 
-  // Schema upgrades for trainers (phone, hochschulsport_approved, hochschulsport_note, status)
+  // Schema upgrades for trainers (phone, hochschulsport_approved, hochschulsport_note, status, show_phone)
   try { db.exec("ALTER TABLE trainers ADD COLUMN phone TEXT;"); } catch (e) {}
   try { db.exec("ALTER TABLE trainers ADD COLUMN hochschulsport_approved INTEGER DEFAULT 1;"); } catch (e) {}
   try { db.exec("ALTER TABLE trainers ADD COLUMN hochschulsport_note TEXT;"); } catch (e) {}
   try { db.exec("ALTER TABLE trainers ADD COLUMN status TEXT DEFAULT 'approved';"); } catch (e) {}
+  try { db.exec("ALTER TABLE trainers ADD COLUMN show_phone INTEGER DEFAULT 0;"); } catch (e) {}
 
   // Create a minimal valid sample PDF for the seeded tournament announcement
   const samplePdfPath = path.join(uploadsDir, 'ausschreibung_shm_2026.pdf');
@@ -581,16 +583,17 @@ export function rejectTrainer(id) {
   return db.prepare("DELETE FROM trainers WHERE id = ?").run(id);
 }
 
-export function registerTrainerSubmission({ name, role, email, phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url }) {
+export function registerTrainerSubmission({ name, role, email, phone, show_phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url }) {
   const stmt = db.prepare(`
-    INSERT INTO trainers (name, role, email, phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    INSERT INTO trainers (name, role, email, phone, show_phone, focus_areas, hochschulsport_approved, hochschulsport_note, photo_url, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `);
   const result = stmt.run(
     name ? name.trim() : 'Badminton-Trainer',
     role ? role.trim() : 'Trainer / Coach',
     email.trim().toLowerCase(),
     phone ? phone.trim() : '',
+    show_phone ? 1 : 0,
     focus_areas ? focus_areas.trim() : 'Allgemeines Training & Taktik',
     hochschulsport_approved ? 1 : 0,
     hochschulsport_note ? hochschulsport_note.trim() : '',
@@ -599,10 +602,10 @@ export function registerTrainerSubmission({ name, role, email, phone, focus_area
   return db.prepare('SELECT * FROM trainers WHERE id = ?').get(result.lastInsertRowid);
 }
 
-export function createTrainer({ name, role, email, focus_areas, photo_url, phone, hochschulsport_approved, hochschulsport_note, status }) {
+export function createTrainer({ name, role, email, focus_areas, photo_url, phone, show_phone, hochschulsport_approved, hochschulsport_note, status }) {
   const stmt = db.prepare(`
-    INSERT INTO trainers (name, role, email, focus_areas, photo_url, phone, hochschulsport_approved, hochschulsport_note, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO trainers (name, role, email, focus_areas, photo_url, phone, show_phone, hochschulsport_approved, hochschulsport_note, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     name,
@@ -611,6 +614,7 @@ export function createTrainer({ name, role, email, focus_areas, photo_url, phone
     focus_areas,
     photo_url || '',
     phone || '',
+    show_phone !== undefined ? (show_phone ? 1 : 0) : 1,
     hochschulsport_approved !== undefined ? (hochschulsport_approved ? 1 : 0) : 1,
     hochschulsport_note || 'USZ-Zulassung vorhanden',
     status || 'approved'
@@ -622,12 +626,12 @@ export function deleteTrainer(id) {
   return db.prepare('DELETE FROM trainers WHERE id = ?').run(id);
 }
 
-export function updateTrainer(id, { name, role, email, focus_areas, photo_url, phone, hochschulsport_approved, hochschulsport_note, status }) {
+export function updateTrainer(id, { name, role, email, focus_areas, photo_url, phone, show_phone, hochschulsport_approved, hochschulsport_note, status }) {
   const existing = db.prepare('SELECT * FROM trainers WHERE id = ?').get(id);
   if (!existing) throw new Error(`Trainer #${id} not found`);
   const stmt = db.prepare(`
     UPDATE trainers 
-    SET name = ?, role = ?, email = ?, focus_areas = ?, photo_url = ?, phone = ?, hochschulsport_approved = ?, hochschulsport_note = ?, status = ?
+    SET name = ?, role = ?, email = ?, focus_areas = ?, photo_url = ?, phone = ?, show_phone = ?, hochschulsport_approved = ?, hochschulsport_note = ?, status = ?
     WHERE id = ?
   `);
   stmt.run(
@@ -637,6 +641,7 @@ export function updateTrainer(id, { name, role, email, focus_areas, photo_url, p
     focus_areas !== undefined ? focus_areas.trim() : existing.focus_areas,
     photo_url !== undefined && photo_url !== '' ? photo_url : existing.photo_url,
     phone !== undefined ? phone.trim() : (existing.phone || ''),
+    show_phone !== undefined ? (show_phone ? 1 : 0) : (existing.show_phone !== undefined ? existing.show_phone : 1),
     hochschulsport_approved !== undefined ? (hochschulsport_approved ? 1 : 0) : (existing.hochschulsport_approved || 1),
     hochschulsport_note !== undefined ? hochschulsport_note.trim() : (existing.hochschulsport_note || ''),
     status !== undefined ? status : (existing.status || 'approved'),
@@ -770,6 +775,7 @@ export function registerPlayerSubmission({
   team,
   email,
   phone,
+  show_phone,
   favorite_player,
   skill_level,
   university_type,
@@ -778,9 +784,9 @@ export function registerPlayerSubmission({
 }) {
   const stmt = db.prepare(`
     INSERT INTO players (
-      name, gender, study_program, specialization, team, email, phone, favorite_player, skill_level, university_type, university_name, photo_url, status
+      name, gender, study_program, specialization, team, email, phone, show_phone, favorite_player, skill_level, university_type, university_name, photo_url, status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `);
   const result = stmt.run(
     name ? name.trim() : 'Badminton-Spieler',
@@ -790,6 +796,7 @@ export function registerPlayerSubmission({
     team ? team.trim() : 'Hochschulsport & Spielbetrieb',
     email.trim().toLowerCase(),
     phone ? phone.trim() : '',
+    show_phone ? 1 : 0,
     favorite_player ? favorite_player.trim() : '',
     skill_level ? skill_level.trim() : 'Fortgeschritten',
     university_type ? university_type.trim() : 'tu_chemnitz',
@@ -808,6 +815,7 @@ export function createPlayer({
   email,
   photo_url,
   phone,
+  show_phone,
   favorite_player,
   skill_level,
   university_type,
@@ -816,9 +824,9 @@ export function createPlayer({
 }) {
   const stmt = db.prepare(`
     INSERT INTO players (
-      name, gender, study_program, specialization, team, email, photo_url, phone, favorite_player, skill_level, university_type, university_name, status
+      name, gender, study_program, specialization, team, email, photo_url, phone, show_phone, favorite_player, skill_level, university_type, university_name, status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const result = stmt.run(
     name,
@@ -829,6 +837,7 @@ export function createPlayer({
     email,
     photo_url || '',
     phone || '',
+    show_phone ? 1 : 0,
     favorite_player || '',
     skill_level || 'Fortgeschritten',
     university_type || 'tu_chemnitz',
@@ -851,6 +860,7 @@ export function updatePlayer(id, {
   email,
   photo_url,
   phone,
+  show_phone,
   favorite_player,
   skill_level,
   university_type,
@@ -861,7 +871,7 @@ export function updatePlayer(id, {
   if (!existing) throw new Error(`Player #${id} not found`);
   const stmt = db.prepare(`
     UPDATE players
-    SET name = ?, gender = ?, study_program = ?, specialization = ?, team = ?, email = ?, photo_url = ?, phone = ?, favorite_player = ?, skill_level = ?, university_type = ?, university_name = ?, status = ?
+    SET name = ?, gender = ?, study_program = ?, specialization = ?, team = ?, email = ?, photo_url = ?, phone = ?, show_phone = ?, favorite_player = ?, skill_level = ?, university_type = ?, university_name = ?, status = ?
     WHERE id = ?
   `);
   stmt.run(
@@ -873,6 +883,7 @@ export function updatePlayer(id, {
     email !== undefined ? email.trim().toLowerCase() : existing.email,
     photo_url !== undefined && photo_url !== '' ? photo_url : existing.photo_url,
     phone !== undefined ? phone.trim() : (existing.phone || ''),
+    show_phone !== undefined ? (show_phone ? 1 : 0) : (existing.show_phone || 0),
     favorite_player !== undefined ? favorite_player.trim() : (existing.favorite_player || ''),
     skill_level !== undefined ? skill_level.trim() : (existing.skill_level || 'Fortgeschritten'),
     university_type !== undefined ? university_type.trim() : (existing.university_type || 'tu_chemnitz'),

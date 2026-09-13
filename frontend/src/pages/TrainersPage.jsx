@@ -51,7 +51,7 @@ export default function TrainersPage({ onNavigate }) {
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-xs"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>{isDe ? 'Als Trainer bewerben' : 'Apply as Coach'}</span>
+                <span>{isDe ? 'Als Badminton-Trainer registrieren' : 'Register as a Badminton Trainer'}</span>
               </button>
             )}
           </div>
@@ -88,6 +88,8 @@ export default function TrainersPage({ onNavigate }) {
                   <img
                     src={getUploadUrl(trainer.photo_url) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80'}
                     alt={trainer.name}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
                       e.target.onerror = null;
@@ -136,7 +138,7 @@ export default function TrainersPage({ onNavigate }) {
                   <Mail className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate">{trainer.email}</span>
                 </a>
-                {trainer.phone && (
+                {trainer.phone && (trainer.show_phone === 1 || trainer.show_phone === true || trainer.show_phone === '1' || trainer.show_phone === undefined) && (
                   <a
                     href={`tel:${trainer.phone}`}
                     className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-200/80 min-h-[40px]"
