@@ -14,15 +14,24 @@ export default function PlayersPage({ onNavigate }) {
 
   const fetchPlayers = async () => {
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
       const res = await safeFetchJson('/api/players');
-      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
-        setPlayers(res.data);
-      } else {
-        setPlayers(DEFAULT_PLAYERS);
-      }
+      let list = (res.ok && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_PLAYERS];
+      const mergedMap = new Map();
+      list.forEach(p => mergedMap.set(String(p.id), p));
+      customPlayers.forEach(p => mergedMap.set(String(p.id), p));
+      const finalList = Array.from(mergedMap.values()).filter(p => !deletedIds.includes(String(p.id)));
+      setPlayers(finalList);
     } catch (err) {
       console.error('Failed to load players, using fallback:', err);
-      setPlayers(DEFAULT_PLAYERS);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+      const mergedMap = new Map();
+      DEFAULT_PLAYERS.forEach(p => mergedMap.set(String(p.id), p));
+      customPlayers.forEach(p => mergedMap.set(String(p.id), p));
+      const finalList = Array.from(mergedMap.values()).filter(p => !deletedIds.includes(String(p.id)));
+      setPlayers(finalList);
     } finally {
       setLoading(false);
     }
@@ -30,6 +39,9 @@ export default function PlayersPage({ onNavigate }) {
 
   useEffect(() => {
     fetchPlayers();
+    const handleStorageChange = () => fetchPlayers();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const menList = players.filter((p) => p.gender === 'men');

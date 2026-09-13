@@ -40,7 +40,7 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import DisciplineSelector from '../components/DisciplineSelector';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
-import { safeFetchJson, getApiUrl, getUploadUrl, getOfflineSubmissions, syncOfflineSubmissions } from '../api/client';
+import { safeFetchJson, getApiUrl, getUploadUrl, getOfflineSubmissions, syncOfflineSubmissions, fileToDataUrl } from '../api/client';
 import { 
   DEFAULT_PLAYERS, 
   DEFAULT_TRAINERS, 
@@ -242,15 +242,24 @@ export default function AdminPage() {
   const fetchGallery = async () => {
     setGalleryLoading(true);
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
       const res = await safeFetchJson('/api/admin/gallery', { headers: getAdminHeaders() });
       if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
-      if (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setGalleryItems(res.data);
-      } else {
-        setGalleryItems(DEFAULT_GALLERY);
-      }
+      let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_GALLERY];
+      const mergedMap = new Map();
+      list.forEach(g => mergedMap.set(String(g.id), g));
+      customGallery.forEach(g => mergedMap.set(String(g.id), g));
+      const finalList = Array.from(mergedMap.values()).filter(g => !deletedIds.includes(String(g.id)));
+      setGalleryItems(finalList);
     } catch (err) {
-      setGalleryItems(DEFAULT_GALLERY);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
+      const mergedMap = new Map();
+      DEFAULT_GALLERY.forEach(g => mergedMap.set(String(g.id), g));
+      customGallery.forEach(g => mergedMap.set(String(g.id), g));
+      const finalList = Array.from(mergedMap.values()).filter(g => !deletedIds.includes(String(g.id)));
+      setGalleryItems(finalList);
     } finally {
       setGalleryLoading(false);
     }
@@ -259,14 +268,23 @@ export default function AdminPage() {
   const fetchPlayers = async () => {
     setPlayersLoading(true);
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
       const res = await safeFetchJson('/api/players');
-      if (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setPlayersList(res.data);
-      } else {
-        setPlayersList(DEFAULT_PLAYERS);
-      }
+      let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_PLAYERS];
+      const mergedMap = new Map();
+      list.forEach(p => mergedMap.set(String(p.id), p));
+      customPlayers.forEach(p => mergedMap.set(String(p.id), p));
+      const finalList = Array.from(mergedMap.values()).filter(p => !deletedIds.includes(String(p.id)));
+      setPlayersList(finalList);
     } catch (err) {
-      setPlayersList(DEFAULT_PLAYERS);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+      const mergedMap = new Map();
+      DEFAULT_PLAYERS.forEach(p => mergedMap.set(String(p.id), p));
+      customPlayers.forEach(p => mergedMap.set(String(p.id), p));
+      const finalList = Array.from(mergedMap.values()).filter(p => !deletedIds.includes(String(p.id)));
+      setPlayersList(finalList);
     } finally {
       setPlayersLoading(false);
     }
@@ -275,14 +293,23 @@ export default function AdminPage() {
   const fetchTrainers = async () => {
     setTrainersLoading(true);
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
       const res = await safeFetchJson('/api/trainers');
-      if (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setTrainersList(res.data);
-      } else {
-        setTrainersList(DEFAULT_TRAINERS);
-      }
+      let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_TRAINERS];
+      const mergedMap = new Map();
+      list.forEach(t => mergedMap.set(String(t.id), t));
+      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTrainersList(finalList);
     } catch (err) {
-      setTrainersList(DEFAULT_TRAINERS);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+      const mergedMap = new Map();
+      DEFAULT_TRAINERS.forEach(t => mergedMap.set(String(t.id), t));
+      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTrainersList(finalList);
     } finally {
       setTrainersLoading(false);
     }
@@ -291,15 +318,24 @@ export default function AdminPage() {
   const fetchTournaments = async () => {
     setTourneysLoading(true);
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
       const res = await safeFetchJson('/api/admin/tournaments', { headers: getAdminHeaders() });
       if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
-      if (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setTournamentsList(res.data);
-      } else {
-        setTournamentsList(TERMINE_LIST || []);
-      }
+      let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...(TERMINE_LIST || [])];
+      const mergedMap = new Map();
+      list.forEach(t => mergedMap.set(String(t.id), t));
+      customTourneys.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTournamentsList(finalList);
     } catch (err) {
-      setTournamentsList(TERMINE_LIST || []);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
+      const mergedMap = new Map();
+      (TERMINE_LIST || []).forEach(t => mergedMap.set(String(t.id), t));
+      customTourneys.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTournamentsList(finalList);
     } finally {
       setTourneysLoading(false);
     }
@@ -330,16 +366,27 @@ export default function AdminPage() {
   const fetchYouTubeVideos = async () => {
     setYoutubeLoading(true);
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_video_ids') || '[]')).map(String);
+      const customVideos = JSON.parse(localStorage.getItem('tuc_custom_videos') || '[]');
       const res = await safeFetchJson('/api/videos');
+      let videos = [];
       if (res.ok && res.data) {
-        setYoutubeVideos(res.data.videos || []);
+        videos = res.data.videos || [];
         if (res.data.youtube_channel_url) {
           setYoutubeChannelUrl(res.data.youtube_channel_url);
           setChannelUrlInput(res.data.youtube_channel_url);
         }
       }
+      const mergedMap = new Map();
+      videos.forEach(v => mergedMap.set(String(v.id), v));
+      customVideos.forEach(v => mergedMap.set(String(v.id), v));
+      const finalList = Array.from(mergedMap.values()).filter(v => !deletedIds.includes(String(v.id)));
+      setYoutubeVideos(finalList);
     } catch (err) {
-      console.error('Failed to load YouTube videos:', err);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_video_ids') || '[]')).map(String);
+      const customVideos = JSON.parse(localStorage.getItem('tuc_custom_videos') || '[]');
+      const finalList = customVideos.filter(v => !deletedIds.includes(String(v.id)));
+      setYoutubeVideos(finalList);
     } finally {
       setYoutubeLoading(false);
     }
@@ -348,14 +395,23 @@ export default function AdminPage() {
   const fetchAdminSchedules = async () => {
     setSchedulesLoading(true);
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_schedule_ids') || '[]')).map(String);
+      const customScheds = JSON.parse(localStorage.getItem('tuc_custom_schedules') || '[]');
       const res = await safeFetchJson('/api/training-schedules');
-      if (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setAdminSchedules(res.data);
-      } else {
-        setAdminSchedules(TRAINING_SESSIONS || []);
-      }
+      let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...(TRAINING_SESSIONS || [])];
+      const mergedMap = new Map();
+      list.forEach(s => mergedMap.set(String(s.id), s));
+      customScheds.forEach(s => mergedMap.set(String(s.id), s));
+      const finalList = Array.from(mergedMap.values()).filter(s => !deletedIds.includes(String(s.id)));
+      setAdminSchedules(finalList);
     } catch (err) {
-      setAdminSchedules(TRAINING_SESSIONS || []);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_schedule_ids') || '[]')).map(String);
+      const customScheds = JSON.parse(localStorage.getItem('tuc_custom_schedules') || '[]');
+      const mergedMap = new Map();
+      (TRAINING_SESSIONS || []).forEach(s => mergedMap.set(String(s.id), s));
+      customScheds.forEach(s => mergedMap.set(String(s.id), s));
+      const finalList = Array.from(mergedMap.values()).filter(s => !deletedIds.includes(String(s.id)));
+      setAdminSchedules(finalList);
     } finally {
       setSchedulesLoading(false);
     }
@@ -588,34 +644,48 @@ export default function AdminPage() {
   // -----------------------------------------------------------------
   const handleApprove = async (id) => {
     try {
-      const res = await fetch(`/api/admin/gallery/${id}/approve`, {
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
+      const item = customGallery.find(g => String(g.id) === String(id));
+      if (item) {
+        item.is_approved = 1;
+        item.status = 'approved';
+        localStorage.setItem('tuc_custom_gallery', JSON.stringify(customGallery));
+      }
+
+      setGalleryItems(prev => prev.map(g => String(g.id) === String(id) ? { ...g, is_approved: 1, status: 'approved' } : g));
+      setFeedback({ type: 'success', message: isDe ? 'Ergebnis freigegeben und veröffentlicht!' : 'Result approved & published!' });
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/admin/gallery/${id}/approve`, {
         method: 'POST',
         headers: getAdminHeaders(),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        setFeedback({ type: 'success', message: isDe ? 'Ergebnis freigegeben und veröffentlicht!' : 'Result approved & published!' });
-        fetchGallery();
-      }
+      }).catch(() => {});
     } catch (err) {
-      setFeedback({ type: 'error', message: 'Fehler beim Freigeben' });
+      setFeedback({ type: 'error', message: isDe ? 'Fehler beim Freigeben' : 'Error approving' });
     }
   };
 
   const handleDeleteGallery = async (id) => {
     if (!window.confirm(isDe ? 'Diesen Galerieeintrag wirklich löschen?' : 'Delete this gallery entry?')) return;
     try {
-      const res = await fetch(`/api/admin/gallery/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_gallery_ids', JSON.stringify(deletedIds));
+      }
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]').filter(g => String(g.id) !== String(id));
+      localStorage.setItem('tuc_custom_gallery', JSON.stringify(customGallery));
+
+      setGalleryItems(prev => prev.filter(g => String(g.id) !== String(id)));
+      setFeedback({ type: 'success', message: isDe ? 'Eintrag gelöscht' : 'Item deleted' });
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/admin/gallery/${id}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        setFeedback({ type: 'success', message: isDe ? 'Eintrag gelöscht' : 'Item deleted' });
-        fetchGallery();
-      }
+      }).catch(() => {});
     } catch (err) {
-      setFeedback({ type: 'error', message: 'Fehler beim Löschen' });
+      setFeedback({ type: 'error', message: isDe ? 'Fehler beim Löschen' : 'Error deleting' });
     }
   };
 
@@ -625,30 +695,42 @@ export default function AdminPage() {
     setFeedback(null);
 
     try {
-      const formData = new FormData();
-      formData.append('tournament_name', newTourneyName.trim());
-      formData.append('result', newResultScore.trim());
-      formData.append('date', newResultDate || new Date().toLocaleDateString('de-DE'));
-      formData.append('player_name', newResultPlayer.trim());
-      formData.append('caption', newResultCaption.trim());
-
+      let photoUrl = newResultPhotoUrl.trim();
       if (newResultPhotoFile) {
-        formData.append('photo', newResultPhotoFile);
-      } else if (newResultPhotoUrl.trim()) {
-        formData.append('photo_url_input', newResultPhotoUrl.trim());
-      } else {
+        try {
+          photoUrl = await fileToDataUrl(newResultPhotoFile);
+        } catch (err) {
+          console.warn('Could not encode photo as data URL:', err);
+        }
+      }
+
+      if (!photoUrl) {
         throw new Error(isDe ? 'Bitte lade ein Foto hoch oder gib eine Bild-URL an.' : 'Please upload a photo or provide an image URL.');
       }
 
-      const res = await fetch('/api/admin/gallery/create', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: formData,
-      });
+      const newId = Date.now();
+      const newGalleryItem = {
+        id: newId,
+        tournament_name: newTourneyName.trim(),
+        result: newResultScore.trim(),
+        date: newResultDate || new Date().toLocaleDateString('de-DE'),
+        player_name: newResultPlayer.trim(),
+        caption: newResultCaption.trim(),
+        photo_url: photoUrl,
+        is_approved: 1,
+        status: 'approved',
+        likes: 0,
+      };
 
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Erstellen');
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
+      customGallery.unshift(newGalleryItem);
+      localStorage.setItem('tuc_custom_gallery', JSON.stringify(customGallery));
 
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      const updatedDeletedIds = deletedIds.filter(id => id !== String(newId));
+      localStorage.setItem('tuc_deleted_gallery_ids', JSON.stringify(updatedDeletedIds));
+
+      setGalleryItems(prev => [newGalleryItem, ...prev]);
       setFeedback({ type: 'success', message: isDe ? 'Eintrag direkt veröffentlicht!' : 'Result directly published!' });
       setNewTourneyName('');
       setNewResultScore('');
@@ -659,7 +741,25 @@ export default function AdminPage() {
       setNewResultPhotoPreview('');
       setNewResultPhotoUrl('');
       setIsAddGalleryOpen(false);
-      fetchGallery();
+      window.dispatchEvent(new Event('storage'));
+
+      const formData = new FormData();
+      formData.append('tournament_name', newGalleryItem.tournament_name);
+      formData.append('result', newGalleryItem.result);
+      formData.append('date', newGalleryItem.date);
+      formData.append('player_name', newGalleryItem.player_name);
+      formData.append('caption', newGalleryItem.caption);
+      if (newResultPhotoFile) {
+        formData.append('photo', newResultPhotoFile);
+      } else if (newGalleryItem.photo_url) {
+        formData.append('photo_url_input', newGalleryItem.photo_url);
+      }
+
+      safeFetchJson('/api/admin/gallery/create', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: formData,
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -672,6 +772,35 @@ export default function AdminPage() {
     if (!editingItem) return;
 
     try {
+      let photoUrl = editingItem.photo_url;
+      if (editingItem.newFile) {
+        try {
+          photoUrl = await fileToDataUrl(editingItem.newFile);
+        } catch (err) {
+          console.warn('Could not encode photo as data URL:', err);
+        }
+      }
+
+      const updatedItem = {
+        ...editingItem,
+        photo_url: photoUrl,
+      };
+      delete updatedItem.newFile;
+
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
+      const idx = customGallery.findIndex(g => String(g.id) === String(editingItem.id));
+      if (idx !== -1) {
+        customGallery[idx] = updatedItem;
+      } else {
+        customGallery.unshift(updatedItem);
+      }
+      localStorage.setItem('tuc_custom_gallery', JSON.stringify(customGallery));
+
+      setGalleryItems(prev => prev.map(g => String(g.id) === String(editingItem.id) ? updatedItem : g));
+      setFeedback({ type: 'success', message: adm.galleryUpdatedSuccess });
+      setEditingItem(null);
+      window.dispatchEvent(new Event('storage'));
+
       const formData = new FormData();
       formData.append('tournament_name', editingItem.tournament_name);
       formData.append('result', editingItem.result);
@@ -682,22 +811,15 @@ export default function AdminPage() {
 
       if (editingItem.newFile) {
         formData.append('photo', editingItem.newFile);
-      } else if (editingItem.photo_url) {
-        formData.append('photo_url_input', editingItem.photo_url);
+      } else if (photoUrl) {
+        formData.append('photo_url_input', photoUrl);
       }
 
-      const res = await fetch(`/api/admin/gallery/${editingItem.id}`, {
+      safeFetchJson(`/api/admin/gallery/${editingItem.id}`, {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: formData,
-      });
-
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Speichern');
-
-      setFeedback({ type: 'success', message: adm.galleryUpdatedSuccess });
-      setEditingItem(null);
-      fetchGallery();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -712,31 +834,38 @@ export default function AdminPage() {
     setFeedback(null);
 
     try {
-      const formData = new FormData();
-      formData.append('name', playerName.trim());
-      formData.append('gender', playerGender);
-      formData.append('study_program', playerStudy.trim());
-      formData.append('specialization', playerSpec.trim());
-      formData.append('team', playerTeam.trim());
-      formData.append('email', playerEmail.trim().toLowerCase());
-
+      let photoUrl = playerPhotoUrl.trim();
       if (playerPhotoFile) {
-        formData.append('photo', playerPhotoFile);
-      } else if (playerPhotoUrl.trim()) {
-        formData.append('photo_url_input', playerPhotoUrl.trim());
+        try {
+          photoUrl = await fileToDataUrl(playerPhotoFile);
+        } catch (err) {
+          console.warn('Could not encode photo as data URL:', err);
+        }
       }
 
-      const res = await safeFetchJson('/api/players', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: formData,
-      });
+      const newId = Date.now();
+      const newPlayer = {
+        id: newId,
+        name: playerName.trim(),
+        gender: playerGender,
+        study_program: playerStudy.trim(),
+        specialization: playerSpec.trim(),
+        team: playerTeam.trim() || 'TUC Shuttlers',
+        email: playerEmail.trim().toLowerCase(),
+        photo_url: photoUrl || (playerGender === 'women'
+          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
+          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')
+      };
 
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) {
-        throw new Error(res.error || 'Fehler beim Erstellen des Spielers');
-      }
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+      customPlayers.push(newPlayer);
+      localStorage.setItem('tuc_custom_players', JSON.stringify(customPlayers));
 
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      const updatedDeletedIds = deletedIds.filter(id => id !== String(newId));
+      localStorage.setItem('tuc_deleted_player_ids', JSON.stringify(updatedDeletedIds));
+
+      setPlayersList(prev => [...prev, newPlayer]);
       setFeedback({ type: 'success', message: adm.playerCreatedSuccess });
       setPlayerName('');
       setPlayerStudy('');
@@ -747,7 +876,36 @@ export default function AdminPage() {
       setPlayerPhotoPreview('');
       setPlayerPhotoUrl('');
       setIsAddPlayerOpen(false);
-      fetchPlayers();
+      window.dispatchEvent(new Event('storage'));
+
+      const formData = new FormData();
+      formData.append('name', newPlayer.name);
+      formData.append('gender', newPlayer.gender);
+      formData.append('study_program', newPlayer.study_program);
+      formData.append('specialization', newPlayer.specialization);
+      formData.append('team', newPlayer.team);
+      formData.append('email', newPlayer.email);
+      if (playerPhotoFile) {
+        formData.append('photo', playerPhotoFile);
+      } else if (newPlayer.photo_url) {
+        formData.append('photo_url_input', newPlayer.photo_url);
+      }
+
+      safeFetchJson('/api/players', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: formData,
+      }).then(res => {
+        if (res.ok && res.data && res.data.player) {
+          const currentCustom = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+          const idx = currentCustom.findIndex(p => p.id === newId);
+          if (idx !== -1) {
+            currentCustom[idx] = res.data.player;
+            localStorage.setItem('tuc_custom_players', JSON.stringify(currentCustom));
+          }
+          fetchPlayers();
+        }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -760,6 +918,35 @@ export default function AdminPage() {
     if (!editingPlayer) return;
 
     try {
+      let photoUrl = editingPlayer.photo_url;
+      if (editingPlayer.newFile) {
+        try {
+          photoUrl = await fileToDataUrl(editingPlayer.newFile);
+        } catch (err) {
+          console.warn('Could not encode photo as data URL:', err);
+        }
+      }
+
+      const updatedPlayer = {
+        ...editingPlayer,
+        photo_url: photoUrl
+      };
+      delete updatedPlayer.newFile;
+
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+      const idx = customPlayers.findIndex(p => String(p.id) === String(editingPlayer.id));
+      if (idx !== -1) {
+        customPlayers[idx] = updatedPlayer;
+      } else {
+        customPlayers.push(updatedPlayer);
+      }
+      localStorage.setItem('tuc_custom_players', JSON.stringify(customPlayers));
+
+      setPlayersList(prev => prev.map(p => String(p.id) === String(editingPlayer.id) ? updatedPlayer : p));
+      setFeedback({ type: 'success', message: adm.playerUpdatedSuccess });
+      setEditingPlayer(null);
+      window.dispatchEvent(new Event('storage'));
+
       const formData = new FormData();
       formData.append('name', editingPlayer.name);
       formData.append('gender', editingPlayer.gender);
@@ -770,22 +957,15 @@ export default function AdminPage() {
 
       if (editingPlayer.newFile) {
         formData.append('photo', editingPlayer.newFile);
-      } else if (editingPlayer.photo_url) {
-        formData.append('photo_url_input', editingPlayer.photo_url);
+      } else if (photoUrl) {
+        formData.append('photo_url_input', photoUrl);
       }
 
-      const res = await fetch(`/api/players/${editingPlayer.id}`, {
+      safeFetchJson(`/api/players/${editingPlayer.id}`, {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: formData,
-      });
-
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Aktualisieren des Spielers');
-
-      setFeedback({ type: 'success', message: adm.playerUpdatedSuccess });
-      setEditingPlayer(null);
-      fetchPlayers();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -795,15 +975,23 @@ export default function AdminPage() {
     if (!window.confirm(`${adm.deletePlayerConfirm}\n\n${name} (#${id})`)) return;
 
     try {
-      const res = await fetch(`/api/players/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_player_ids', JSON.stringify(deletedIds));
+      }
+
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]').filter(p => String(p.id) !== String(id));
+      localStorage.setItem('tuc_custom_players', JSON.stringify(customPlayers));
+
+      setPlayersList(prev => prev.filter(p => String(p.id) !== String(id)));
+      setFeedback({ type: 'success', message: `${name}: ${adm.playerDeletedSuccess}` });
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/players/${id}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        setFeedback({ type: 'success', message: `${name}: ${adm.playerDeletedSuccess}` });
-        fetchPlayers();
-      }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -818,29 +1006,34 @@ export default function AdminPage() {
     setFeedback(null);
 
     try {
-      const formData = new FormData();
-      formData.append('name', trainerName.trim());
-      formData.append('role', trainerRole.trim());
-      formData.append('email', trainerEmail.trim().toLowerCase());
-      formData.append('focus_areas', trainerFocus.trim());
-
+      let photoUrl = trainerPhotoUrl.trim();
       if (trainerPhotoFile) {
-        formData.append('photo', trainerPhotoFile);
-      } else if (trainerPhotoUrl.trim()) {
-        formData.append('photo_url_input', trainerPhotoUrl.trim());
+        try {
+          photoUrl = await fileToDataUrl(trainerPhotoFile);
+        } catch (err) {
+          console.warn('Could not encode photo as data URL:', err);
+        }
       }
 
-      const res = await safeFetchJson('/api/trainers', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: formData,
-      });
+      const newId = Date.now();
+      const newTrainer = {
+        id: newId,
+        name: trainerName.trim(),
+        role: trainerRole.trim(),
+        email: trainerEmail.trim().toLowerCase(),
+        focus_areas: trainerFocus.trim(),
+        photo_url: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+      };
 
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) {
-        throw new Error(res.error || 'Fehler beim Anlegen des Trainers');
-      }
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+      customTrainers.push(newTrainer);
+      localStorage.setItem('tuc_custom_trainers', JSON.stringify(customTrainers));
 
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      const updatedDeletedIds = deletedIds.filter(id => id !== String(newId));
+      localStorage.setItem('tuc_deleted_trainer_ids', JSON.stringify(updatedDeletedIds));
+
+      setTrainersList(prev => [...prev, newTrainer]);
       setFeedback({ type: 'success', message: adm.trainerCreatedSuccess });
       setTrainerName('');
       setTrainerRole('');
@@ -850,7 +1043,34 @@ export default function AdminPage() {
       setTrainerPhotoPreview('');
       setTrainerPhotoUrl('');
       setIsAddTrainerOpen(false);
-      fetchTrainers();
+      window.dispatchEvent(new Event('storage'));
+
+      const formData = new FormData();
+      formData.append('name', newTrainer.name);
+      formData.append('role', newTrainer.role);
+      formData.append('email', newTrainer.email);
+      formData.append('focus_areas', newTrainer.focus_areas);
+      if (trainerPhotoFile) {
+        formData.append('photo', trainerPhotoFile);
+      } else if (newTrainer.photo_url) {
+        formData.append('photo_url_input', newTrainer.photo_url);
+      }
+
+      safeFetchJson('/api/trainers', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: formData,
+      }).then(res => {
+        if (res.ok && res.data && res.data.trainer) {
+          const currentCustom = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+          const idx = currentCustom.findIndex(t => t.id === newId);
+          if (idx !== -1) {
+            currentCustom[idx] = res.data.trainer;
+            localStorage.setItem('tuc_custom_trainers', JSON.stringify(currentCustom));
+          }
+          fetchTrainers();
+        }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -863,6 +1083,35 @@ export default function AdminPage() {
     if (!editingTrainer) return;
 
     try {
+      let photoUrl = editingTrainer.photo_url;
+      if (editingTrainer.newFile) {
+        try {
+          photoUrl = await fileToDataUrl(editingTrainer.newFile);
+        } catch (err) {
+          console.warn('Could not encode photo as data URL:', err);
+        }
+      }
+
+      const updatedTrainer = {
+        ...editingTrainer,
+        photo_url: photoUrl
+      };
+      delete updatedTrainer.newFile;
+
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+      const idx = customTrainers.findIndex(t => String(t.id) === String(editingTrainer.id));
+      if (idx !== -1) {
+        customTrainers[idx] = updatedTrainer;
+      } else {
+        customTrainers.push(updatedTrainer);
+      }
+      localStorage.setItem('tuc_custom_trainers', JSON.stringify(customTrainers));
+
+      setTrainersList(prev => prev.map(t => String(t.id) === String(editingTrainer.id) ? updatedTrainer : t));
+      setFeedback({ type: 'success', message: adm.trainerUpdatedSuccess });
+      setEditingTrainer(null);
+      window.dispatchEvent(new Event('storage'));
+
       const formData = new FormData();
       formData.append('name', editingTrainer.name);
       formData.append('role', editingTrainer.role);
@@ -871,22 +1120,15 @@ export default function AdminPage() {
 
       if (editingTrainer.newFile) {
         formData.append('photo', editingTrainer.newFile);
-      } else if (editingTrainer.photo_url) {
-        formData.append('photo_url_input', editingTrainer.photo_url);
+      } else if (photoUrl) {
+        formData.append('photo_url_input', photoUrl);
       }
 
-      const res = await fetch(`/api/trainers/${editingTrainer.id}`, {
+      safeFetchJson(`/api/trainers/${editingTrainer.id}`, {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: formData,
-      });
-
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Aktualisieren des Trainers');
-
-      setFeedback({ type: 'success', message: adm.trainerUpdatedSuccess });
-      setEditingTrainer(null);
-      fetchTrainers();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -896,15 +1138,23 @@ export default function AdminPage() {
     if (!window.confirm(`${adm.deleteTrainerConfirm}\n\n${name} (#${id})`)) return;
 
     try {
-      const res = await fetch(`/api/trainers/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_trainer_ids', JSON.stringify(deletedIds));
+      }
+
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]').filter(t => String(t.id) !== String(id));
+      localStorage.setItem('tuc_custom_trainers', JSON.stringify(customTrainers));
+
+      setTrainersList(prev => prev.filter(t => String(t.id) !== String(id)));
+      setFeedback({ type: 'success', message: `${name}: ${adm.trainerDeletedSuccess}` });
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/trainers/${id}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        setFeedback({ type: 'success', message: `${name}: ${adm.trainerDeletedSuccess}` });
-        fetchTrainers();
-      }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -919,28 +1169,26 @@ export default function AdminPage() {
     setFeedback(null);
 
     try {
-      const formData = new FormData();
-      formData.append('title', tourneyTitle.trim());
-      formData.append('date', tourneyDate.trim());
-      formData.append('deadline', tourneyDeadline.trim());
-      formData.append('location', tourneyLocation.trim());
-      formData.append('description', tourneyDesc.trim());
+      const newId = Date.now();
+      const newTourney = {
+        id: newId,
+        title: tourneyTitle.trim(),
+        date: tourneyDate.trim(),
+        deadline: tourneyDeadline.trim(),
+        location: tourneyLocation.trim() || 'Sporthalle Thüringer Weg 11, Chemnitz',
+        description: tourneyDesc.trim(),
+        document_url: tourneyDocUrl.trim() || '',
+      };
 
-      if (tourneyDocFile) {
-        formData.append('document', tourneyDocFile);
-      } else if (tourneyDocUrl.trim()) {
-        formData.append('document_url_input', tourneyDocUrl.trim());
-      }
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
+      customTourneys.push(newTourney);
+      localStorage.setItem('tuc_custom_tournaments', JSON.stringify(customTourneys));
 
-      const res = await fetch('/api/tournaments', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: formData,
-      });
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      const updatedDeletedIds = deletedIds.filter(id => id !== String(newId));
+      localStorage.setItem('tuc_deleted_tournament_ids', JSON.stringify(updatedDeletedIds));
 
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Anlegen des Turniers');
-
+      setTournamentsList(prev => [...prev, newTourney]);
       setFeedback({ type: 'success', message: adm.tourneyCreatedSuccess });
       setTourneyTitle('');
       setTourneyDate('');
@@ -950,7 +1198,25 @@ export default function AdminPage() {
       setTourneyDocFile(null);
       setTourneyDocUrl('');
       setIsAddTourneyOpen(false);
-      fetchTournaments();
+      window.dispatchEvent(new Event('storage'));
+
+      const formData = new FormData();
+      formData.append('title', newTourney.title);
+      formData.append('date', newTourney.date);
+      formData.append('deadline', newTourney.deadline);
+      formData.append('location', newTourney.location);
+      formData.append('description', newTourney.description);
+      if (tourneyDocFile) {
+        formData.append('document', tourneyDocFile);
+      } else if (tourneyDocUrl.trim()) {
+        formData.append('document_url_input', tourneyDocUrl.trim());
+      }
+
+      safeFetchJson('/api/tournaments', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: formData,
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -963,6 +1229,23 @@ export default function AdminPage() {
     if (!editingTournament) return;
 
     try {
+      const updatedTourney = { ...editingTournament };
+      delete updatedTourney.newDocFile;
+
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
+      const idx = customTourneys.findIndex(t => String(t.id) === String(editingTournament.id));
+      if (idx !== -1) {
+        customTourneys[idx] = updatedTourney;
+      } else {
+        customTourneys.push(updatedTourney);
+      }
+      localStorage.setItem('tuc_custom_tournaments', JSON.stringify(customTourneys));
+
+      setTournamentsList(prev => prev.map(t => String(t.id) === String(editingTournament.id) ? updatedTourney : t));
+      setFeedback({ type: 'success', message: adm.tourneyUpdatedSuccess });
+      setEditingTournament(null);
+      window.dispatchEvent(new Event('storage'));
+
       const formData = new FormData();
       formData.append('title', editingTournament.title);
       formData.append('date', editingTournament.date);
@@ -970,24 +1253,17 @@ export default function AdminPage() {
       formData.append('location', editingTournament.location);
       formData.append('description', editingTournament.description || '');
 
-      if (editingTournament.newFile) {
-        formData.append('document', editingTournament.newFile);
+      if (editingTournament.newDocFile) {
+        formData.append('document', editingTournament.newDocFile);
       } else if (editingTournament.document_url) {
         formData.append('document_url_input', editingTournament.document_url);
       }
 
-      const res = await fetch(`/api/tournaments/${editingTournament.id}`, {
+      safeFetchJson(`/api/tournaments/${editingTournament.id}`, {
         method: 'PUT',
         headers: getAdminHeaders(),
         body: formData,
-      });
-
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Aktualisieren des Turniers');
-
-      setFeedback({ type: 'success', message: adm.tourneyUpdatedSuccess });
-      setEditingTournament(null);
-      fetchTournaments();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -997,15 +1273,22 @@ export default function AdminPage() {
     if (!window.confirm(`${adm.deleteTournamentConfirm}\n\n${title} (#${id})`)) return;
 
     try {
-      const res = await fetch(`/api/tournaments/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_tournament_ids', JSON.stringify(deletedIds));
+      }
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]').filter(t => String(t.id) !== String(id));
+      localStorage.setItem('tuc_custom_tournaments', JSON.stringify(customTourneys));
+
+      setTournamentsList(prev => prev.filter(t => String(t.id) !== String(id)));
+      setFeedback({ type: 'success', message: adm.tourneyDeletedSuccess });
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/tournaments/${id}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        setFeedback({ type: 'success', message: adm.tourneyDeletedSuccess });
-        fetchTournaments();
-      }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -1139,28 +1422,39 @@ export default function AdminPage() {
     setVideoSubmitting(true);
     setFeedback(null);
     try {
-      const res = await fetch('/api/admin/videos', {
-        method: 'POST',
-        headers: {
-          ...getAdminHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: videoTitle.trim(),
-          youtube_url: videoUrl.trim(),
-          category: videoCategory.trim(),
-          description: videoDesc.trim(),
-          display_order: youtubeVideos.length + 1,
-        }),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Hinzufügen des Videos');
+      const newId = Date.now();
+      const newVid = {
+        id: newId,
+        title: videoTitle.trim(),
+        youtube_url: videoUrl.trim(),
+        category: videoCategory.trim(),
+        description: videoDesc.trim(),
+        display_order: youtubeVideos.length + 1,
+      };
+
+      const customVideos = JSON.parse(localStorage.getItem('tuc_custom_videos') || '[]');
+      customVideos.push(newVid);
+      localStorage.setItem('tuc_custom_videos', JSON.stringify(customVideos));
+
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_video_ids') || '[]')).map(String);
+      localStorage.setItem('tuc_deleted_video_ids', JSON.stringify(deletedIds.filter(id => id !== String(newId))));
+
+      setYoutubeVideos(prev => [...prev, newVid]);
       setFeedback({ type: 'success', message: 'Video erfolgreich hinzugefügt!' });
       setVideoTitle('');
       setVideoUrl('');
       setVideoDesc('');
       setIsAddVideoOpen(false);
-      fetchYouTubeVideos();
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson('/api/admin/videos', {
+        method: 'POST',
+        headers: {
+          ...getAdminHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newVid),
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -1172,19 +1466,28 @@ export default function AdminPage() {
     e.preventDefault();
     if (!editingVideo) return;
     try {
-      const res = await fetch(`/api/admin/videos/${editingVideo.id}`, {
+      const customVideos = JSON.parse(localStorage.getItem('tuc_custom_videos') || '[]');
+      const idx = customVideos.findIndex(v => String(v.id) === String(editingVideo.id));
+      if (idx !== -1) {
+        customVideos[idx] = editingVideo;
+      } else {
+        customVideos.push(editingVideo);
+      }
+      localStorage.setItem('tuc_custom_videos', JSON.stringify(customVideos));
+
+      setYoutubeVideos(prev => prev.map(v => String(v.id) === String(editingVideo.id) ? editingVideo : v));
+      setFeedback({ type: 'success', message: 'Video erfolgreich aktualisiert!' });
+      setEditingVideo(null);
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/admin/videos/${editingVideo.id}`, {
         method: 'PUT',
         headers: {
           ...getAdminHeaders(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(editingVideo),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Aktualisieren des Videos');
-      setFeedback({ type: 'success', message: 'Video erfolgreich aktualisiert!' });
-      setEditingVideo(null);
-      fetchYouTubeVideos();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -1193,15 +1496,22 @@ export default function AdminPage() {
   const handleDeleteVideo = async (id, title) => {
     if (!window.confirm(`${adm.youtubeTab?.deleteConfirm || 'Video löschen?'}\n\n${title}`)) return;
     try {
-      const res = await fetch(`/api/admin/videos/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_video_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_video_ids', JSON.stringify(deletedIds));
+      }
+      const customVideos = JSON.parse(localStorage.getItem('tuc_custom_videos') || '[]').filter(v => String(v.id) !== String(id));
+      localStorage.setItem('tuc_custom_videos', JSON.stringify(customVideos));
+
+      setYoutubeVideos(prev => prev.filter(v => String(v.id) !== String(id)));
+      setFeedback({ type: 'success', message: 'Video gelöscht.' });
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/admin/videos/${id}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        setFeedback({ type: 'success', message: 'Video gelöscht.' });
-        fetchYouTubeVideos();
-      }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -1215,28 +1525,39 @@ export default function AdminPage() {
     setSchedSubmitting(true);
     setFeedback(null);
     try {
-      const res = await fetch('/api/admin/training-schedules', {
+      const newId = Date.now();
+      const newSched = {
+        id: newId,
+        day_title: schedDay.trim(),
+        time_slot: schedTime.trim(),
+        group_name: schedGroup.trim(),
+        hall_name: schedHall.trim(),
+        courts_info: schedCourts.trim(),
+        notes: schedNotes.trim(),
+        display_order: Number(schedOrder) || 1,
+      };
+
+      const customScheds = JSON.parse(localStorage.getItem('tuc_custom_schedules') || '[]');
+      customScheds.push(newSched);
+      localStorage.setItem('tuc_custom_schedules', JSON.stringify(customScheds));
+
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_schedule_ids') || '[]')).map(String);
+      localStorage.setItem('tuc_deleted_schedule_ids', JSON.stringify(deletedIds.filter(id => id !== String(newId))));
+
+      setAdminSchedules(prev => [...prev, newSched]);
+      setFeedback({ type: 'success', message: 'Trainingszeit erfolgreich angelegt!' });
+      setSchedNotes('');
+      setIsAddScheduleOpen(false);
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson('/api/admin/training-schedules', {
         method: 'POST',
         headers: {
           ...getAdminHeaders(),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          day_title: schedDay.trim(),
-          time_slot: schedTime.trim(),
-          group_name: schedGroup.trim(),
-          hall_name: schedHall.trim(),
-          courts_info: schedCourts.trim(),
-          notes: schedNotes.trim(),
-          display_order: Number(schedOrder) || 1,
-        }),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Anlegen der Trainingszeit');
-      setFeedback({ type: 'success', message: 'Trainingszeit erfolgreich angelegt!' });
-      setSchedNotes('');
-      setIsAddScheduleOpen(false);
-      fetchAdminSchedules();
+        body: JSON.stringify(newSched),
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -1248,19 +1569,28 @@ export default function AdminPage() {
     e.preventDefault();
     if (!editingSchedule) return;
     try {
-      const res = await fetch(`/api/admin/training-schedules/${editingSchedule.id}`, {
+      const customScheds = JSON.parse(localStorage.getItem('tuc_custom_schedules') || '[]');
+      const idx = customScheds.findIndex(s => String(s.id) === String(editingSchedule.id));
+      if (idx !== -1) {
+        customScheds[idx] = editingSchedule;
+      } else {
+        customScheds.push(editingSchedule);
+      }
+      localStorage.setItem('tuc_custom_schedules', JSON.stringify(customScheds));
+
+      setAdminSchedules(prev => prev.map(s => String(s.id) === String(editingSchedule.id) ? editingSchedule : s));
+      setFeedback({ type: 'success', message: 'Trainingszeit erfolgreich aktualisiert!' });
+      setEditingSchedule(null);
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/admin/training-schedules/${editingSchedule.id}`, {
         method: 'PUT',
         headers: {
           ...getAdminHeaders(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(editingSchedule),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (!res.ok) throw new Error('Fehler beim Aktualisieren der Trainingszeit');
-      setFeedback({ type: 'success', message: 'Trainingszeit erfolgreich aktualisiert!' });
-      setEditingSchedule(null);
-      fetchAdminSchedules();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -1269,15 +1599,22 @@ export default function AdminPage() {
   const handleDeleteSchedule = async (id, day) => {
     if (!window.confirm(`${adm.trainingTab?.deleteConfirm || 'Trainings-Slot entfernen?'}\n\n${day}`)) return;
     try {
-      const res = await fetch(`/api/admin/training-schedules/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_schedule_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_schedule_ids', JSON.stringify(deletedIds));
+      }
+      const customScheds = JSON.parse(localStorage.getItem('tuc_custom_schedules') || '[]').filter(s => String(s.id) !== String(id));
+      localStorage.setItem('tuc_custom_schedules', JSON.stringify(customScheds));
+
+      setAdminSchedules(prev => prev.filter(s => String(s.id) !== String(id)));
+      setFeedback({ type: 'success', message: 'Trainingszeit entfernt.' });
+      window.dispatchEvent(new Event('storage'));
+
+      safeFetchJson(`/api/admin/training-schedules/${id}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
-      });
-      if (res.status === 401) return handleUnauthorized();
-      if (res.ok) {
-        setFeedback({ type: 'success', message: 'Trainingszeit entfernt.' });
-        fetchAdminSchedules();
-      }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }

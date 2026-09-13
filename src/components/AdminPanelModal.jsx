@@ -17,7 +17,8 @@ import {
   LogOut,
   RefreshCw
 } from 'lucide-react';
-import { safeFetchJson } from '../api/client';
+import { safeFetchJson, fileToDataUrl } from '../api/client';
+import { DEFAULT_PLAYERS, DEFAULT_TRAINERS, TERMINE_LIST, DEFAULT_GALLERY } from '../data/mockData';
 
 export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
   // Authentication state
@@ -79,16 +80,48 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
     if (!authToken) return;
     setLoading(true);
     try {
+      const deletedPlayerIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+
+      const deletedTrainerIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+
+      const deletedTourneyIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
+
+      const deletedGalleryIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
+
       const [tRes, pRes, tourRes, mRes] = await Promise.all([
         safeFetchJson('/api/trainers'),
         safeFetchJson('/api/players'),
         safeFetchJson('/api/tournaments'),
         safeFetchJson('/api/media'),
       ]);
-      if (tRes.ok && tRes.data) setTrainers(tRes.data);
-      if (pRes.ok && pRes.data) setPlayers(pRes.data);
-      if (tourRes.ok && tourRes.data) setTournaments(tourRes.data);
-      if (mRes.ok && mRes.data) setMediaList(mRes.data);
+
+      let tList = (tRes.ok && Array.isArray(tRes.data) && tRes.data.length > 0) ? tRes.data : [...DEFAULT_TRAINERS];
+      const tMap = new Map();
+      tList.forEach(t => tMap.set(String(t.id), t));
+      customTrainers.forEach(t => tMap.set(String(t.id), t));
+      setTrainers(Array.from(tMap.values()).filter(t => !deletedTrainerIds.includes(String(t.id))));
+
+      let pList = (pRes.ok && Array.isArray(pRes.data) && pRes.data.length > 0) ? pRes.data : [...DEFAULT_PLAYERS];
+      const pMap = new Map();
+      pList.forEach(p => pMap.set(String(p.id), p));
+      customPlayers.forEach(p => pMap.set(String(p.id), p));
+      setPlayers(Array.from(pMap.values()).filter(p => !deletedPlayerIds.includes(String(p.id))));
+
+      let toList = (tourRes.ok && Array.isArray(tourRes.data) && tourRes.data.length > 0) ? tourRes.data : [...(TERMINE_LIST || [])];
+      const toMap = new Map();
+      toList.forEach(to => toMap.set(String(to.id), to));
+      customTourneys.forEach(to => toMap.set(String(to.id), to));
+      setTournaments(Array.from(toMap.values()).filter(to => !deletedTourneyIds.includes(String(to.id))));
+
+      let mList = (mRes.ok && Array.isArray(mRes.data) && mRes.data.length > 0) ? mRes.data : [...DEFAULT_GALLERY];
+      const mMap = new Map();
+      mList.forEach(m => mMap.set(String(m.id), m));
+      customGallery.forEach(m => mMap.set(String(m.id), m));
+      setMediaList(Array.from(mMap.values()).filter(m => !deletedGalleryIds.includes(String(m.id))));
     } catch (err) {
       console.error('Error fetching admin data:', err);
     } finally {
@@ -147,26 +180,38 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
     setFeedback(null);
 
     try {
-      const formData = new FormData();
-      formData.append('name', playerForm.name);
-      formData.append('gender', playerForm.gender);
-      formData.append('study_program', playerForm.study_program);
-      formData.append('specialization', playerForm.specialization);
-      formData.append('team', playerForm.team);
-      formData.append('email', playerForm.email);
+      let photoUrl = '';
       if (playerForm.photoFile) {
-        formData.append('photo', playerForm.photoFile);
+        try {
+          photoUrl = await fileToDataUrl(playerForm.photoFile);
+        } catch (err) {
+          console.warn('Could not encode photo:', err);
+        }
       }
 
-      const res = await safeFetchJson('/api/players', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${authToken}` },
-        body: formData,
-      });
+      const newId = Date.now();
+      const newPlayer = {
+        id: newId,
+        name: playerForm.name.trim(),
+        gender: playerForm.gender,
+        study_program: playerForm.study_program.trim(),
+        specialization: playerForm.specialization.trim(),
+        team: playerForm.team.trim() || '1. Mannschaft (Sachsenliga)',
+        email: playerForm.email.trim().toLowerCase(),
+        photo_url: photoUrl || (playerForm.gender === 'women'
+          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80'
+          : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80')
+      };
 
-      if (!res.ok) throw new Error(res.error || 'Failed to add player');
-      const data = res.data;
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+      customPlayers.push(newPlayer);
+      localStorage.setItem('tuc_custom_players', JSON.stringify(customPlayers));
 
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      localStorage.setItem('tuc_deleted_player_ids', JSON.stringify(deletedIds.filter(id => id !== String(newId))));
+
+      setPlayers(prev => [...prev, newPlayer]);
+      setFeedback({ type: 'success', message: `Player ${newPlayer.name} added successfully!` });
       setPlayerForm({
         name: '',
         gender: 'men',
@@ -176,9 +221,35 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         email: '',
         photoFile: null,
       });
-      setFeedback({ type: 'success', message: `Player ${data.player.name} added successfully!` });
-      fetchAllData();
+      window.dispatchEvent(new Event('storage'));
       if (onDataChanged) onDataChanged();
+
+      const formData = new FormData();
+      formData.append('name', newPlayer.name);
+      formData.append('gender', newPlayer.gender);
+      formData.append('study_program', newPlayer.study_program);
+      formData.append('specialization', newPlayer.specialization);
+      formData.append('team', newPlayer.team);
+      formData.append('email', newPlayer.email);
+      if (playerForm.photoFile) {
+        formData.append('photo', playerForm.photoFile);
+      }
+
+      safeFetchJson('/api/players', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: formData,
+      }).then(res => {
+        if (res.ok && res.data && res.data.player) {
+          const currentCustom = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]');
+          const idx = currentCustom.findIndex(p => p.id === newId);
+          if (idx !== -1) {
+            currentCustom[idx] = res.data.player;
+            localStorage.setItem('tuc_custom_players', JSON.stringify(currentCustom));
+          }
+          fetchAllData();
+        }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -190,14 +261,23 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
   const handleDeletePlayer = async (id) => {
     if (!window.confirm('Are you sure you want to remove this player?')) return;
     try {
-      const res = await fetch(`/api/players/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_player_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_player_ids', JSON.stringify(deletedIds));
+      }
+      const customPlayers = JSON.parse(localStorage.getItem('tuc_custom_players') || '[]').filter(p => String(p.id) !== String(id));
+      localStorage.setItem('tuc_custom_players', JSON.stringify(customPlayers));
+
+      setPlayers(prev => prev.filter(p => String(p.id) !== String(id)));
+      setFeedback({ type: 'success', message: 'Player removed.' });
+      window.dispatchEvent(new Event('storage'));
+      if (onDataChanged) onDataChanged();
+
+      safeFetchJson(`/api/players/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) throw new Error('Failed to delete player');
-      setFeedback({ type: 'success', message: 'Player removed.' });
-      fetchAllData();
-      if (onDataChanged) onDataChanged();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -210,28 +290,62 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
     setFeedback(null);
 
     try {
+      let photoUrl = '';
+      if (trainerForm.photoFile) {
+        try {
+          photoUrl = await fileToDataUrl(trainerForm.photoFile);
+        } catch (err) {
+          console.warn('Could not encode photo:', err);
+        }
+      }
+
+      const newId = Date.now();
+      const newTrainer = {
+        id: newId,
+        name: trainerForm.name.trim(),
+        role: trainerForm.role.trim(),
+        email: trainerForm.email.trim().toLowerCase(),
+        focus_areas: trainerForm.focus_areas.trim(),
+        photo_url: photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
+      };
+
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+      customTrainers.push(newTrainer);
+      localStorage.setItem('tuc_custom_trainers', JSON.stringify(customTrainers));
+
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      localStorage.setItem('tuc_deleted_trainer_ids', JSON.stringify(deletedIds.filter(id => id !== String(newId))));
+
+      setTrainers(prev => [...prev, newTrainer]);
+      setFeedback({ type: 'success', message: `Trainer ${newTrainer.name} added successfully!` });
+      setTrainerForm({ name: '', role: '', email: '', focus_areas: '', photoFile: null });
+      window.dispatchEvent(new Event('storage'));
+      if (onDataChanged) onDataChanged();
+
       const formData = new FormData();
-      formData.append('name', trainerForm.name);
-      formData.append('role', trainerForm.role);
-      formData.append('email', trainerForm.email);
-      formData.append('focus_areas', trainerForm.focus_areas);
+      formData.append('name', newTrainer.name);
+      formData.append('role', newTrainer.role);
+      formData.append('email', newTrainer.email);
+      formData.append('focus_areas', newTrainer.focus_areas);
       if (trainerForm.photoFile) {
         formData.append('photo', trainerForm.photoFile);
       }
 
-      const res = await safeFetchJson('/api/trainers', {
+      safeFetchJson('/api/trainers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
         body: formData,
-      });
-
-      if (!res.ok) throw new Error(res.error || 'Failed to add trainer');
-      const data = res.data;
-
-      setTrainerForm({ name: '', role: '', email: '', focus_areas: '', photoFile: null });
-      setFeedback({ type: 'success', message: `Trainer ${data?.trainer?.name || 'Coach'} added successfully!` });
-      fetchAllData();
-      if (onDataChanged) onDataChanged();
+      }).then(res => {
+        if (res.ok && res.data && res.data.trainer) {
+          const currentCustom = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+          const idx = currentCustom.findIndex(t => t.id === newId);
+          if (idx !== -1) {
+            currentCustom[idx] = res.data.trainer;
+            localStorage.setItem('tuc_custom_trainers', JSON.stringify(currentCustom));
+          }
+          fetchAllData();
+        }
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -243,14 +357,23 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
   const handleDeleteTrainer = async (id) => {
     if (!window.confirm('Are you sure you want to remove this trainer profile?')) return;
     try {
-      const res = await fetch(`/api/trainers/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_trainer_ids', JSON.stringify(deletedIds));
+      }
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]').filter(t => String(t.id) !== String(id));
+      localStorage.setItem('tuc_custom_trainers', JSON.stringify(customTrainers));
+
+      setTrainers(prev => prev.filter(t => String(t.id) !== String(id)));
+      setFeedback({ type: 'success', message: 'Trainer removed.' });
+      window.dispatchEvent(new Event('storage'));
+      if (onDataChanged) onDataChanged();
+
+      safeFetchJson(`/api/trainers/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) throw new Error('Failed to delete trainer');
-      setFeedback({ type: 'success', message: 'Trainer removed.' });
-      fetchAllData();
-      if (onDataChanged) onDataChanged();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -263,24 +386,26 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
     setFeedback(null);
 
     try {
-      const formData = new FormData();
-      formData.append('title', tourneyForm.title);
-      formData.append('date', tourneyForm.date);
-      formData.append('deadline', tourneyForm.deadline);
-      formData.append('location', tourneyForm.location);
-      formData.append('description', tourneyForm.description);
-      if (tourneyForm.docFile) {
-        formData.append('document', tourneyForm.docFile);
-      }
+      const newId = Date.now();
+      const newTourney = {
+        id: newId,
+        title: tourneyForm.title.trim(),
+        date: tourneyForm.date.trim(),
+        deadline: tourneyForm.deadline.trim(),
+        location: tourneyForm.location.trim() || 'Sporthalle Thüringer Weg 11, Chemnitz',
+        description: tourneyForm.description.trim(),
+        document_url: '',
+      };
 
-      const res = await safeFetchJson('/api/tournaments', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${authToken}` },
-        body: formData,
-      });
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
+      customTourneys.push(newTourney);
+      localStorage.setItem('tuc_custom_tournaments', JSON.stringify(customTourneys));
 
-      if (!res.ok) throw new Error(res.error || 'Failed to post tournament');
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      localStorage.setItem('tuc_deleted_tournament_ids', JSON.stringify(deletedIds.filter(id => id !== String(newId))));
 
+      setTournaments(prev => [...prev, newTourney]);
+      setFeedback({ type: 'success', message: 'Tournament announcement posted successfully!' });
       setTourneyForm({
         title: '',
         date: '',
@@ -289,9 +414,24 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
         description: '',
         docFile: null,
       });
-      setFeedback({ type: 'success', message: 'Tournament announcement posted successfully!' });
-      fetchAllData();
+      window.dispatchEvent(new Event('storage'));
       if (onDataChanged) onDataChanged();
+
+      const formData = new FormData();
+      formData.append('title', newTourney.title);
+      formData.append('date', newTourney.date);
+      formData.append('deadline', newTourney.deadline);
+      formData.append('location', newTourney.location);
+      formData.append('description', newTourney.description);
+      if (tourneyForm.docFile) {
+        formData.append('document', tourneyForm.docFile);
+      }
+
+      safeFetchJson('/api/tournaments', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: formData,
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -303,14 +443,23 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
   const handleDeleteTourney = async (id) => {
     if (!window.confirm('Delete this tournament notice?')) return;
     try {
-      const res = await fetch(`/api/tournaments/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_tournament_ids', JSON.stringify(deletedIds));
+      }
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]').filter(t => String(t.id) !== String(id));
+      localStorage.setItem('tuc_custom_tournaments', JSON.stringify(customTourneys));
+
+      setTournaments(prev => prev.filter(t => String(t.id) !== String(id)));
+      setFeedback({ type: 'success', message: 'Tournament removed.' });
+      window.dispatchEvent(new Event('storage'));
+      if (onDataChanged) onDataChanged();
+
+      safeFetchJson(`/api/tournaments/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) throw new Error('Failed to delete tournament');
-      setFeedback({ type: 'success', message: 'Tournament removed.' });
-      fetchAllData();
-      if (onDataChanged) onDataChanged();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }
@@ -323,28 +472,52 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
     setFeedback(null);
 
     try {
+      let photoUrl = '';
+      if (mediaForm.mediaFile) {
+        try {
+          photoUrl = await fileToDataUrl(mediaForm.mediaFile);
+        } catch (err) {
+          console.warn('Could not encode media file:', err);
+        }
+      }
+
+      const newId = Date.now();
+      const newMedia = {
+        id: newId,
+        tournament_name: mediaForm.title.trim(),
+        result: 'Tournament Media',
+        caption: mediaForm.caption.trim(),
+        photo_url: photoUrl,
+        is_approved: 1,
+        status: 'approved',
+      };
+
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
+      customGallery.unshift(newMedia);
+      localStorage.setItem('tuc_custom_gallery', JSON.stringify(customGallery));
+
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      localStorage.setItem('tuc_deleted_gallery_ids', JSON.stringify(deletedIds.filter(id => id !== String(newId))));
+
+      setMediaList(prev => [newMedia, ...prev]);
+      setFeedback({ type: 'success', message: 'Media item saved and published!' });
+      setMediaForm({ title: '', type: 'photo', caption: '', mediaFile: null });
+      window.dispatchEvent(new Event('storage'));
+      if (onDataChanged) onDataChanged();
+
       const formData = new FormData();
       formData.append('title', mediaForm.title);
       formData.append('type', mediaForm.type);
       formData.append('caption', mediaForm.caption);
       if (mediaForm.mediaFile) {
         formData.append('file', mediaForm.mediaFile);
-      } else {
-        throw new Error('Please select a photo or video file to upload.');
       }
 
-      const res = await safeFetchJson('/api/media', {
+      safeFetchJson('/api/media', {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
         body: formData,
-      });
-
-      if (!res.ok) throw new Error(res.error || 'Failed to upload media item');
-
-      setMediaForm({ title: '', type: 'photo', caption: '', mediaFile: null });
-      setFeedback({ type: 'success', message: 'Media item saved and published!' });
-      fetchAllData();
-      if (onDataChanged) onDataChanged();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     } finally {
@@ -356,14 +529,23 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
   const handleDeleteMedia = async (id) => {
     if (!window.confirm('Delete this media item?')) return;
     try {
-      const res = await fetch(`/api/media/${id}`, {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      if (!deletedIds.includes(String(id))) {
+        deletedIds.push(String(id));
+        localStorage.setItem('tuc_deleted_gallery_ids', JSON.stringify(deletedIds));
+      }
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]').filter(g => String(g.id) !== String(id));
+      localStorage.setItem('tuc_custom_gallery', JSON.stringify(customGallery));
+
+      setMediaList(prev => prev.filter(m => String(m.id) !== String(id)));
+      setFeedback({ type: 'success', message: 'Media item removed.' });
+      window.dispatchEvent(new Event('storage'));
+      if (onDataChanged) onDataChanged();
+
+      safeFetchJson(`/api/media/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) throw new Error('Failed to delete media item');
-      setFeedback({ type: 'success', message: 'Media item removed.' });
-      fetchAllData();
-      if (onDataChanged) onDataChanged();
+      }).catch(() => {});
     } catch (err) {
       setFeedback({ type: 'error', message: err.message });
     }

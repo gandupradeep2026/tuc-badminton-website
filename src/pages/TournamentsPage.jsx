@@ -54,15 +54,24 @@ export default function TournamentsPage() {
 
   const fetchTournaments = async () => {
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
       const res = await safeFetchJson('/api/tournaments');
-      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
-        setTournaments(res.data);
-      } else {
-        setTournaments(DEFAULT_TOURNAMENTS);
-      }
+      let list = (res.ok && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_TOURNAMENTS];
+      const mergedMap = new Map();
+      list.forEach(t => mergedMap.set(String(t.id), t));
+      customTourneys.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTournaments(finalList);
     } catch (err) {
       console.error('Failed to load tournaments, using fallback:', err);
-      setTournaments(DEFAULT_TOURNAMENTS);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
+      const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
+      const mergedMap = new Map();
+      DEFAULT_TOURNAMENTS.forEach(t => mergedMap.set(String(t.id), t));
+      customTourneys.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTournaments(finalList);
     } finally {
       setLoading(false);
     }
@@ -70,6 +79,9 @@ export default function TournamentsPage() {
 
   useEffect(() => {
     fetchTournaments();
+    const handleStorageChange = () => fetchTournaments();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   return (

@@ -13,15 +13,24 @@ export default function TrainersPage({ onNavigate }) {
 
   const fetchTrainers = async () => {
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
       const res = await safeFetchJson('/api/trainers');
-      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
-        setTrainers(res.data);
-      } else {
-        setTrainers(DEFAULT_TRAINERS);
-      }
+      let list = (res.ok && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_TRAINERS];
+      const mergedMap = new Map();
+      list.forEach(t => mergedMap.set(String(t.id), t));
+      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTrainers(finalList);
     } catch (err) {
       console.error('Failed to load trainers, using fallback:', err);
-      setTrainers(DEFAULT_TRAINERS);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_trainer_ids') || '[]')).map(String);
+      const customTrainers = JSON.parse(localStorage.getItem('tuc_custom_trainers') || '[]');
+      const mergedMap = new Map();
+      DEFAULT_TRAINERS.forEach(t => mergedMap.set(String(t.id), t));
+      customTrainers.forEach(t => mergedMap.set(String(t.id), t));
+      const finalList = Array.from(mergedMap.values()).filter(t => !deletedIds.includes(String(t.id)));
+      setTrainers(finalList);
     } finally {
       setLoading(false);
     }
@@ -29,6 +38,9 @@ export default function TrainersPage({ onNavigate }) {
 
   useEffect(() => {
     fetchTrainers();
+    const handleStorageChange = () => fetchTrainers();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   return (

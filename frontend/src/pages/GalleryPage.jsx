@@ -43,15 +43,28 @@ export default function GalleryPage() {
 
   const fetchGallery = async () => {
     try {
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
       const res = await safeFetchJson('/api/gallery');
-      if (res.ok && Array.isArray(res.data) && res.data.length > 0) {
-        setItems(res.data);
-      } else {
-        setItems(DEFAULT_GALLERY);
-      }
+      let list = (res.ok && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_GALLERY];
+      const mergedMap = new Map();
+      list.forEach(g => mergedMap.set(String(g.id), g));
+      customGallery.forEach(g => mergedMap.set(String(g.id), g));
+      const finalList = Array.from(mergedMap.values())
+        .filter(g => !deletedIds.includes(String(g.id)))
+        .filter(g => g.is_approved === 1 || g.is_approved === true || g.status === 'approved');
+      setItems(finalList);
     } catch (err) {
       console.error('Failed to load gallery items, using fallback:', err);
-      setItems(DEFAULT_GALLERY);
+      const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
+      const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
+      const mergedMap = new Map();
+      DEFAULT_GALLERY.forEach(g => mergedMap.set(String(g.id), g));
+      customGallery.forEach(g => mergedMap.set(String(g.id), g));
+      const finalList = Array.from(mergedMap.values())
+        .filter(g => !deletedIds.includes(String(g.id)))
+        .filter(g => g.is_approved === 1 || g.is_approved === true || g.status === 'approved');
+      setItems(finalList);
     } finally {
       setLoading(false);
     }
@@ -59,6 +72,9 @@ export default function GalleryPage() {
 
   useEffect(() => {
     fetchGallery();
+    const handleStorageChange = () => fetchGallery();
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const handleFileChange = (e) => {
