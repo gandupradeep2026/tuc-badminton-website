@@ -344,6 +344,32 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ error: 'Unauthorized: Gültige Admin-Sitzung erforderlich.' });
 }
 
+function requireStudentOrAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
+  const adminTokenHeader = req.headers['x-admin-token'];
+  let adminToken = adminTokenHeader;
+  if (!adminToken && authHeader && authHeader.startsWith('Bearer ')) {
+    adminToken = authHeader.substring(7);
+  }
+  if (isValidSession(adminToken)) {
+    return next();
+  }
+
+  const studentToken = req.headers['x-student-token'] || (authHeader && authHeader.startsWith('Student ') ? authHeader.substring(8) : null);
+  if (studentToken) {
+    const session = verifyStudentSession(studentToken);
+    if (session) {
+      req.studentSession = session;
+      return next();
+    }
+  }
+
+  return res.status(401).json({
+    locked: true,
+    error: 'Studenten-Verifikation erforderlich. Bitte bestätige deine Universitäts-E-Mail-Adresse, um das Spieler-Verzeichnis freizuschalten.'
+  });
+}
+
 // -------------------------------------------------------------
 // API Routes
 // -------------------------------------------------------------
