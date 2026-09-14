@@ -45,6 +45,8 @@ export default function AppEntryModal({ isOpen, onClose }) {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
   const [regCode, setRegCode] = useState('');
 
   // Forgot Password state
@@ -53,6 +55,8 @@ export default function AppEntryModal({ isOpen, onClose }) {
   const [forgotCode, setForgotCode] = useState('');
   const [forgotNewPass, setForgotNewPass] = useState('');
   const [forgotConfirmPass, setForgotConfirmPass] = useState('');
+  const [showForgotNewPass, setShowForgotNewPass] = useState(false);
+  const [showForgotConfirmPass, setShowForgotConfirmPass] = useState(false);
 
   // Status
   const [loading, setLoading] = useState(false);
@@ -71,6 +75,11 @@ export default function AppEntryModal({ isOpen, onClose }) {
     setMode(newMode);
     setRegStep(1);
     setForgotStep(1);
+    setShowLoginPassword(false);
+    setShowRegPassword(false);
+    setShowRegConfirmPassword(false);
+    setShowForgotNewPass(false);
+    setShowForgotConfirmPass(false);
   };
 
   // -------------------------------------------------------------
@@ -598,32 +607,55 @@ export default function AppEntryModal({ isOpen, onClose }) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                        {a.passwordLabel} <span className="text-red-500">*</span>
-                      </label>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      {a.passwordLabel} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
-                        type="password"
+                        type={showRegPassword ? 'text' : 'password'}
                         required
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] focus:border-[#005A36] outline-none"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        tabIndex="-1"
+                        aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                        {a.passwordConfirmLabel} <span className="text-red-500">*</span>
-                      </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      {a.passwordConfirmLabel} <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
-                        type="password"
+                        type={showRegConfirmPassword ? 'text' : 'password'}
                         required
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] focus:border-[#005A36] outline-none"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        tabIndex="-1"
+                        aria-label={showRegConfirmPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showRegConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -771,7 +803,7 @@ export default function AppEntryModal({ isOpen, onClose }) {
                       maxLength="6"
                       required
                       value={forgotCode}
-                      onChange={(e) => setForgotCode(e.target.value.replace(/D/g, ''))}
+                      onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, ''))}
                       placeholder={a.codePlaceholder}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-center font-mono font-bold text-base tracking-widest focus:ring-2 focus:ring-[#005A36] outline-none"
                     />
@@ -781,28 +813,52 @@ export default function AppEntryModal({ isOpen, onClose }) {
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                       {a.newPasswordLabel} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="password"
-                      required
-                      value={forgotNewPass}
-                      onChange={(e) => setForgotNewPass(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
-                    />
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showForgotNewPass ? 'text' : 'password'}
+                        required
+                        value={forgotNewPass}
+                        onChange={(e) => setForgotNewPass(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotNewPass(!showForgotNewPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        tabIndex="-1"
+                        aria-label={showForgotNewPass ? 'Hide password' : 'Show password'}
+                      >
+                        {showForgotNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                       {a.passwordConfirmLabel} <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="password"
-                      required
-                      value={forgotConfirmPass}
-                      onChange={(e) => setForgotConfirmPass(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
-                    />
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type={showForgotConfirmPass ? 'text' : 'password'}
+                        required
+                        value={forgotConfirmPass}
+                        onChange={(e) => setForgotConfirmPass(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotConfirmPass(!showForgotConfirmPass)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        tabIndex="-1"
+                        aria-label={showForgotConfirmPass ? 'Hide password' : 'Show password'}
+                      >
+                        {showForgotConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <button
