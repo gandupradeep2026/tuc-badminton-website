@@ -1623,6 +1623,41 @@ export default function AdminPage() {
     }
   };
 
+  const handleDisableAnnouncement = async () => {
+    setAnnounceSubmitting(true);
+    setFeedback(null);
+    const disabledState = {
+      title: 'Hinweis',
+      message: '',
+      type: 'info',
+      is_active: false
+    };
+
+    try {
+      await safeFetchJson('/api/admin/announcement', {
+        method: 'PUT',
+        headers: {
+          ...getAdminHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(disabledState),
+      });
+
+      localStorage.removeItem('tuc_announcement');
+      setAnnouncement(disabledState);
+      setFeedback({ 
+        type: 'success', 
+        message: isDe 
+          ? 'Hinweisbanner wurde vollständig deaktiviert und von der Homepage entfernt!' 
+          : 'Announcement banner has been deactivated and removed from the homepage!' 
+      });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.message });
+    } finally {
+      setAnnounceSubmitting(false);
+    }
+  };
+
   // -----------------------------------------------------------------
   // Security: Password Change Action
   // -----------------------------------------------------------------
@@ -3760,8 +3795,9 @@ export default function AdminPage() {
                 type="text"
                 value={announcement.title}
                 onChange={(e) => setAnnouncement({ ...announcement, title: e.target.value })}
-                required
-                className="w-full p-2.5 border border-slate-300 rounded-xl text-xs"
+                required={Boolean(announcement.is_active)}
+                placeholder="z.B. Wichtige Mitteilung zum Spielbetrieb"
+                className="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium"
               />
             </div>
 
@@ -3773,7 +3809,8 @@ export default function AdminPage() {
                 value={announcement.message}
                 onChange={(e) => setAnnouncement({ ...announcement, message: e.target.value })}
                 rows={3}
-                required
+                required={Boolean(announcement.is_active)}
+                placeholder="Nachrichtentext eingeben..."
                 className="w-full p-2.5 border border-slate-300 rounded-xl text-xs"
               />
             </div>
@@ -3812,20 +3849,32 @@ export default function AdminPage() {
                     <Bell className="w-4 h-4 text-blue-600" />
                   )}
                 </div>
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 min-w-0 flex-1">
                   <h4 className="font-bold text-xs">{announcement.title || 'Titel'}</h4>
                   <p className="text-[11px] opacity-90">{announcement.message || 'Mitteilungstext...'}</p>
                 </div>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={announceSubmitting}
-              className="w-full py-3 rounded-xl bg-[#005A36] hover:bg-[#004328] text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-2"
-            >
-              {announceSubmitting ? 'Wird gespeichert...' : adm.saveAnnounceBtn}
-            </button>
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+              <button
+                type="submit"
+                disabled={announceSubmitting}
+                className="w-full sm:flex-1 py-3 rounded-xl bg-[#005A36] hover:bg-[#004328] text-white font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {announceSubmitting ? 'Wird gespeichert...' : adm.saveAnnounceBtn}
+              </button>
+
+              <button
+                type="button"
+                disabled={announceSubmitting}
+                onClick={handleDisableAnnouncement}
+                className="w-full sm:w-auto px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDe ? 'Banner ausblenden' : 'Hide Banner'}</span>
+              </button>
+            </div>
           </form>
         </div>
       )}

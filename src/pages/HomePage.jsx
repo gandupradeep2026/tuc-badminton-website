@@ -17,7 +17,8 @@ import {
   ExternalLink,
   Edit3,
   Sparkles,
-  UserPlus
+  UserPlus,
+  X
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import StadiumCarousel from '../components/StadiumCarousel';
@@ -68,11 +69,22 @@ export default function HomePage({ onNavigate }) {
   useEffect(() => {
     safeFetchJson('/api/announcement')
       .then(res => {
-        if (res.ok && res.data && res.data.is_active) {
+        if (
+          res.ok && 
+          res.data && 
+          (res.data.is_active === true || res.data.is_active === 1 || res.data.is_active === '1') && 
+          res.data.message && 
+          res.data.message.trim()
+        ) {
           setAnnouncement(res.data);
+        } else {
+          setAnnouncement(null);
         }
       })
-      .catch(err => console.error('Failed to load announcement:', err));
+      .catch(err => {
+        console.error('Failed to load announcement:', err);
+        setAnnouncement(null);
+      });
   }, []);
 
   return (
@@ -82,7 +94,7 @@ export default function HomePage({ onNavigate }) {
       <StadiumCarousel />
 
       {/* Dynamic Site Announcement Banner (Admin Controlled) */}
-      {announcement && (
+      {announcement && (announcement.is_active === true || announcement.is_active === 1 || announcement.is_active === '1') && announcement.message && (
         <div className={`p-4 sm:p-5 rounded-2xl border shadow-sm flex items-start gap-3.5 transition-all ${
           announcement.type === 'warning'
             ? 'bg-amber-50 border-amber-300 text-amber-950'
@@ -112,6 +124,14 @@ export default function HomePage({ onNavigate }) {
               {announcement.message}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => setAnnouncement(null)}
+            className="p-1.5 rounded-lg hover:bg-black/5 text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0 cursor-pointer"
+            title="Schließen / Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

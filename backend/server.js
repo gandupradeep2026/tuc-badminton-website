@@ -347,6 +347,9 @@ app.get('/api/stats', (req, res) => {
 app.get('/api/announcement', (req, res) => {
   try {
     const ann = getSiteAnnouncement();
+    if (!ann || !ann.is_active || !ann.message || !ann.message.trim()) {
+      return res.json({ is_active: false });
+    }
     res.json(ann);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve announcement' });

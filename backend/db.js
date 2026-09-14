@@ -213,7 +213,7 @@ export function initDatabase() {
   if (!existingAnnounce) {
     db.prepare(`
       INSERT INTO site_announcements (id, title, message, type, is_active)
-      VALUES (1, 'Aktuelle Hinweise zum Spielbetrieb', 'Willkommen zur Sommerrunde 2026. Bitte denkt an saubere Hallenschuhe mit abriebfester Sohle!', 'info', 1)
+      VALUES (1, 'Aktuelle Hinweise zum Spielbetrieb', '', 'info', 0)
     `).run();
   }
   // 1. Trainers table
