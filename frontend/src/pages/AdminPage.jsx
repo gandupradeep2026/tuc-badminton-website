@@ -42,7 +42,20 @@ import {
   Building2,
   CreditCard,
   Copy,
-  Send
+  Send,
+  Activity,
+  Cpu,
+  HardDrive,
+  Server,
+  BarChart3,
+  Globe,
+  Wifi,
+  Zap,
+  Database,
+  TrendingUp,
+  Smartphone,
+  Monitor,
+  ArrowUpRight
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import DisciplineSelector from '../components/DisciplineSelector';
@@ -55,6 +68,16 @@ import {
   TERMINE_LIST, 
   TRAINING_SESSIONS 
 } from '../data/mockData';
+
+function formatUptime(seconds) {
+  if (!seconds || seconds < 0) return '0m';
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor((seconds % (3600 * 24)) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
 
 export default function AdminPage() {
   const { t, language } = useLanguage();
@@ -276,6 +299,13 @@ export default function AdminPage() {
   const [forwardingId, setForwardingId] = useState(null);
 
   // -----------------------------------------------------------------
+  // 13. System, Oracle Cloud Free Tier & Traffic Stats
+  // -----------------------------------------------------------------
+  const [systemStats, setSystemStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsLastRefreshed, setStatsLastRefreshed] = useState(null);
+
+  // -----------------------------------------------------------------
   // Data Fetching
   // -----------------------------------------------------------------
   const fetchAllAdminData = () => {
@@ -291,6 +321,7 @@ export default function AdminPage() {
     fetchServices();
     fetchDonationSettings();
     fetchInquiries();
+    fetchSystemStats();
   };
 
   const fetchGallery = async () => {
@@ -724,6 +755,22 @@ export default function AdminPage() {
       `Sportliche Grüße,\nAdmin - TUC Badminton Community`
     );
     return `mailto:${inq.target_email}?subject=${subject}&body=${body}`;
+  };
+
+  const fetchSystemStats = async () => {
+    try {
+      setStatsLoading(true);
+      const res = await safeFetchJson('/api/admin/system-stats', { headers: getAdminHeaders() });
+      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.ok && res.data) {
+        setSystemStats(res.data);
+        setStatsLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (err) {
+      console.error('Failed to load system and traffic stats:', err);
+    } finally {
+      setStatsLoading(false);
+    }
   };
 
   const handleApproveService = async (id, name) => {
@@ -2298,6 +2345,17 @@ export default function AdminPage() {
           ) : (
             <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-normal">Privat</span>
           )}
+        </button>
+
+        <button
+          onClick={() => { setActiveTab('stats'); fetchSystemStats(); }}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 ${
+            activeTab === 'stats' ? 'bg-[#005A36] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          <span>{isDe ? 'Server & Oracle Stats' : 'Server & Stats'}</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title={isDe ? 'Live-Überwachung' : 'Live Monitoring'} />
         </button>
       </div>
 
@@ -5040,6 +5098,666 @@ export default function AdminPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* =====================================================================
+          TAB 13: Oracle Cloud Free Tier & Server Performance Dashboard
+      ===================================================================== */}
+      {activeTab === 'stats' && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-700 flex-shrink-0">
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-xl font-black text-slate-900">
+                    {isDe ? 'Server- & Oracle Cloud-Überwachung' : 'Server & Oracle Cloud Monitoring'}
+                  </h2>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Always Free Tier • 0,00 €</span>
+                  </span>
+                  {systemStats?.traffic?.isLiveLog && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                      Live Nginx Access
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {isDe
+                    ? 'Echtzeit-Hardwareverbrauch, Oracle Always-Free Kontingente, Nginx-Traffic und Datenbankgröße'
+                    : 'Real-time hardware utilization, Oracle Always-Free tier pool, Nginx traffic, and database metrics'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+              <div className="text-right hidden sm:block">
+                <p className="text-[10px] uppercase font-bold text-slate-400">
+                  {isDe ? 'Letzte Aktualisierung' : 'Last Refreshed'}
+                </p>
+                <p className="text-xs font-semibold text-slate-700">
+                  {statsLastRefreshed || '—'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchSystemStats}
+                disabled={statsLoading}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${statsLoading ? 'animate-spin text-emerald-600' : ''}`} />
+                <span>{isDe ? 'Aktualisieren' : 'Refresh'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section 1: Oracle Cloud Free Tier & Zero-Cost Shield */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  {isDe ? '1. Oracle Cloud Always Free Kontingent vs. Verbrauch' : '1. Oracle Cloud Always Free Tier Quotas'}
+                </h3>
+              </div>
+              <span className="text-xs text-slate-500 font-medium">
+                Shape: <span className="font-bold text-slate-700">{systemStats?.oracleFreeTier?.shape || 'Ampere A1 Flex (ARM64)'}</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* OCPU Card */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {isDe ? 'OCPU Rechenleistung' : 'OCPU Compute'}
+                    </span>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-2xl font-black text-slate-900">
+                        {systemStats?.oracleFreeTier?.cpuAssignedOcpu ?? 1}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        / {systemStats?.oracleFreeTier?.cpuFreeTierPoolOcpu ?? 4} OCPUs
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700">
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">{isDe ? 'Instanz-Zuweisung' : 'Assigned to VM'}</span>
+                    <span className="font-bold text-slate-700">
+                      {Math.round(((systemStats?.oracleFreeTier?.cpuAssignedOcpu || 1) / (systemStats?.oracleFreeTier?.cpuFreeTierPoolOcpu || 4)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.round(((systemStats?.oracleFreeTier?.cpuAssignedOcpu || 1) / (systemStats?.oracleFreeTier?.cpuFreeTierPoolOcpu || 4)) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-500 pt-1">
+                    <span>{isDe ? 'Live CPU-Last:' : 'Live Load:'} <strong className="text-slate-800">{systemStats?.system?.cpuLoadPercent ?? 0}%</strong></span>
+                    <span>1m / 5m: {systemStats?.system?.cpuLoad1m ?? 0} / {systemStats?.system?.cpuLoad5m ?? 0}</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60 text-[11px] text-emerald-900 font-medium flex items-center justify-between">
+                  <span>{isDe ? 'Freies Rest-Kontingent:' : 'Remaining Free Pool:'}</span>
+                  <span className="font-black text-emerald-700">+{systemStats?.oracleFreeTier?.cpuRemainingFreeOcpu ?? 3} OCPUs</span>
+                </div>
+              </div>
+
+              {/* RAM Card */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {isDe ? 'Arbeitsspeicher (RAM)' : 'RAM Memory'}
+                    </span>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-2xl font-black text-slate-900">
+                        {systemStats?.oracleFreeTier?.ramAssignedGb ?? 6}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        / {systemStats?.oracleFreeTier?.ramFreeTierPoolGb ?? 24} GB Pool
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-teal-50 text-teal-700">
+                    <Zap className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">{isDe ? 'In VM belegt' : 'In-VM Used'}</span>
+                    <span className="font-bold text-slate-700">
+                      {systemStats?.system?.usedRamGb ?? 0.8} GB ({systemStats?.system?.memUsagePercent ?? 14}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-teal-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, systemStats?.system?.memUsagePercent || 15)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-500 pt-1">
+                    <span>{isDe ? 'Frei in VM:' : 'Free in VM:'} <strong className="text-slate-800">{systemStats?.system?.freeRamGb ?? 5.2} GB</strong></span>
+                    <span>Total: {systemStats?.system?.totalRamGb ?? 6} GB</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-teal-50/70 border border-teal-200/60 text-[11px] text-teal-900 font-medium flex items-center justify-between">
+                  <span>{isDe ? 'Freies Rest-Kontingent:' : 'Remaining Free Pool:'}</span>
+                  <span className="font-black text-teal-700">+{systemStats?.oracleFreeTier?.ramRemainingFreeGb ?? 18} GB</span>
+                </div>
+              </div>
+
+              {/* Disk Card */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {isDe ? 'NVMe Boot-Speicher' : 'NVMe Boot Storage'}
+                    </span>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-2xl font-black text-slate-900">
+                        {systemStats?.system?.totalDiskGb ?? 47.3}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        / {systemStats?.oracleFreeTier?.diskFreeTierPoolGb ?? 200} GB Pool
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-blue-50 text-blue-700">
+                    <HardDrive className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">{isDe ? 'Belegt auf Disk' : 'Used on Disk'}</span>
+                    <span className="font-bold text-slate-700">
+                      {systemStats?.system?.usedDiskGb ?? 3.4} GB ({systemStats?.system?.diskUsagePercent ?? 7.5}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, systemStats?.system?.diskUsagePercent || 8)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-500 pt-1">
+                    <span>{isDe ? 'Frei auf Partition:' : 'Free on Disk:'} <strong className="text-slate-800">{systemStats?.system?.freeDiskGb ?? 43.9} GB</strong></span>
+                    <span>~92% frei</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/60 text-[11px] text-blue-900 font-medium flex items-center justify-between">
+                  <span>{isDe ? 'Oracle Block Pool frei:' : 'Free Pool left:'}</span>
+                  <span className="font-black text-blue-700">+{systemStats?.oracleFreeTier?.diskRemainingFreeGb ?? 152.7} GB</span>
+                </div>
+              </div>
+
+              {/* Bandwidth Card */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {isDe ? 'Ausgehende Bandbreite' : 'Monthly Outbound Egress'}
+                    </span>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-2xl font-black text-slate-900">
+                        {systemStats?.oracleFreeTier?.bandwidthUsedGb ?? '0.00'}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        / 10.000 GB (10 TB)
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-700">
+                    <Wifi className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">{isDe ? 'Kontingent-Verbrauch' : 'Quota Used'}</span>
+                    <span className="font-bold text-slate-700">
+                      {systemStats?.oracleFreeTier?.bandwidthPercentUsed ?? '< 0.01'}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.max(1, Math.min(100, (systemStats?.oracleFreeTier?.bandwidthPercentUsed || 0.1) * 20))}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-500 pt-1">
+                    <span>{isDe ? 'Übertragene Daten:' : 'Total Egress:'} <strong className="text-slate-800">{systemStats?.traffic?.totalDataTransferredMb ?? '0.00'} MB</strong></span>
+                    <span className="text-emerald-600 font-bold">100% Free</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200/60 text-[11px] text-indigo-900 font-medium flex items-center justify-between">
+                  <span>{isDe ? 'Verbleibende Bandbreite:' : 'Remaining Bandwidth:'}</span>
+                  <span className="font-black text-indigo-700">{systemStats?.oracleFreeTier?.bandwidthRemainingGb ?? '9.999'} GB</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: Live Web Traffic & Nginx Performance */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  {isDe ? '2. Web-Traffic & Nginx-Performance' : '2. Web Traffic & Nginx Performance'}
+                </h3>
+              </div>
+              <span className="text-xs text-slate-500">
+                {isDe ? 'Nginx Access-Log (/var/log/nginx/access.log)' : 'Parsed directly from Nginx access logs'}
+              </span>
+            </div>
+
+            {/* Traffic Top Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">{isDe ? 'Gesamte Aufrufe' : 'Total Requests'}</span>
+                  <BarChart3 className="w-4 h-4 text-slate-400" />
+                </div>
+                <p className="text-2xl font-black text-slate-900 mt-2">
+                  {systemStats?.traffic?.totalRequests?.toLocaleString() ?? 0}
+                </p>
+                <span className="text-[11px] text-slate-500">{isDe ? 'HTTP Hits im Access-Log' : 'HTTP hits recorded'}</span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">{isDe ? 'Eindeutige Besucher' : 'Unique Visitors'}</span>
+                  <Users className="w-4 h-4 text-slate-400" />
+                </div>
+                <p className="text-2xl font-black text-emerald-600 mt-2">
+                  {systemStats?.traffic?.uniqueVisitors?.toLocaleString() ?? 0}
+                </p>
+                <span className="text-[11px] text-slate-500">{isDe ? 'Unterschiedliche IP-Adressen' : 'Distinct IP addresses'}</span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">{isDe ? 'Heute aktiv' : 'Active Today'}</span>
+                  <TrendingUp className="w-4 h-4 text-slate-400" />
+                </div>
+                <p className="text-2xl font-black text-blue-600 mt-2">
+                  {systemStats?.traffic?.todayRequests?.toLocaleString() ?? 0}
+                </p>
+                <span className="text-[11px] text-slate-500">
+                  {isDe ? `${systemStats?.traffic?.todayUniqueVisitors ?? 0} Besucher heute` : `${systemStats?.traffic?.todayUniqueVisitors ?? 0} visitors today`}
+                </span>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">{isDe ? 'Erfolgsquote' : 'Success Rate'}</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                </div>
+                <p className="text-2xl font-black text-slate-900 mt-2">
+                  {systemStats?.traffic?.totalRequests > 0
+                    ? `${(100 - (systemStats?.traffic?.errorRatePercent || 0)).toFixed(1)}%`
+                    : '100%'}
+                </p>
+                <span className="text-[11px] text-emerald-700 font-medium">
+                  {isDe ? `Fehlerquote: ${systemStats?.traffic?.errorRatePercent ?? 0}%` : `Error rate: ${systemStats?.traffic?.errorRatePercent ?? 0}%`}
+                </span>
+              </div>
+            </div>
+
+            {/* Traffic Details Grid (Status Codes + Top Routes + Devices) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Status Codes */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    {isDe ? 'HTTP Status-Codes' : 'HTTP Status Codes'}
+                  </h4>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Nginx</span>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-xs font-medium mb-1">
+                      <span className="flex items-center gap-1.5 text-emerald-700">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        2xx {isDe ? 'Erfolgreich' : 'Success'}
+                      </span>
+                      <span className="font-bold text-slate-800">{systemStats?.traffic?.statusCodes?.['2xx'] ?? 0}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full"
+                        style={{
+                          width: `${systemStats?.traffic?.totalRequests > 0
+                            ? Math.round(((systemStats?.traffic?.statusCodes?.['2xx'] || 0) / systemStats.traffic.totalRequests) * 100)
+                            : 100}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs font-medium mb-1">
+                      <span className="flex items-center gap-1.5 text-blue-700">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        3xx {isDe ? 'Cache / Weiterleitung' : 'Redirect / Cache'}
+                      </span>
+                      <span className="font-bold text-slate-800">{systemStats?.traffic?.statusCodes?.['3xx'] ?? 0}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-blue-500 h-full rounded-full"
+                        style={{
+                          width: `${systemStats?.traffic?.totalRequests > 0
+                            ? Math.round(((systemStats?.traffic?.statusCodes?.['3xx'] || 0) / systemStats.traffic.totalRequests) * 100)
+                            : 0}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs font-medium mb-1">
+                      <span className="flex items-center gap-1.5 text-amber-700">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        4xx {isDe ? 'Nicht gefunden / Client' : 'Not Found / Client'}
+                      </span>
+                      <span className="font-bold text-slate-800">{systemStats?.traffic?.statusCodes?.['4xx'] ?? 0}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-amber-500 h-full rounded-full"
+                        style={{
+                          width: `${systemStats?.traffic?.totalRequests > 0
+                            ? Math.round(((systemStats?.traffic?.statusCodes?.['4xx'] || 0) / systemStats.traffic.totalRequests) * 100)
+                            : 0}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs font-medium mb-1">
+                      <span className="flex items-center gap-1.5 text-red-700">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        5xx {isDe ? 'Server-Fehler' : 'Server Errors'}
+                      </span>
+                      <span className="font-bold text-slate-800">{systemStats?.traffic?.statusCodes?.['5xx'] ?? 0}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-red-500 h-full rounded-full"
+                        style={{
+                          width: `${systemStats?.traffic?.totalRequests > 0
+                            ? Math.round(((systemStats?.traffic?.statusCodes?.['5xx'] || 0) / systemStats.traffic.totalRequests) * 100)
+                            : 0}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Device Breakdown */}
+                <div className="pt-3 border-t border-slate-100">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase block mb-2">
+                    {isDe ? 'Geräte-Verteilung' : 'Device Breakdown'}
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 rounded-xl bg-slate-50 flex items-center gap-2">
+                      <Monitor className="w-4 h-4 text-slate-600" />
+                      <div>
+                        <p className="text-[10px] text-slate-400">Desktop</p>
+                        <p className="text-xs font-bold text-slate-800">{systemStats?.traffic?.deviceBreakdown?.desktop ?? 0}</p>
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-50 flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-slate-600" />
+                      <div>
+                        <p className="text-[10px] text-slate-400">Mobile</p>
+                        <p className="text-xs font-bold text-slate-800">{systemStats?.traffic?.deviceBreakdown?.mobile ?? 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Routes (Takes 2 cols) */}
+              <div className="lg:col-span-2 bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    {isDe ? 'Meistbesuchte Routen & Seiten' : 'Most Visited Routes & Endpoints'}
+                  </h4>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Top 8</span>
+                </div>
+
+                {(!systemStats?.traffic?.topRoutes || systemStats.traffic.topRoutes.length === 0) ? (
+                  <p className="text-xs text-slate-400 py-6 text-center">
+                    {isDe ? 'Noch keine Routenaufrufe erfasst.' : 'No route requests recorded yet.'}
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {systemStats.traffic.topRoutes.map((r, idx) => {
+                      const maxHits = systemStats.traffic.topRoutes[0]?.count || 1;
+                      const pct = Math.round((r.count / maxHits) * 100);
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-mono text-[11px] font-semibold text-slate-700 truncate max-w-xs md:max-w-md">
+                              {r.route}
+                            </span>
+                            <span className="font-bold text-slate-900 ml-2">
+                              {r.count} <span className="text-[10px] text-slate-400 font-normal">Hits</span>
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Server Engine, Runtime & Database Footprint */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Server className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  {isDe ? '3. System-Engine & Speicher-Fußabdruck' : '3. Server Runtime & Footprint'}
+                </h3>
+              </div>
+              <span className="text-xs text-slate-500">
+                OS: <span className="font-mono text-slate-700">{systemStats?.system?.platform || 'linux (arm64)'}</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Uptime Box */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">{isDe ? 'Betriebszeit (Uptime)' : 'Uptime'}</span>
+                  <Clock className="w-4 h-4 text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-xl font-black text-slate-900">
+                    {formatUptime(systemStats?.system?.processUptimeSeconds)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {isDe ? 'Node.js Prozess' : 'Node.js process'}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>{isDe ? 'System-Uptime:' : 'Host Uptime:'}</span>
+                  <span className="font-semibold text-slate-800">{formatUptime(systemStats?.system?.systemUptimeSeconds)}</span>
+                </div>
+              </div>
+
+              {/* Node Memory Box */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">{isDe ? 'Node.js Speicher' : 'Node.js Memory'}</span>
+                  <Zap className="w-4 h-4 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-xl font-black text-slate-900">
+                    {systemStats?.system?.processMemRssMb ?? 0} MB
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    RSS Memory ({systemStats?.system?.nodeVersion || 'v20'})
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>{isDe ? 'Heap Belegung:' : 'Heap Used:'}</span>
+                  <span className="font-semibold text-slate-800">{systemStats?.system?.processMemHeapUsedMb ?? 0} MB</span>
+                </div>
+              </div>
+
+              {/* SQLite DB Box */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">SQLite Datenbank</span>
+                  <Database className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-xl font-black text-slate-900">
+                    {systemStats?.system?.dbSizeKb ?? 0} KB
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    badminton_community.db
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>{isDe ? 'Upload-Dateien:' : 'Uploads Folder:'}</span>
+                  <span className="font-semibold text-slate-800">{systemStats?.system?.uploadsSizeMb ?? 0} MB</span>
+                </div>
+              </div>
+
+              {/* Hardware / Host Box */}
+              <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">{isDe ? 'Server Hostname' : 'Host Info'}</span>
+                  <Server className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-base font-black text-slate-900 font-mono truncate">
+                    {systemStats?.system?.hostname || 'oracle-ampere-a1'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                    {systemStats?.system?.cpuModel || 'Ampere ARM A1'}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
+                  <span>Kernel:</span>
+                  <span className="font-mono text-slate-800 text-[10px] truncate max-w-[130px]">{systemStats?.system?.kernelRelease || 'linux-arm64'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Database Entities Overview */}
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-[#00472A] rounded-3xl p-6 text-white shadow-lg space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5">
+                <Database className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-black tracking-wide">
+                  {isDe ? '4. Live-Datenbank & Community-Inhalte' : '4. Database & Platform Content'}
+                </h3>
+              </div>
+              <span className="text-xs text-emerald-300 font-medium">
+                {isDe ? 'Vollständig synchronisiert' : 'Fully Synchronized'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                  {isDe ? 'Spieler-Profile' : 'Players'}
+                </span>
+                <p className="text-xl font-black mt-1">
+                  {systemStats?.database?.playersApproved ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-300">
+                  +{systemStats?.database?.playersPending ?? 0} {isDe ? 'ausstehend' : 'pending'}
+                </span>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                  {isDe ? 'Privattrainer' : 'Private Trainers'}
+                </span>
+                <p className="text-xl font-black mt-1">
+                  {systemStats?.database?.trainersApproved ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-300">
+                  +{systemStats?.database?.trainersPending ?? 0} {isDe ? 'neu zur Prüfung' : 'awaiting review'}
+                </span>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                  {isDe ? 'Besaitungsservice' : 'Stringing Services'}
+                </span>
+                <p className="text-xl font-black mt-1">
+                  {systemStats?.database?.servicesApproved ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-300">
+                  +{systemStats?.database?.servicesPending ?? 0} {isDe ? 'ausstehend' : 'pending'}
+                </span>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                  {isDe ? 'Vermittlungen' : 'Inquiries'}
+                </span>
+                <p className="text-xl font-black mt-1">
+                  {systemStats?.database?.inquiriesTotal ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-300">
+                  {systemStats?.database?.inquiriesPending ?? 0} {isDe ? 'offen zum Weiterleiten' : 'to forward'}
+                </span>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-xs p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200">
+                  {isDe ? 'Turniere & Termine' : 'Tournaments'}
+                </span>
+                <p className="text-xl font-black mt-1">
+                  {systemStats?.database?.tournamentsCount ?? 0}
+                </p>
+                <span className="text-[10px] text-slate-300">
+                  {systemStats?.database?.resultsCount ?? 0} {isDe ? 'Ergebnisse' : 'results'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

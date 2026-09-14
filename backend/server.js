@@ -85,7 +85,9 @@ import {
   markContactInquiryForwarded,
   updateContactInquiryStatus,
   deleteContactInquiry,
+  db,
 } from './db.js';
+import { getSystemAndTrafficStats } from './statsService.js';
 import {
   sendPasswordResetEmail,
   sendPartnerRequestEmail,
@@ -397,6 +399,17 @@ app.put('/api/admin/donation-settings', requireAdmin, (req, res) => {
     res.json({ success: true, settings: updated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update donation settings' });
+  }
+});
+
+// Admin: System, Oracle Free Tier & Traffic Analytics Stats
+app.get('/api/admin/system-stats', requireAdmin, (req, res) => {
+  try {
+    const stats = getSystemAndTrafficStats(db);
+    res.json(stats);
+  } catch (err) {
+    console.error('Error gathering system stats:', err);
+    res.status(500).json({ error: 'Failed to retrieve system and traffic stats' });
   }
 });
 
