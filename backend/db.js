@@ -2004,17 +2004,20 @@ export function updateDonationSettings({
 // -------------------------------------------------------------
 export function getPublicGameSessions() {
   const sessions = db.prepare(`
-    SELECT 
-      id, title, host_name,
-      location_name, location_name AS venue,
-      location_address, location_address AS address,
-      session_date, start_time, end_time,
-      game_format, game_format AS format,
-      max_players, current_players, skill_level, cost_note,
-      description, status, created_at
-    FROM game_sessions 
-    WHERE status IN ('open', 'full', 'cancelled')
-    ORDER BY session_date ASC, start_time ASC
+      SELECT 
+        id, title, host_name,
+        location_name, location_name AS venue,
+        location_address, location_address AS address,
+        session_date, start_time, end_time,
+        game_format, game_format AS format,
+        max_players, current_players, skill_level, cost_note,
+        description, status, created_at,
+        COALESCE(shuttlecock_type, 'feather') AS shuttlecock_type,
+        COALESCE(intensity_level, 'casual') AS intensity_level,
+        COALESCE(total_cost, 0) AS total_cost
+      FROM game_sessions 
+      WHERE status IN ('open', 'full', 'cancelled')
+      ORDER BY session_date ASC, start_time ASC
   `).all();
 
   for (const s of sessions) {
