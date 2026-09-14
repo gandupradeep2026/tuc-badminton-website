@@ -1,7 +1,9 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { LanguageProvider } from './context/LanguageContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import SimpleHeader from './components/SimpleHeader';
 import SimpleFooter from './components/SimpleFooter';
+import AppEntryModal from './components/AppEntryModal';
 
 // Code-splitting with React.lazy to make the initial page load ultra-fast and lightweight
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -48,6 +50,7 @@ function AppContent() {
   };
 
   const [activePage, setActivePage] = useState(getPageFromHash);
+  const { isEntryModalOpen, closeEntryModal } = useAuth();
 
   // Sync with browser back/forward buttons
   useEffect(() => {
@@ -119,6 +122,12 @@ function AppContent() {
         onNavigate={navigateTo} 
       />
 
+      {/* 4. One-Time Student App Entry Modal */}
+      <AppEntryModal
+        isOpen={isEntryModalOpen}
+        onClose={closeEntryModal}
+      />
+
     </div>
   );
 }
@@ -126,7 +135,9 @@ function AppContent() {
 export default function App() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </LanguageProvider>
   );
 }

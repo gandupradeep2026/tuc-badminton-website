@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   ShieldCheck, 
@@ -12,119 +12,92 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Upload, 
-  ArrowRight,
-  Sparkles,
-  School,
-  Check,
-  Wrench,
-  Package
+  ArrowRight, 
+  Sparkles, 
+  School, 
+  Check, 
+  Wrench, 
+  Lock, 
+  Unlock 
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { getApiUrl, safeFetchJson, saveOfflineSubmission, fileToDataUrl, getUploadUrl } from '../api/client';
+import { safeFetchJson, fileToDataUrl, getUploadUrl } from '../api/client';
 import BadmintonAvatar, { AVATAR_OPTIONS } from '../components/BadmintonAvatar';
 
 export default function RegistrationPage({ onNavigate }) {
+  const { user, token, isAuthenticated, openEntryModal, refreshProfile } = useAuth();
   const { language, t } = useLanguage();
   const reg = t.registration;
   const isDe = language === 'de';
 
-  const [activeTab, setActiveTab] = useState('player'); // 'player' | 'trainer'
+  const [activeTab, setActiveTab] = useState('player'); // 'player' | 'trainer' | 'service'
   const [submitting, setSubmitting] = useState(false);
-  const [submittedType, setSubmittedType] = useState(null); // 'player' | 'trainer' | null
-  const [isOfflineSaved, setIsOfflineSaved] = useState(false);
+  const [submittedType, setSubmittedType] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
   // -------------------------------------------------------------
-  // -------------------------------------------------------------
-  // Player Form State
+  // Player Profile State
   // -------------------------------------------------------------
   const [playerName, setPlayerName] = useState('');
-  const [playerGender, setPlayerGender] = useState('men'); // 'men' | 'women'
-  const [playerDisciplines, setPlayerDisciplines] = useState(['Einzel']);
+  const [playerGender, setPlayerGender] = useState('men');
+  const [playerDisciplines, setPlayerDisciplines] = useState(['Einzel', 'Doppel']);
   const [playerLevel, setPlayerLevel] = useState('Fortgeschritten / Advanced');
   const [playerFav, setPlayerFav] = useState('');
-  const [playerEmail, setPlayerEmail] = useState('');
   const [playerPhone, setPlayerPhone] = useState('');
-  const [playerShowPhone, setPlayerShowPhone] = useState(false);
-  const [playerUniType, setPlayerUniType] = useState('tuc'); // 'tuc' | 'other'
+  const [playerUniType, setPlayerUniType] = useState('tuc');
   const [playerUniName, setPlayerUniName] = useState('TU Chemnitz');
   const [playerStudy, setPlayerStudy] = useState('');
   const [playerAvatarType, setPlayerAvatarType] = useState('badminton_smash');
-  const [playerIsPublic, setPlayerIsPublic] = useState(true);
   const [playerPhotoFile, setPlayerPhotoFile] = useState(null);
   const [playerPhotoPreview, setPlayerPhotoPreview] = useState('');
-  const [playerPhotoUrl, setPlayerPhotoUrl] = useState('');
-
-  // Email OTP verification state for player registration
-  const [playerOtpCode, setPlayerOtpCode] = useState('');
-  const [playerOtpSent, setPlayerOtpSent] = useState(false);
-  const [playerOtpSending, setPlayerOtpSending] = useState(false);
-  const [playerOtpError, setPlayerOtpError] = useState('');
-  const [playerOtpSuccess, setPlayerOtpSuccess] = useState('');
-
-  const handleSendPlayerOtp = async () => {
-    setPlayerOtpError('');
-    setPlayerOtpSuccess('');
-    if (!playerEmail.trim() || !playerEmail.includes('@')) {
-      setPlayerOtpError(isDe ? 'Bitte gib zuerst eine gültige E-Mail-Adresse ein.' : 'Please enter a valid email address first.');
-      return;
-    }
-    try {
-      setPlayerOtpSending(true);
-      const res = await safeFetchJson('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: playerEmail.trim().toLowerCase(),
-          scope: 'register_player'
-        })
-      });
-      if (!res.ok) {
-        throw new Error(res.error || (isDe ? 'Fehler beim Senden des Codes.' : 'Failed to send verification code.'));
-      }
-      setPlayerOtpSent(true);
-      setPlayerOtpSuccess(res.data?.message || (isDe ? '6-stelliger Code an deine E-Mail gesendet!' : '6-digit code sent to your email!'));
-    } catch (err) {
-      setPlayerOtpError(err.message || 'Error');
-    } finally {
-      setPlayerOtpSending(false);
-    }
-  };
 
   // -------------------------------------------------------------
   // Trainer Form State
   // -------------------------------------------------------------
-  const [trainerType, setTrainerType] = useState('usz'); // 'usz' | 'private'
   const [trainerName, setTrainerName] = useState('');
   const [trainerEmail, setTrainerEmail] = useState('');
   const [trainerPhone, setTrainerPhone] = useState('');
-  const [trainerShowPhone, setTrainerShowPhone] = useState(false);
-  const [trainerRole, setTrainerRole] = useState('');
+  const [trainerRole, setTrainerRole] = useState('Badminton Coach');
   const [trainerHourlyRate, setTrainerHourlyRate] = useState('');
-  const [trainerAvailability, setTrainerAvailability] = useState('');
   const [trainerExperience, setTrainerExperience] = useState('');
-  const [trainerFocus, setTrainerFocus] = useState('');
-  const [trainerUszApproved, setTrainerUszApproved] = useState(false);
-  const [trainerUszNote, setTrainerUszNote] = useState('');
-  const [trainerPhotoFile, setTrainerPhotoFile] = useState(null);
-  const [trainerPhotoPreview, setTrainerPhotoPreview] = useState('');
-  const [trainerPhotoUrl, setTrainerPhotoUrl] = useState('');
+  const [trainerFocus, setTrainerFocus] = useState('Technik & Beinarbeit');
 
   // -------------------------------------------------------------
-  // Service Provider Form State (Stringers & Sellers)
+  // Service Provider Form State
   // -------------------------------------------------------------
   const [serviceName, setServiceName] = useState('');
   const [serviceEmail, setServiceEmail] = useState('');
   const [servicePhone, setServicePhone] = useState('');
-  const [serviceShowPhone, setServiceShowPhone] = useState(true);
   const [serviceTypes, setServiceTypes] = useState(['Schläger-Besaitungsservice']);
   const [servicePricing, setServicePricing] = useState('');
-  const [serviceItems, setServiceItems] = useState('');
-  const [serviceLocation, setServiceLocation] = useState('Sporthalle Thüringer Weg 11');
-  const [serviceExperience, setServiceExperience] = useState('');
-  const [servicePhotoFile, setServicePhotoFile] = useState(null);
-  const [servicePhotoPreview, setServicePhotoPreview] = useState('');
-  const [servicePhotoUrl, setServicePhotoUrl] = useState('');
+  const [serviceLocation, setServiceLocation] = useState('Sporthalle Thüringer Weg 11 / Campus');
+
+  // Auto-populate when authenticated user is loaded
+  useEffect(() => {
+    if (user) {
+      if (user.name && !playerName) setPlayerName(user.name);
+      if (user.university && !playerUniName) {
+        setPlayerUniName(user.university);
+        setPlayerUniType(user.university === 'TU Chemnitz' ? 'tuc' : 'other');
+      }
+      if (user.name && !trainerName) setTrainerName(user.name);
+      if (user.email && !trainerEmail) setTrainerEmail(user.email);
+      if (user.name && !serviceName) setServiceName(user.name);
+      if (user.email && !serviceEmail) setServiceEmail(user.email);
+    }
+  }, [user]);
+
+  const toggleDiscipline = (disc) => {
+    if (playerDisciplines.includes(disc)) {
+      if (playerDisciplines.length > 1) {
+        setPlayerDisciplines(playerDisciplines.filter(d => d !== disc));
+      }
+    } else {
+      setPlayerDisciplines([...playerDisciplines, disc]);
+    }
+  };
 
   const toggleServiceType = (type) => {
     if (serviceTypes.includes(type)) {
@@ -136,105 +109,63 @@ export default function RegistrationPage({ onNavigate }) {
     }
   };
 
-  // Discipline toggle helper
-  const toggleDiscipline = (disc) => {
-    if (playerDisciplines.includes(disc)) {
-      if (playerDisciplines.length > 1) {
-        setPlayerDisciplines(playerDisciplines.filter(d => d !== disc));
-      }
-    } else {
-      setPlayerDisciplines([...playerDisciplines, disc]);
-    }
-  };
-
   // -------------------------------------------------------------
-  // Handle Player Submit
+  // Handle Player Submit (Zero-OTP for Authenticated Member)
   // -------------------------------------------------------------
   const handleSubmitPlayer = async (e) => {
     e.preventDefault();
     setErrorMsg('');
-    setSubmitting(true);
+    setSuccessMsg('');
 
-    if (!playerName.trim() || !playerEmail.trim() || !playerStudy.trim()) {
-      setErrorMsg(reg.errGeneral);
-      setSubmitting(false);
+    if (!isAuthenticated) {
+      openEntryModal();
       return;
     }
 
-    if (!playerOtpCode || playerOtpCode.trim().length !== 6) {
-      setErrorMsg(isDe 
-        ? 'Bitte bestätige deine E-Mail-Adresse mit dem 6-stelligen Code vor dem Absenden.' 
-        : 'Please verify your email address with the 6-digit code before submitting.');
-      setSubmitting(false);
+    if (!playerName.trim()) {
+      setErrorMsg(isDe ? 'Bitte gib deinen Namen ein.' : 'Please enter your name.');
       return;
     }
 
-    if (playerUniType === 'other' && !playerUniName.trim()) {
-      setErrorMsg(isDe ? 'Bitte gib den Namen deiner Universität / Hochschule an.' : 'Please enter your university name.');
-      setSubmitting(false);
-      return;
-    }
+    const finalUni = playerUniType === 'other' ? (playerUniName.trim() || 'Andere Hochschule') : 'TU Chemnitz';
 
     try {
-      const payload = {
-        name: playerName.trim(),
-        gender: playerGender,
-        specialization: playerDisciplines.join(', '),
-        skill_level: playerLevel,
-        favorite_player: playerFav.trim(),
-        email: playerEmail.trim().toLowerCase(),
-        phone: playerPhone.trim(),
-        show_phone: playerShowPhone ? 1 : 0,
-        university_type: playerUniType,
-        university_name: playerUniType === 'other' ? playerUniName.trim() : 'TU Chemnitz',
-        study_program: playerStudy.trim(),
-        avatar_type: playerAvatarType,
-        is_public: playerIsPublic ? 1 : 0,
-        otp_code: playerOtpCode.trim(),
-      };
-
-      let photoDataUrl = playerPhotoUrl.trim();
-      if (playerPhotoFile) {
-        photoDataUrl = await fileToDataUrl(playerPhotoFile);
-      }
+      setSubmitting(true);
 
       const formData = new FormData();
-      Object.entries(payload).forEach(([k, v]) => formData.append(k, v));
+      formData.append('name', playerName.trim());
+      formData.append('gender', playerGender);
+      formData.append('university', finalUni);
+      formData.append('skill_level', playerLevel);
+      formData.append('preferred_category', playerDisciplines.join(', '));
+      formData.append('specialization', playerDisciplines.join(', '));
+      formData.append('phone', playerPhone.trim());
+      formData.append('avatar_type', playerAvatarType);
+      formData.append('favorite_player', playerFav.trim());
+      formData.append('study_program', playerStudy.trim() || 'Badminton Member');
+
       if (playerPhotoFile) {
         formData.append('photo', playerPhotoFile);
-      } else if (photoDataUrl) {
-        formData.append('photo_url_input', photoDataUrl);
       }
 
-      const result = await safeFetchJson('/api/register/player', {
+      const res = await safeFetchJson('/api/players/profile', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-student-token': token
+        },
+        body: formData
       });
 
-      if (!result.ok) {
-        if (result.status === 409) {
-          setErrorMsg(result.error || (isDe 
-            ? 'Diese E-Mail-Adresse ist bereits als aktiver Spieler registriert. Keine doppelten Einträge möglich.' 
-            : 'This email address is already registered as an active player. Duplicate entries are not allowed.'));
-          return;
-        }
-        if (result.isOffline) {
-          saveOfflineSubmission({
-            type: 'player',
-            data: payload,
-            photoDataUrl,
-          });
-          setIsOfflineSaved(true);
-          setSubmittedType('player');
-          return;
-        }
-        throw new Error(result.error || (isDe ? 'Fehler beim Übermitteln der Spieler-Registrierung.' : 'Error submitting player registration.'));
+      if (!res.ok) {
+        throw new Error(res.error || (isDe ? 'Fehler beim Speichern des Profils.' : 'Failed to save profile.'));
       }
 
-      setIsOfflineSaved(false);
       setSubmittedType('player');
+      setSuccessMsg(res.data?.message || (isDe ? 'Spielerprofil erfolgreich gespeichert!' : 'Player profile saved successfully!'));
+      await refreshProfile();
     } catch (err) {
-      setErrorMsg(err.message || (isDe ? 'Übermittlung fehlgeschlagen.' : 'Submission failed.'));
+      setErrorMsg(err.message || 'Verbindungsfehler beim Speichern.');
     } finally {
       setSubmitting(false);
     }
@@ -246,1367 +177,720 @@ export default function RegistrationPage({ onNavigate }) {
   const handleSubmitTrainer = async (e) => {
     e.preventDefault();
     setErrorMsg('');
-    setSubmitting(true);
+    setSuccessMsg('');
 
-    if (!trainerName.trim() || !trainerEmail.trim() || !trainerPhone.trim() || !trainerRole.trim()) {
-      setErrorMsg(reg.errGeneral);
-      setSubmitting(false);
-      return;
-    }
-
-    if (trainerType === 'usz' && !trainerUszApproved) {
-      setErrorMsg(reg.errUszApproval);
-      setSubmitting(false);
+    const emailToUse = user?.email || trainerEmail.trim().toLowerCase();
+    if (!trainerName.trim() || !emailToUse) {
+      setErrorMsg(isDe ? 'Name und E-Mail sind erforderlich.' : 'Name and email are required.');
       return;
     }
 
     try {
-      const payload = {
-        trainer_type: trainerType,
-        name: trainerName.trim(),
-        role: trainerRole.trim(),
-        email: trainerEmail.trim().toLowerCase(),
-        phone: trainerPhone.trim(),
-        show_phone: trainerShowPhone ? 1 : 0,
-        focus_areas: trainerFocus.trim(),
-        hourly_rate: trainerHourlyRate.trim(),
-        availability: trainerAvailability.trim(),
-        experience_years: trainerExperience.trim(),
-        hochschulsport_approved: trainerType === 'usz' ? 'true' : 'false',
-        hochschulsport_note: trainerType === 'usz' ? (trainerUszNote.trim() || 'USZ Genehmigung bestätigt') : 'Privattrainer',
-      };
-
-      let photoDataUrl = trainerPhotoUrl.trim();
-      if (trainerPhotoFile) {
-        photoDataUrl = await fileToDataUrl(trainerPhotoFile);
-      }
-
-      const formData = new FormData();
-      Object.entries(payload).forEach(([k, v]) => formData.append(k, v));
-      if (trainerPhotoFile) {
-        formData.append('photo', trainerPhotoFile);
-      } else if (photoDataUrl) {
-        formData.append('photo_url_input', photoDataUrl);
-      }
-
-      const result = await safeFetchJson('/api/register/trainer', {
+      setSubmitting(true);
+      const res = await safeFetchJson('/api/trainers/register', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: trainerName.trim(),
+          email: emailToUse,
+          phone: trainerPhone.trim(),
+          role: trainerRole.trim(),
+          hourly_rate: trainerHourlyRate.trim(),
+          experience_years: trainerExperience.trim(),
+          focus_areas: trainerFocus.trim(),
+          show_phone: 0,
+        })
       });
 
-      if (!result.ok) {
-        if (result.status === 409) {
-          setErrorMsg(result.error || (isDe 
-            ? 'Diese E-Mail-Adresse ist bereits als Trainer registriert. Keine doppelten Einträge möglich.' 
-            : 'This email address is already registered as a coach/trainer. Duplicate entries are not allowed.'));
-          return;
-        }
-        if (result.isOffline) {
-          saveOfflineSubmission({
-            type: 'trainer',
-            data: payload,
-            photoDataUrl,
-          });
-          setIsOfflineSaved(true);
-          setSubmittedType('trainer');
-          return;
-        }
-        throw new Error(result.error || (isDe ? 'Fehler beim Übermitteln der Trainer-Bewerbung.' : 'Error submitting trainer application.'));
+      if (!res.ok) {
+        throw new Error(res.error || (isDe ? 'Fehler bei der Trainer-Registrierung.' : 'Trainer registration failed.'));
       }
 
-      setIsOfflineSaved(false);
       setSubmittedType('trainer');
+      setSuccessMsg(res.data?.message || (isDe ? 'Trainer-Profil erfolgreich eingereicht!' : 'Trainer profile submitted!'));
     } catch (err) {
-      setErrorMsg(err.message || (isDe ? 'Übermittlung fehlgeschlagen.' : 'Submission failed.'));
+      setErrorMsg(err.message || 'Fehler beim Absenden.');
     } finally {
       setSubmitting(false);
     }
   };
 
   // -------------------------------------------------------------
-  // Handle Service Provider Submit (Stringers & Sellers)
+  // Handle Service Submit
   // -------------------------------------------------------------
   const handleSubmitService = async (e) => {
     e.preventDefault();
     setErrorMsg('');
-    setSubmitting(true);
+    setSuccessMsg('');
 
-    if (!serviceName.trim() || !serviceEmail.trim() || !servicePhone.trim()) {
-      setErrorMsg(isDe ? 'Bitte fülle alle Pflichtfelder (Name, E-Mail, Telefon) aus.' : 'Please fill in all required fields (Name, Email, Phone).');
-      setSubmitting(false);
+    const emailToUse = user?.email || serviceEmail.trim().toLowerCase();
+    if (!serviceName.trim() || !emailToUse) {
+      setErrorMsg(isDe ? 'Name und E-Mail sind erforderlich.' : 'Name and email are required.');
       return;
     }
 
     try {
-      const payload = {
-        name: serviceName.trim(),
-        service_type: serviceTypes.join(', '),
-        email: serviceEmail.trim().toLowerCase(),
-        phone: servicePhone.trim(),
-        show_phone: serviceShowPhone ? 1 : 0,
-        pricing_details: servicePricing.trim(),
-        available_items: serviceItems.trim(),
-        location_note: serviceLocation.trim(),
-        experience_years: serviceExperience.trim(),
-      };
-
-      let photoDataUrl = servicePhotoUrl.trim();
-      if (servicePhotoFile) {
-        photoDataUrl = await fileToDataUrl(servicePhotoFile);
-      }
-
-      const formData = new FormData();
-      Object.entries(payload).forEach(([k, v]) => formData.append(k, v));
-      if (servicePhotoFile) {
-        formData.append('photo', servicePhotoFile);
-      } else if (photoDataUrl) {
-        formData.append('photo_url_input', photoDataUrl);
-      }
-
-      const result = await safeFetchJson('/api/register/equipment-service', {
+      setSubmitting(true);
+      const res = await safeFetchJson('/api/equipment-services/register', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: serviceName.trim(),
+          email: emailToUse,
+          phone: servicePhone.trim(),
+          service_type: serviceTypes.join(', '),
+          pricing_details: servicePricing.trim(),
+          location_note: serviceLocation.trim(),
+          show_phone: 0,
+        })
       });
 
-      if (!result.ok) {
-        if (result.status === 409) {
-          setErrorMsg(result.error || (isDe 
-            ? 'Diese E-Mail-Adresse ist bereits als Ausrüster/Besaiter registriert. Keine doppelten Einträge möglich.' 
-            : 'This email address is already registered as an equipment provider. Duplicate entries are not allowed.'));
-          return;
-        }
-        throw new Error(result.error || (isDe ? 'Fehler beim Übermitteln der Ausrüster-Registrierung.' : 'Error submitting equipment service registration.'));
+      if (!res.ok) {
+        throw new Error(res.error || (isDe ? 'Fehler bei der Service-Registrierung.' : 'Service registration failed.'));
       }
 
-      setIsOfflineSaved(false);
       setSubmittedType('service');
+      setSuccessMsg(res.data?.message || (isDe ? 'Ausrüstungs-Service erfolgreich eingereicht!' : 'Equipment service submitted!'));
     } catch (err) {
-      setErrorMsg(err.message || (isDe ? 'Übermittlung fehlgeschlagen.' : 'Submission failed.'));
+      setErrorMsg(err.message || 'Fehler beim Absenden.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleResetForm = () => {
-    setSubmittedType(null);
-    setIsOfflineSaved(false);
-    setErrorMsg('');
-    if (activeTab === 'player') {
-      setPlayerName('');
-      setPlayerFav('');
-      setPlayerEmail('');
-      setPlayerPhone('');
-      setPlayerShowPhone(false);
-      setPlayerStudy('');
-      setPlayerPhotoFile(null);
-      setPlayerPhotoPreview('');
-      setPlayerPhotoUrl('');
-    } else if (activeTab === 'trainer') {
-      setTrainerName('');
-      setTrainerEmail('');
-      setTrainerPhone('');
-      setTrainerShowPhone(false);
-      setTrainerType('usz');
-      setTrainerHourlyRate('');
-      setTrainerAvailability('');
-      setTrainerExperience('');
-      setTrainerRole('');
-      setTrainerFocus('');
-      setTrainerUszApproved(false);
-      setTrainerUszNote('');
-      setTrainerPhotoFile(null);
-      setTrainerPhotoPreview('');
-      setTrainerPhotoUrl('');
-    } else {
-      setServiceName('');
-      setServiceEmail('');
-      setServicePhone('');
-      setServiceShowPhone(true);
-      setServiceTypes(['Schläger-Besaitungsservice']);
-      setServicePricing('');
-      setServiceItems('');
-      setServiceLocation('Sporthalle Thüringer Weg 11');
-      setServiceExperience('');
-      setServicePhotoFile(null);
-      setServicePhotoPreview('');
-      setServicePhotoUrl('');
-    }
-  };
-
-  // -------------------------------------------------------------
-  // View: Success Screen
-  // -------------------------------------------------------------
-  if (submittedType) {
-    return (
-      <div className="max-w-2xl mx-auto py-8 sm:py-12 space-y-6 animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-white rounded-3xl border border-emerald-200 shadow-xl overflow-hidden p-6 sm:p-10 text-center space-y-6">
-          <div className="w-20 h-20 rounded-3xl bg-emerald-100 text-[#005A36] mx-auto flex items-center justify-center shadow-inner">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-50 text-[#005A36] border border-emerald-200">
-                {submittedType === 'player' 
-                  ? (reg.badgePlayerSubmitted || '🏸 Spieler-Registrierung') 
-                  : (submittedType === 'trainer' 
-                      ? (reg.badgeTrainerSubmitted || '👥 Badminton-Trainer Registrierung')
-                      : (isDe ? '🏸 Ausrüster & Besaiter Registrierung' : '🏸 Stringer & Equipment Registration'))}
-              </span>
-              {isOfflineSaved && (
-                <span className="inline-block px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
-                  {reg.badgeOfflineQueue || '⚡ Offline gespeichert (Warteschlange)'}
-                </span>
-              )}
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {reg.successTitle}
-            </h2>
-            <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
-              {isOfflineSaved
-                ? (submittedType === 'player' ? (reg.msgOfflinePlayer || 'Ihre Spieler-Registrierung wurde sicher auf diesem Gerät gespeichert!') : (reg.msgOfflineTrainer || 'Ihre Trainer-Registrierung wurde sicher auf diesem Gerät gespeichert!'))
-                : (submittedType === 'player' 
-                    ? reg.successPlayerDesc 
-                    : (submittedType === 'trainer' 
-                        ? reg.successTrainerDesc 
-                        : (isDe ? 'Ihre Registrierung als Ausrüster / Besaiter wurde erfolgreich übermittelt! Nach redaktioneller Prüfung durch den Admin wird Ihr Profil im Ausrüstungsbereich freigeschaltet.' : 'Your equipment provider registration was successfully submitted! Once verified by the admin, your profile will be published.')))
-              }
-            </p>
-          </div>
-
-          {/* Workflow Steps Card */}
-          <div className="text-left bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-3">
-            <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500">
-              {reg.whatNext}
-            </h4>
-            <ul className="text-xs sm:text-sm text-slate-700 space-y-2">
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005A36] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                <span>{reg.step1}</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005A36] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                <span>{submittedType === 'service' 
-                  ? (isDe ? 'Der Admin prüft deine Angaben und schaltet deinen Service im Ausrüstungsbereich frei.' : 'The admin reviews your details and publishes your service in the equipment section.') 
-                  : reg.step2}</span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-emerald-100 text-[#005A36] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                <span>{submittedType === 'service'
-                  ? (isDe ? 'Spieler und Studierende der TU Chemnitz können dich für Besaitungen und Bälle direkt kontaktieren!' : 'Students and players can contact you directly for racket stringing and shuttles!')
-                  : reg.step3}</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              onClick={() => onNavigate('home')}
-              className="w-full sm:w-auto px-6 py-3 min-h-[46px] rounded-xl text-xs sm:text-sm font-bold bg-[#005A36] hover:bg-[#00472A] text-white transition-colors shadow-sm flex items-center justify-center gap-2"
-            >
-              <span>{reg.btnBackHome}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleResetForm}
-              className="w-full sm:w-auto px-6 py-3 min-h-[46px] rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
-            >
-              {reg.btnNewRegistration}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // -------------------------------------------------------------
-  // View: Main Registration Form
-  // -------------------------------------------------------------
   return (
-    <div className="space-y-6 sm:space-y-8 pb-16 max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 pb-16">
       
-      {/* Header Banner */}
-      <div className="border-b border-slate-200 pb-5 text-center sm:text-left">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-[#005A36] text-[11px] sm:text-xs font-bold mb-2">
-          <UserPlus className="w-3.5 h-3.5" />
-          <span>{reg.badge}</span>
+      {/* Header */}
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-[#005A36] text-xs font-bold">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Badminton Student Community</span>
         </div>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
-          {reg.title}
+        <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+          {isDe ? 'Profil erstellen & Community beitreten' : 'Create Profile & Join Community'}
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-          {reg.subtitle}
+        <p className="text-sm text-slate-500 max-w-xl mx-auto">
+          {isDe 
+            ? 'Trage dich in unseren Kader ein, finde Spielpartner für Einzel, Doppel & Mixed oder biete deine Trainings- und Besaitungsdienste an.' 
+            : 'Join our player roster, find sparring partners for singles/doubles, or offer coaching and stringing services.'}
         </p>
       </div>
 
-      {/* Role Selection Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 text-xs sm:text-sm font-bold shadow-xs">
-        <button
-          type="button"
-          onClick={() => { setActiveTab('player'); setErrorMsg(''); }}
-          className={`py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[46px] ${
-            activeTab === 'player'
-              ? 'bg-[#005A36] text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-          }`}
-        >
-          <span>{reg.tabPlayer}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => { setActiveTab('trainer'); setErrorMsg(''); }}
-          className={`py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[46px] ${
-            activeTab === 'trainer'
-              ? 'bg-[#005A36] text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-          }`}
-        >
-          <span>{reg.tabTrainer}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => { setActiveTab('service'); setErrorMsg(''); }}
-          className={`py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[46px] ${
-            activeTab === 'service'
-              ? 'bg-[#005A36] text-white shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-          }`}
-        >
-          <span>🏸 {isDe ? 'Besaitung & Ausrüstung' : 'Stringing & Gear'}</span>
-        </button>
+      {/* Role Tabs */}
+      <div className="flex justify-center">
+        <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
+          <button
+            type="button"
+            onClick={() => { setActiveTab('player'); setSubmittedType(null); setErrorMsg(''); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'player'
+                ? 'bg-[#005A36] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>{isDe ? '🎓 Spieler / Student' : '🎓 Player / Student'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('trainer'); setSubmittedType(null); setErrorMsg(''); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'trainer'
+                ? 'bg-[#005A36] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>{isDe ? '👥 Trainer & Coach' : '👥 Trainer & Coach'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('service'); setSubmittedType(null); setErrorMsg(''); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'service'
+                ? 'bg-[#005A36] text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Wrench className="w-4 h-4" />
+            <span>{isDe ? '🔧 Ausrüstung & Service' : '🔧 Gear & Service'}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Error Notice */}
-      {errorMsg && (
-        <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs sm:text-sm flex items-start gap-3 shadow-xs">
-          <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600 mt-0.5" />
-          <div className="space-y-0.5">
-            <span className="font-bold">{reg.validationError || (isDe ? 'Eingabefehler:' : 'Validation Error:')}</span>
-            <p>{errorMsg}</p>
+      {/* Authenticated Status or Sign-In Prompt Box */}
+      {!isAuthenticated ? (
+        <div className="p-5 rounded-3xl bg-amber-50/90 border border-amber-200 text-amber-950 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3.5 text-left">
+            <div className="w-11 h-11 rounded-2xl bg-amber-200/80 text-amber-800 flex items-center justify-center flex-shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">
+                {isDe ? 'Einmalige Registrierung erforderlich' : 'One-time registration required'}
+              </h3>
+              <p className="text-xs text-amber-800 mt-0.5">
+                {isDe 
+                  ? 'Studierende registrieren sich mit ihrer Hochschul-E-Mail (@tu-chemnitz.de). Trainer & Service-Anbieter können sich direkt mit Gmail anmelden.' 
+                  : 'Students register with university email. Trainers & service providers can use Gmail.'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={openEntryModal}
+            className="w-full sm:w-auto py-2.5 px-5 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 flex-shrink-0"
+          >
+            <Unlock className="w-4 h-4 text-emerald-200" />
+            <span>{isDe ? 'Jetzt kostenlos einloggen' : 'Sign in for free'}</span>
+          </button>
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#005A36] text-white flex items-center justify-center flex-shrink-0">
+              <ShieldCheck className="w-5 h-5 text-emerald-200" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold">
+                  {isDe ? '🔓 Angemeldet als verifiziertes Mitglied:' : '🔓 Signed in as verified member:'}
+                </span>
+                <span className="text-xs font-mono font-bold text-[#005A36] bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                  {user?.email}
+                </span>
+                <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900">
+                  {user?.role === 'trainer' ? 'Trainer' : (user?.role === 'service' ? 'Service' : 'Student')}
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 mt-0.5">
+                {isDe 
+                  ? 'Keine weiteren Codes oder Bestätigungen nötig – Änderungen werden sofort aktiv.' 
+                  : 'Zero OTP required – your updates take effect immediately.'}
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 1. PLAYER REGISTRATION FORM                                */}
-      {/* ========================================================= */}
-      {activeTab === 'player' && (
-        <form onSubmit={handleSubmitPlayer} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
-          
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="font-display font-black text-xl text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5 text-[#005A36]" />
-              <span>{reg.playerTitle}</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              {reg.playerDesc}
-            </p>
+      {/* Success View */}
+      {submittedType && (
+        <div className="p-8 sm:p-10 rounded-3xl bg-white border border-emerald-200 shadow-xl text-center space-y-4 max-w-lg mx-auto animate-fadeIn">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-9 h-9" />
           </div>
+          <h2 className="text-2xl font-black text-slate-900">
+            {isDe ? 'Profil erfolgreich gespeichert!' : 'Profile Saved!'}
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            {isDe 
+              ? 'Dein Profil ist nun aktiv in der Badminton Student Community hinterlegt. Deine Kontaktdaten bleiben strikt geschützt.' 
+              : 'Your profile is now active in the Badminton Student Community. Your direct contact details remain completely shielded.'}
+          </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-xs sm:text-sm">
-            
-            {/* Full Name */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.nameLabel}
-              </label>
-              <input
-                type="text"
-                required
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder={reg.namePlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
-
-            {/* Gender / Category */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.genderLabel}
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <label className={`cursor-pointer p-2.5 rounded-xl border text-center font-bold text-xs transition-all flex items-center justify-center ${
-                  playerGender === 'men' ? 'bg-[#005A36] text-white border-[#005A36]' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}>
-                  <input
-                    type="radio"
-                    name="playerGender"
-                    value="men"
-                    checked={playerGender === 'men'}
-                    onChange={() => setPlayerGender('men')}
-                    className="sr-only"
-                  />
-                  <span>{reg.genderMen}</span>
-                </label>
-                <label className={`cursor-pointer p-2.5 rounded-xl border text-center font-bold text-xs transition-all flex items-center justify-center ${
-                  playerGender === 'women' ? 'bg-[#005A36] text-white border-[#005A36]' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}>
-                  <input
-                    type="radio"
-                    name="playerGender"
-                    value="women"
-                    checked={playerGender === 'women'}
-                    onChange={() => setPlayerGender('women')}
-                    className="sr-only"
-                  />
-                  <span>{reg.genderWomen}</span>
-                </label>
-                <label className={`cursor-pointer p-2.5 rounded-xl border text-center font-bold text-xs transition-all flex items-center justify-center ${
-                  playerGender === 'diverse' ? 'bg-[#005A36] text-white border-[#005A36]' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}>
-                  <input
-                    type="radio"
-                    name="playerGender"
-                    value="diverse"
-                    checked={playerGender === 'diverse'}
-                    onChange={() => setPlayerGender('diverse')}
-                    className="sr-only"
-                  />
-                  <span>{reg.genderDiverse}</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Disciplines Selection (Multi-select) */}
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="font-bold text-slate-700">
-                  {reg.disciplinesLabel}
-                </label>
-                <span className="text-[11px] text-slate-400 font-medium">
-                  {reg.disciplinesHelp}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2.5">
-                {[
-                  { id: 'Einzel', label: reg.singles },
-                  { id: 'Doppel', label: reg.doubles },
-                  { id: 'Mixed', label: reg.mixed }
-                ].map((item) => {
-                  const isChecked = playerDisciplines.includes(item.id);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => toggleDiscipline(item.id)}
-                      className={`p-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-1.5 min-h-[44px] ${
-                        isChecked
-                          ? 'bg-emerald-50 border-[#005A36] text-[#005A36] shadow-xs'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className={`w-4 h-4 rounded flex items-center justify-center border ${
-                        isChecked ? 'bg-[#005A36] border-[#005A36] text-white' : 'border-slate-300'
-                      }`}>
-                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                      </div>
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Skill Level Selection */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.levelLabel}
-              </label>
-              <select
-                value={playerLevel}
-                onChange={(e) => setPlayerLevel(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 bg-white font-medium focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all"
+          <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('players')}
+                className="py-3 px-6 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <option value="Anfänger">{reg.levelBeginner}</option>
-                <option value="Fortgeschritten">{reg.levelIntermediate}</option>
-                <option value="Erfahren">{reg.levelAdvanced}</option>
-                <option value="Wettkampf">{reg.levelCompetitive}</option>
-              </select>
-            </div>
-
-            {/* Favorite Player / Idol (Clean text input without preset recommendations) */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.favPlayerLabel}
-              </label>
-              <input
-                type="text"
-                value={playerFav}
-                onChange={(e) => setPlayerFav(e.target.value)}
-                placeholder={reg.favPlayerPlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
-
-            {/* Email Address with OTP Verification */}
-            <div className="space-y-2">
-              <label className="font-bold text-slate-700 block">
-                {reg.emailLabel} <span className="text-red-500">*</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  required
-                  value={playerEmail}
-                  onChange={(e) => {
-                    setPlayerEmail(e.target.value);
-                    if (playerOtpSent) {
-                      setPlayerOtpSent(false);
-                      setPlayerOtpCode('');
-                    }
-                  }}
-                  placeholder={reg.emailPlaceholder}
-                  className="flex-1 p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={handleSendPlayerOtp}
-                  disabled={playerOtpSending || !playerEmail.includes('@')}
-                  className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] active:scale-[0.99] transition-all disabled:opacity-50 whitespace-nowrap shadow-xs"
-                >
-                  {playerOtpSending ? (isDe ? 'Sendet...' : 'Sending...') : (playerOtpSent ? (isDe ? 'Code erneut' : 'Resend') : (isDe ? 'Code anfordern' : 'Send Code'))}
-                </button>
-              </div>
-
-              {playerOtpError && (
-                <p className="text-xs text-red-600 font-semibold">{playerOtpError}</p>
-              )}
-              {playerOtpSuccess && (
-                <p className="text-xs text-emerald-700 font-semibold">{playerOtpSuccess}</p>
-              )}
-
-              {/* 6-Digit OTP Code Input */}
-              {playerOtpSent && (
-                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-1.5 animate-in fade-in">
-                  <label className="block text-xs font-bold text-emerald-950">
-                    {isDe ? '6-stelliger Bestätigungscode aus deiner E-Mail *' : '6-digit Confirmation Code from Email *'}
-                  </label>
-                  <input
-                    type="text"
-                    maxLength="6"
-                    required
-                    value={playerOtpCode}
-                    onChange={(e) => setPlayerOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
-                    className="w-full p-2.5 rounded-xl border border-emerald-300 bg-white font-mono text-sm tracking-widest text-center font-bold focus:ring-2 focus:ring-[#005A36] outline-none"
-                  />
-                  <p className="text-[11px] text-emerald-800">
-                    {isDe ? 'Bitte gib die 6 Ziffern ein, die wir an deine E-Mail gesendet haben.' : 'Please enter the 6 digits sent to your inbox.'}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Phone Number (Optional) & Show/Hide Toggle */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.phoneLabel} <span className="text-slate-400 font-normal text-xs">(optional)</span>
-              </label>
-              <input
-                type="tel"
-                value={playerPhone}
-                onChange={(e) => setPlayerPhone(e.target.value)}
-                placeholder={reg.phonePlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
-              />
-              <label className="flex items-start gap-2.5 mt-2 cursor-pointer select-none p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={playerShowPhone}
-                  onChange={(e) => setPlayerShowPhone(e.target.checked)}
-                  className="mt-0.5 rounded border-slate-300 text-[#005A36] focus:ring-[#005A36]"
-                />
-                <div className="text-xs">
-                  <span className="text-slate-800 font-semibold block">{reg.showPhoneLabel}</span>
-                  <span className="text-slate-400 text-[11px] block">{reg.phonePrivacyHint}</span>
-                </div>
-              </label>
-            </div>
-
-            {/* University Status Radio Group */}
-            <div className="sm:col-span-2 space-y-2 pt-2 border-t border-slate-100">
-              <label className="font-bold text-slate-800 block">
-                {reg.uniStatusLabel}
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <label className={`cursor-pointer p-3 rounded-xl border font-bold text-xs transition-all flex items-center gap-2.5 ${
-                  playerUniType === 'tu_chemnitz'
-                    ? 'bg-emerald-50 border-[#005A36] text-[#005A36]'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                }`}>
-                  <input
-                    type="radio"
-                    name="uniType"
-                    value="tu_chemnitz"
-                    checked={playerUniType === 'tu_chemnitz'}
-                    onChange={() => setPlayerUniType('tu_chemnitz')}
-                    className="text-[#005A36] focus:ring-[#005A36]"
-                  />
-                  <span>{reg.uniTuChemnitz}</span>
-                </label>
-
-                <label className={`cursor-pointer p-3 rounded-xl border font-bold text-xs transition-all flex items-center gap-2.5 ${
-                  playerUniType === 'other'
-                    ? 'bg-emerald-50 border-[#005A36] text-[#005A36]'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                }`}>
-                  <input
-                    type="radio"
-                    name="uniType"
-                    value="other"
-                    checked={playerUniType === 'other'}
-                    onChange={() => setPlayerUniType('other')}
-                    className="text-[#005A36] focus:ring-[#005A36]"
-                  />
-                  <span>{reg.uniOther}</span>
-                </label>
-
-                <label className={`cursor-pointer p-3 rounded-xl border font-bold text-xs transition-all flex items-center gap-2.5 ${
-                  playerUniType === 'none'
-                    ? 'bg-emerald-50 border-[#005A36] text-[#005A36]'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                }`}>
-                  <input
-                    type="radio"
-                    name="uniType"
-                    value="none"
-                    checked={playerUniType === 'none'}
-                    onChange={() => setPlayerUniType('none')}
-                    className="text-[#005A36] focus:ring-[#005A36]"
-                  />
-                  <span>{reg.uniNone}</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Other University Name (Conditional) */}
-            {playerUniType === 'other' && (
-              <div className="sm:col-span-2 animate-in fade-in duration-150">
-                <label className="font-bold text-slate-700 block mb-1.5">
-                  {reg.uniNameLabel}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={playerUniName}
-                  onChange={(e) => setPlayerUniName(e.target.value)}
-                  placeholder={reg.uniNamePlaceholder}
-                  className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-                />
-              </div>
+                <Users className="w-4 h-4" />
+                <span>{isDe ? 'Zum Community-Kader' : 'View Community Roster'}</span>
+              </button>
             )}
-
-            {/* Study Program */}
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.studyProgramLabel}
-              </label>
-              <input
-                type="text"
-                required
-                value={playerStudy}
-                onChange={(e) => setPlayerStudy(e.target.value)}
-                placeholder={reg.studyProgramPlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
-
-            {/* Badminton Sport Avatar Picker */}
-            <div className="sm:col-span-2 space-y-3 pt-2 border-t border-slate-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <label className="font-bold text-slate-800 block text-xs sm:text-sm">
-                    {isDe ? '🏸 Wähle dein Badminton-Avatar (Kein Foto nötig)' : '🏸 Choose Badminton Avatar (No photo needed)'}
-                  </label>
-                  <p className="text-[11px] text-slate-400">
-                    {isDe ? 'Bleibe geschützt und wähle eines unserer sportlichen Badminton-Icons:' : 'Protect your privacy with one of our badminton icons:'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
-                  <span className="text-[11px] text-slate-500 font-bold">{isDe ? 'Vorschau:' : 'Preview:'}</span>
-                  <BadmintonAvatar avatarType={playerAvatarType} photoUrl={playerPhotoPreview || playerPhotoUrl} name={playerName} size="sm" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {AVATAR_OPTIONS.map((opt) => {
-                  const isSelected = playerAvatarType === opt.id && !playerPhotoPreview && !playerPhotoUrl;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        setPlayerAvatarType(opt.id);
-                        setPlayerPhotoFile(null);
-                        setPlayerPhotoPreview('');
-                        setPlayerPhotoUrl('');
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
-                        isSelected 
-                          ? 'border-[#005A36] bg-emerald-50/80 shadow-xs ring-1 ring-[#005A36]' 
-                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <BadmintonAvatar avatarType={opt.id} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <span className="font-bold text-[11px] block truncate text-slate-900">{isDe ? opt.nameDe : opt.nameEn}</span>
-                        <span className="text-[10px] text-slate-400 block truncate">{isDe ? opt.descDe : opt.descEn}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Optional Custom Photo Upload */}
-              <details className="mt-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-                <summary className="cursor-pointer font-bold text-slate-700 select-none">
-                  {isDe ? '📷 Optional: Eigenes Profilfoto verwenden' : '📷 Optional: Upload custom profile photo instead'}
-                </summary>
-                <div className="mt-3 space-y-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        setPlayerPhotoFile(file);
-                        setPlayerPhotoPreview(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#005A36] file:text-white hover:file:bg-[#00472A] cursor-pointer"
-                  />
-                  <input
-                    type="url"
-                    value={playerPhotoUrl}
-                    onChange={(e) => {
-                      setPlayerPhotoUrl(e.target.value);
-                      if (e.target.value) setPlayerPhotoPreview('');
-                    }}
-                    placeholder={reg.photoUrlPlaceholder}
-                    className="w-full p-2 rounded-xl border border-slate-200 text-xs font-mono"
-                  />
-                </div>
-              </details>
-            </div>
-
-            {/* Privacy Shield & Public Directory Visibility Toggle */}
-            <div className="sm:col-span-2 p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#005A36] flex-shrink-0" />
-                <span className="font-bold text-slate-900 text-xs sm:text-sm">
-                  {isDe ? 'Datenschutz & Schutz deiner Privatsphäre' : 'Privacy & Directory Shield'}
-                </span>
-              </div>
-              <label className="flex items-start gap-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={playerIsPublic}
-                  onChange={(e) => setPlayerIsPublic(e.target.checked)}
-                  className="mt-1 rounded border-slate-300 text-[#005A36] focus:ring-[#005A36] w-4 h-4"
-                />
-                <div className="text-xs text-slate-700 leading-relaxed">
-                  <span className="font-bold block text-slate-900">
-                    {isDe ? 'Profil im öffentlichen Spielerverzeichnis anzeigen' : 'List profile in public player directory'}
-                  </span>
-                  <span className="text-slate-500 text-[11px] block mt-0.5">
-                    {isDe 
-                      ? 'Dein Nachname wird automatisch geschützt (z. B. "Max M."). E-Mail & Telefon sind für Dritte niemals sichtbar — Anfragen werden per Mailer diskret weitergeleitet.'
-                      : 'Your last name is automatically abbreviated (e.g. "Max M."). Email & phone are never shown — inquiries are relayed discreetly via our secure server.'}
-                  </span>
-                </div>
-              </label>
-            </div>
-
-          </div>
-
-          {/* Admin Approval Notice Banner */}
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-[#005A36] flex-shrink-0" />
-            <p>
-              <strong>Admin-Prüfung:</strong> Neue Spieler-Registrierungen werden aus Sicherheitsgründen durch den Administrator geprüft und nach Freigabe in der offiziellen Spielerliste aufgeführt.
-            </p>
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-2">
             <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3.5 px-6 rounded-2xl font-black text-sm sm:text-base text-white bg-[#005A36] hover:bg-[#00472A] active:bg-[#003820] transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+              type="button"
+              onClick={() => setSubmittedType(null)}
+              className="py-3 px-5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-all cursor-pointer"
             >
-              <UserPlus className="w-5 h-5" />
-              <span>{submitting ? reg.submitting : reg.submitPlayerBtn}</span>
+              {isDe ? 'Weiteres bearbeiten' : 'Edit Again'}
             </button>
           </div>
-
-        </form>
+        </div>
       )}
 
-      {/* ========================================================= */}
-      {/* 2. TRAINER APPLICATION FORM                               */}
-      {/* ========================================================= */}
-      {activeTab === 'trainer' && (
-        <form onSubmit={handleSubmitTrainer} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
-          
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="font-display font-black text-xl text-slate-900 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-[#005A36]" />
-              <span>{reg.trainerTitle}</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              {reg.trainerDesc}
-            </p>
-          </div>
+      {/* Form Container */}
+      {!submittedType && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
 
-          {/* Trainer Category: USZ Trainer vs Privattrainer */}
-          <div className="space-y-2">
-            <label className="font-bold text-slate-800 block text-xs sm:text-sm">
-              {isDe ? 'Trainer-Kategorie' : 'Coach Category'}
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setTrainerType('usz')}
-                className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
-                  trainerType === 'usz'
-                    ? 'bg-emerald-50 border-[#005A36] text-[#005A36] shadow-xs ring-2 ring-[#005A36]/10'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center border mt-0.5 ${
-                  trainerType === 'usz' ? 'border-[#005A36] bg-[#005A36] text-white' : 'border-slate-300'
-                }`}>
-                  {trainerType === 'usz' && <div className="w-2 h-2 bg-white rounded-full" />}
-                </div>
-                <div>
-                  <div className="font-bold text-xs sm:text-sm text-slate-900">
-                    {isDe ? 'USZ Hochschulsport-Trainer' : 'USZ University Coach'}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    {isDe ? 'Offizielle Betreuung von USZ-Kursen an der TU Chemnitz (USZ-Bestätigung erforderlich)' : 'Official university sports classes (USZ confirmation required)'}
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTrainerType('private')}
-                className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
-                  trainerType === 'private'
-                    ? 'bg-emerald-50 border-[#005A36] text-[#005A36] shadow-xs ring-2 ring-[#005A36]/10'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center border mt-0.5 ${
-                  trainerType === 'private' ? 'border-[#005A36] bg-[#005A36] text-white' : 'border-slate-300'
-                }`}>
-                  {trainerType === 'private' && <div className="w-2 h-2 bg-white rounded-full" />}
-                </div>
-                <div>
-                  <div className="font-bold text-xs sm:text-sm text-slate-900">
-                    {isDe ? 'Privattrainer / Individual Coach' : 'Private Coach / 1-on-1'}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    {isDe ? 'Bietet privates Einzeltraining, Sparring & Technik-Coaching für Spieler an' : 'Offers private 1-on-1 coaching, sparring & individual technique training'}
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Privacy Shield Notice */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 text-xs flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-[#005A36] flex-shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-slate-900 block mb-0.5">
-                {isDe ? '🛡️ Diskretion & Kontaktschutz:' : '🛡️ Privacy Shield & Mediation:'}
-              </span>
-              <span className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
-                {isDe
-                  ? 'Deine E-Mail-Adresse und Telefonnummer bleiben geschützt und werden nicht öffentlich auf der Website angezeigt. Interessierte Spieler stellen eine Vermittlungsanfrage über den Admin, der diese nach kurzer Prüfung an dich weiterleitet.'
-                  : 'Your contact details (email and phone) remain confidential and will not be displayed on the public site. Players submit requests to the admin, who forwards them to you.'}
-              </span>
-            </div>
-          </div>
-
-          {/* Mandatory USZ Approval Notice Box (USZ Only) */}
-          {trainerType === 'usz' && (
-            <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 space-y-3 shadow-xs">
-              <div className="flex items-center gap-2 font-black text-xs sm:text-sm text-amber-900">
-                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                <span>{reg.uszApprovalRequired}</span>
-              </div>
-              <p className="text-xs leading-relaxed text-amber-900/90">
-                {reg.uszApprovalNotice}
+          {/* Privacy Guarantee Box */}
+          <div className="mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-slate-900">
+                {isDe ? '🔒 Strikter Privatsphäre-Schutz nach deinen Wünschen:' : '🔒 Strict Privacy Shielding:'}
               </p>
-              <label className="flex items-start gap-3 cursor-pointer pt-1 bg-white/80 p-3 rounded-xl border border-amber-200">
-                <input
-                  type="checkbox"
-                  required
-                  checked={trainerUszApproved}
-                  onChange={(e) => setTrainerUszApproved(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 text-[#005A36] rounded border-amber-400 focus:ring-[#005A36]"
-                />
-                <span className="text-xs font-bold text-slate-900 leading-snug">
-                  {reg.uszCheckboxLabel}
-                </span>
-              </label>
+              <p className="leading-relaxed">
+                {isDe 
+                  ? 'Nur dein Name, Badminton-Level, deine bevorzugten Kategorien und dein Avatar/Foto werden öffentlich im Verzeichnis angezeigt. Deine Telefonnummer und E-Mail sind vollständig verborgen und werden erst sichtbar, wenn dir jemand eine Spielanfrage sendet und du dieser zustimmst.' 
+                  : 'Only your name, skill level, preferred categories, and avatar are shown publicly. Your contact details remain shielded until you accept a play request.'}
+              </p>
+            </div>
+          </div>
+
+          {errorMsg && (
+            <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-500" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-xs sm:text-sm">
-            
-            {/* Trainer Full Name */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.nameLabel}
-              </label>
-              <input
-                type="text"
-                required
-                value={trainerName}
-                onChange={(e) => setTrainerName(e.target.value)}
-                placeholder={reg.namePlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
-
-            {/* Role / License */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.trainerRoleLabel}
-              </label>
-              <input
-                type="text"
-                required
-                value={trainerRole}
-                onChange={(e) => setTrainerRole(e.target.value)}
-                placeholder={reg.trainerRolePlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
-
-            {/* Email Address */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.emailLabel}
-              </label>
-              <input
-                type="email"
-                required
-                value={trainerEmail}
-                onChange={(e) => setTrainerEmail(e.target.value)}
-                placeholder={reg.emailPlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
-              />
-            </div>
-
-            {/* Phone Number & Show/Hide Toggle */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.phoneLabel}
-              </label>
-              <input
-                type="tel"
-                required
-                value={trainerPhone}
-                onChange={(e) => setTrainerPhone(e.target.value)}
-                placeholder={reg.phonePlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
-              />
-              <label className="flex items-start gap-2.5 mt-2 cursor-pointer select-none p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-slate-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={trainerShowPhone}
-                  onChange={(e) => setTrainerShowPhone(e.target.checked)}
-                  className="mt-0.5 rounded border-slate-300 text-[#005A36] focus:ring-[#005A36]"
-                />
-                <div className="text-xs">
-                  <span className="text-slate-800 font-semibold block">{reg.showPhoneLabel}</span>
-                  <span className="text-slate-400 text-[11px] block">{reg.phonePrivacyHint}</span>
-                </div>
-              </label>
-            </div>
-
-            {/* USZ Reference Note (Only for USZ Trainers) */}
-            {trainerType === 'usz' && (
-              <div className="sm:col-span-2">
-                <label className="font-bold text-slate-700 block mb-1.5">
-                  {reg.uszNoteLabel}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={trainerUszNote}
-                  onChange={(e) => setTrainerUszNote(e.target.value)}
-                  placeholder={reg.uszNotePlaceholder}
-                  className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-                />
-              </div>
-            )}
-
-            {/* Private Trainer Specific Fields */}
-            {trainerType === 'private' && (
-              <>
+          {/* TAB 1: PLAYER / STUDENT PROFILE */}
+          {activeTab === 'player' && (
+            <form onSubmit={handleSubmitPlayer} className="space-y-6">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                
+                {/* Full Name */}
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1.5">
-                    {isDe ? 'Stundensatz / Honorar' : 'Hourly Rate / Fee'}
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Name / Vorname & Nachname' : 'Full Name'} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    placeholder="z.B. Lukas Weber"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] focus:border-[#005A36] outline-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {isDe ? 'Wird im Verzeichnis für Spielpartner angezeigt.' : 'Displayed in the roster for sparring partners.'}
+                  </p>
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Geschlecht' : 'Gender'} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPlayerGender('men')}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        playerGender === 'men'
+                          ? 'bg-blue-50 border-blue-500 text-blue-900 font-extrabold'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {isDe ? 'Herren (Men)' : 'Men'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPlayerGender('women')}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        playerGender === 'women'
+                          ? 'bg-purple-50 border-purple-500 text-purple-900 font-extrabold'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {isDe ? 'Damen (Women)' : 'Women'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* University */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Universität / Hochschule' : 'University / College'} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setPlayerUniType('tuc'); setPlayerUniName('TU Chemnitz'); }}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          playerUniType === 'tuc'
+                            ? 'bg-emerald-50 border-[#005A36] text-[#005A36]'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        TU Chemnitz
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlayerUniType('other')}
+                        className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                          playerUniType === 'other'
+                            ? 'bg-emerald-50 border-[#005A36] text-[#005A36]'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {isDe ? 'Andere Hochschule' : 'Other University'}
+                      </button>
+                    </div>
+                    {playerUniType === 'other' && (
+                      <input
+                        type="text"
+                        required
+                        value={playerUniName}
+                        onChange={(e) => setPlayerUniName(e.target.value)}
+                        placeholder="z.B. TU Dresden, HTWK Leipzig, etc."
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#005A36] outline-none"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {/* Registered Email (Protected) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Verifizierte E-Mail-Adresse' : 'Registered Email'}
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      readOnly
+                      disabled
+                      value={user?.email || 'Wird nach Login verknüpft'}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-xs sm:text-sm font-mono text-slate-700 cursor-not-allowed"
+                    />
+                  </div>
+                  <p className="text-[10px] text-emerald-700 font-medium mt-1 flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>{isDe ? 'Bereits verifiziert • Bleibt im Verzeichnis verborgen' : 'Verified • Hidden in directory'}</span>
+                  </p>
+                </div>
+
+                {/* Skill Level */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Badminton-Level / Spielstärke' : 'Badminton Level'} <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={playerLevel}
+                    onChange={(e) => setPlayerLevel(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm bg-white text-slate-800 outline-none focus:ring-2 focus:ring-[#005A36]"
+                  >
+                    <option value="Anfänger / Beginner">{isDe ? 'Anfänger / Beginner (Grundregeln & Spaß)' : 'Beginner'}</option>
+                    <option value="Fortgeschritten / Advanced">{isDe ? 'Fortgeschritten / Advanced (Regelmäßiges Spiel)' : 'Intermediate / Advanced'}</option>
+                    <option value="Profi / Wettkampf">{isDe ? 'Profi / Wettkampf (Turnier- & Uni-Cup Erfahrung)' : 'Pro / Tournament'}</option>
+                    <option value="Vereinsspieler / Liga">{isDe ? 'Vereinsspieler / Liga (Sachsenliga / Bezirksliga)' : 'Club / League Player'}</option>
+                  </select>
+                </div>
+
+                {/* Preferred Categories / Disciplines */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Bevorzugte Spielkategorien' : 'Preferred Categories'} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {['Einzel', 'Doppel', 'Mixed'].map((cat) => {
+                      const isSel = playerDisciplines.includes(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleDiscipline(cat)}
+                          className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            isSel
+                              ? 'bg-[#005A36] border-[#005A36] text-white shadow-2xs'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {isDe ? 'Wähle alle Kategorien, für die du Spielpartner suchst.' : 'Select all categories you want to play.'}
+                  </p>
+                </div>
+
+                {/* Optional Phone / WhatsApp */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Telefon / WhatsApp (optional)' : 'Phone / WhatsApp (optional)'}
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      value={playerPhone}
+                      onChange={(e) => setPlayerPhone(e.target.value)}
+                      placeholder="+49 152 12345678"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {isDe ? 'Wird niemals öffentlich angezeigt. Nur für bestätigte Partner sichtbar.' : 'Never shown publicly. Revealed only upon accepted request.'}
+                  </p>
+                </div>
+
+                {/* Favorite Player / Idol */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Lieblingsspieler / Vorbild (optional)' : 'Favorite Player / Idol (optional)'}
+                  </label>
+                  <div className="relative">
+                    <Star className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={playerFav}
+                      onChange={(e) => setPlayerFav(e.target.value)}
+                      placeholder="z.B. Viktor Axelsen, Tai Tzu-ying, Lin Dan"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                    />
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Badminton Avatar & Photo Selection */}
+              <div className="pt-4 border-t border-slate-200 space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    {isDe ? 'Badminton-Avatar & Profilbild (optional)' : 'Avatar & Photo (optional)'}
+                  </h4>
+                  <p className="text-xs text-slate-500">
+                    {isDe 
+                      ? 'Wähle einen unserer stilvollen Badminton-Avatare oder lade dein eigenes Foto hoch.' 
+                      : 'Choose a badminton avatar or upload your photo.'}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Avatar Preview */}
+                  <BadmintonAvatar
+                    photoUrl={playerPhotoPreview}
+                    avatarType={playerAvatarType}
+                    name={playerName || 'Player'}
+                    size="lg"
+                  />
+
+                  {/* Avatar Choice Dropdown */}
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      {isDe ? 'Standard-Avatar wählen' : 'Select Avatar Style'}
+                    </label>
+                    <select
+                      value={playerAvatarType}
+                      onChange={(e) => setPlayerAvatarType(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-[#005A36]"
+                    >
+                      {AVATAR_OPTIONS.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {isDe ? opt.labelDe : opt.labelEn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Optional Custom File Upload */}
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      {isDe ? 'Oder eigenes Foto hochladen' : 'Or upload photo'}
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setPlayerPhotoFile(file);
+                          setPlayerPhotoPreview(URL.createObjectURL(file));
+                        }
+                      }}
+                      className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-50 file:text-[#005A36] hover:file:bg-emerald-100 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-4 border-t border-slate-200">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-[#005A36] to-emerald-700 hover:from-[#00472A] hover:to-emerald-800 shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>{isDe ? 'Profil jetzt kostenlos speichern (Zero OTP)' : 'Save Profile (Zero OTP)'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+
+            </form>
+          )}
+
+          {/* TAB 2: TRAINER / COACH */}
+          {activeTab === 'trainer' && (
+            <form onSubmit={handleSubmitTrainer} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Name des Trainers / Coaches' : 'Trainer Name'} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={trainerName}
+                    onChange={(e) => setTrainerName(e.target.value)}
+                    placeholder="z.B. Alex Schmidt"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'E-Mail-Adresse' : 'Email'} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={user?.email || trainerEmail}
+                    onChange={(e) => setTrainerEmail(e.target.value)}
+                    placeholder="alex.schmidt@gmail.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Trainings-Schwerpunkte' : 'Focus Areas'}
+                  </label>
+                  <input
+                    type="text"
+                    value={trainerFocus}
+                    onChange={(e) => setTrainerFocus(e.target.value)}
+                    placeholder="z.B. Einsteiger-Technik, Smash & Abwehr, Doppel-Taktik"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Honorar / Konditionen (optional)' : 'Hourly Rate (optional)'}
                   </label>
                   <input
                     type="text"
                     value={trainerHourlyRate}
                     onChange={(e) => setTrainerHourlyRate(e.target.value)}
-                    placeholder={isDe ? 'z. B. 25 € / Std. oder nach Vereinbarung' : 'e.g. 25 € / hr or negotiable'}
-                    className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+                    placeholder="z.B. 15€ / Std. oder USZ-Kurs"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
                   />
                 </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-bold text-white bg-[#005A36] hover:bg-[#00472A] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Award className="w-4 h-4" />
+                    <span>{isDe ? 'Als Trainer eintragen' : 'Submit Trainer Profile'}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* TAB 3: GEAR & STRINGING SERVICE */}
+          {activeTab === 'service' && (
+            <form onSubmit={handleSubmitService} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1.5">
-                    {isDe ? 'Trainererfahrung / Referenzen' : 'Coaching Experience / References'}
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Anbieter-Name / Werkstatt' : 'Provider Name'} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    value={trainerExperience}
-                    onChange={(e) => setTrainerExperience(e.target.value)}
-                    placeholder={isDe ? 'z. B. 5 Jahre Vereinserfahrung, C-Lizenz' : 'e.g. 5 yrs club coach, C-license'}
-                    className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
+                    required
+                    value={serviceName}
+                    onChange={(e) => setServiceName(e.target.value)}
+                    placeholder="z.B. Marco Racket Service"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'E-Mail-Adresse' : 'Email'} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={user?.email || serviceEmail}
+                    onChange={(e) => setServiceEmail(e.target.value)}
+                    placeholder="service@gmail.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
+                  />
+                </div>
+
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1.5">
-                    {isDe ? 'Verfügbare Trainingszeiten' : 'Availability / Time Slots'}
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Angebotene Services' : 'Offered Services'}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {['Schläger-Besaitungsservice', 'Griffbandwechsel', 'Bälle & Zubehör', 'Schlägerverleih'].map((type) => {
+                      const isSel = serviceTypes.includes(type);
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => toggleServiceType(type)}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            isSel
+                              ? 'bg-[#005A36] border-[#005A36] text-white'
+                              : 'bg-white border-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    {isDe ? 'Preise & Details' : 'Pricing & Details'}
                   </label>
                   <input
                     type="text"
-                    value={trainerAvailability}
-                    onChange={(e) => setTrainerAvailability(e.target.value)}
-                    placeholder={isDe ? 'z. B. Di & Do ab 17:00 Uhr, Sa vormittags' : 'e.g. Tue & Thu from 5pm, Sat mornings'}
-                    className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Focus / Bio */}
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.trainerFocusLabel}
-              </label>
-              <textarea
-                rows={3}
-                required
-                value={trainerFocus}
-                onChange={(e) => setTrainerFocus(e.target.value)}
-                placeholder={reg.trainerFocusPlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium resize-none"
-              />
-            </div>
-
-            {/* Profile Photo (Upload or URL) */}
-            <div className="sm:col-span-2 space-y-2 pt-2 border-t border-slate-100">
-              <label className="font-bold text-slate-700 block">
-                {reg.photoLabel}
-              </label>
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
-                  {trainerPhotoPreview || trainerPhotoUrl ? (
-                    <img 
-                      src={trainerPhotoPreview || getUploadUrl(trainerPhotoUrl)} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover" 
-                    />
-                  ) : (
-                    <ShieldCheck className="w-8 h-8 text-slate-400" />
-                  )}
-                </div>
-                <div className="flex-1 w-full space-y-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        setTrainerPhotoFile(file);
-                        setTrainerPhotoPreview(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#005A36] file:text-white hover:file:bg-[#00472A] cursor-pointer"
-                  />
-                  <input
-                    type="url"
-                    value={trainerPhotoUrl}
-                    onChange={(e) => {
-                      setTrainerPhotoUrl(e.target.value);
-                      if (e.target.value) setTrainerPhotoPreview('');
-                    }}
-                    placeholder={reg.photoUrlPlaceholder}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-mono"
+                    value={servicePricing}
+                    onChange={(e) => setServicePricing(e.target.value)}
+                    placeholder="z.B. Besaitung 15€ inkl. Saite (Yonex BG65 / Nanogy98)"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-[#005A36] outline-none"
                   />
                 </div>
               </div>
-            </div>
 
-          </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-3.5 px-6 rounded-2xl text-xs sm:text-sm font-bold text-white bg-[#005A36] hover:bg-[#00472A] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Wrench className="w-4 h-4" />
+                    <span>{isDe ? 'Service-Eintrag speichern' : 'Submit Service Profile'}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
-          {/* Admin Approval Notice Banner */}
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-[#005A36] flex-shrink-0" />
-            <p>
-              <strong>Admin-Freigabe:</strong> Die Trainer-Registrierung wird zusammen mit dem USZ-Genehmigungsnachweis durch den Admin überprüft. Nach Bestätigung wird das Trainerprofil öffentlich sichtbar.
-            </p>
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3.5 px-6 rounded-2xl font-black text-sm sm:text-base text-white bg-[#005A36] hover:bg-[#00472A] active:bg-[#003820] transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <ShieldCheck className="w-5 h-5" />
-              <span>{submitting ? reg.submitting : reg.submitTrainerBtn}</span>
-            </button>
-          </div>
-
-        </form>
-      )}
-
-      {/* ========================================================= */}
-      {/* 3. EQUIPMENT SERVICE PROVIDER REGISTRATION FORM            */}
-      {/* ========================================================= */}
-      {activeTab === 'service' && (
-        <form onSubmit={handleSubmitService} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
-          
-          <div className="border-b border-slate-100 pb-4">
-            <h2 className="font-display font-black text-xl text-slate-900 flex items-center gap-2">
-              <Wrench className="w-5 h-5 text-[#005A36]" />
-              <span>{isDe ? 'Besaitungsservice & Ausrüstungs-Anbieter' : 'Equipment & Stringing Provider Registration'}</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              {isDe 
-                ? 'Trage dich als Besaiter oder Material-Anbieter für die Badminton-Community der TU Chemnitz ein. Nach Prüfung durch den Admin wird dein Profil veröffentlicht.'
-                : 'Register as a racket stringer or equipment provider for the TU Chemnitz badminton community.'}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-xs sm:text-sm">
-            
-            {/* Full Name */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {isDe ? 'Vollständiger Name / Anbietername' : 'Full Name / Provider Name'} *
-              </label>
-              <input
-                type="text"
-                required
-                value={serviceName}
-                onChange={(e) => setServiceName(e.target.value)}
-                placeholder={isDe ? 'z. B. Max Mustermann' : 'e.g. John Doe'}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
-
-            {/* Email Address */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.emailLabel} *
-              </label>
-              <input
-                type="email"
-                required
-                value={serviceEmail}
-                onChange={(e) => setServiceEmail(e.target.value)}
-                placeholder="ihre.email@s2022.tu-chemnitz.de"
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs"
-              />
-            </div>
-
-            {/* Phone / WhatsApp */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.phoneLabel} (WhatsApp) *
-              </label>
-              <input
-                type="tel"
-                required
-                value={servicePhone}
-                onChange={(e) => setServicePhone(e.target.value)}
-                placeholder="+49 176 12345678"
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs"
-              />
-              <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={serviceShowPhone}
-                  onChange={(e) => setServiceShowPhone(e.target.checked)}
-                  className="rounded text-[#005A36] focus:ring-[#005A36] w-4 h-4"
-                />
-                <span className="text-xs text-slate-600">
-                  {isDe ? 'Telefonnummer & WhatsApp öffentlich auf der Website für Anfragen anzeigen' : 'Show phone & WhatsApp publicly for player inquiries'}
-                </span>
-              </label>
-            </div>
-
-            {/* Handoff Location / Campus presence */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {isDe ? 'Übergabeort / Campus-Präsenz' : 'Handoff Location / Campus presence'}
-              </label>
-              <input
-                type="text"
-                value={serviceLocation}
-                onChange={(e) => setServiceLocation(e.target.value)}
-                placeholder={isDe ? 'z. B. Sporthalle Thüringer Weg 11 (Mo & Fr)' : 'e.g. Sporthalle Thüringer Weg (Mon & Fri)'}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium"
-              />
-            </div>
-
-            {/* Services Offered Checkboxes */}
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {isDe ? 'Angebotene Leistungen (mehrere wählbar)' : 'Services Offered (select all that apply)'}
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { id: 'Schläger-Besaitungsservice', label: isDe ? '🏸 Besaitungsservice' : '🏸 Racket Stringing' },
-                  { id: 'Federball-Verkauf', label: isDe ? '🪶 Federball-Verkauf' : '🪶 Shuttlecocks' },
-                  { id: 'Schläger-Verkauf & Beratung', label: isDe ? '🎾 Schläger-Verkauf' : '🎾 Rackets' },
-                  { id: 'Griffbänder & Zubehör', label: isDe ? '🔧 Griffbänder & Zubehör' : '🔧 Grips & Accessories' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => toggleServiceType(item.id)}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center flex items-center justify-center ${
-                      serviceTypes.includes(item.id)
-                        ? 'bg-[#005A36] text-white border-[#005A36] shadow-xs'
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Pricing / Rates Details */}
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {isDe ? 'Preise & Gebühren (z. B. Besaitungslohn, Bälle)' : 'Pricing & Service Rates'}
-              </label>
-              <textarea
-                rows={2}
-                value={servicePricing}
-                onChange={(e) => setServicePricing(e.target.value)}
-                placeholder={isDe 
-                  ? 'z. B. 12€ Bespannung bei mitgebrachter Saite; 18€ inkl. Yonex BG80 / Aerobite; 28€ Rolle Victor Federbälle'
-                  : 'e.g. 12€ stringing with own string; 18€ incl. Yonex BG80; 28€ Victor shuttles tube'}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium text-xs leading-relaxed"
-              />
-            </div>
-
-            {/* Available Strings, Shuttles & Gear */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {isDe ? 'Verfügbare Saiten & Ballmarken' : 'Available Strings & Shuttle Brands'}
-              </label>
-              <input
-                type="text"
-                value={serviceItems}
-                onChange={(e) => setServiceItems(e.target.value)}
-                placeholder={isDe ? 'z. B. Yonex BG80, BG65, Aerobite; Victor Champion Shuttles' : 'e.g. Yonex BG80, Aerobite, Victor Champion'}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium text-xs"
-              />
-            </div>
-
-            {/* Machine & Experience */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {isDe ? 'Besaitungsmaschine / Erfahrung' : 'Stringing Machine / Experience'}
-              </label>
-              <input
-                type="text"
-                value={serviceExperience}
-                onChange={(e) => setServiceExperience(e.target.value)}
-                placeholder={isDe ? 'z. B. Elektronische 6-Punkt-Maschine / 4 Jahre Erfahrung' : 'e.g. Electronic constant pull machine / 4 years exp'}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium text-xs"
-              />
-            </div>
-
-            {/* Photo / Logo Upload */}
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {isDe ? 'Profilfoto oder Logo (optional)' : 'Profile Photo or Logo (optional)'}
-              </label>
-              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <div className="w-16 h-16 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
-                  {servicePhotoPreview || (servicePhotoUrl && getUploadUrl(servicePhotoUrl)) ? (
-                    <img
-                      src={servicePhotoPreview || getUploadUrl(servicePhotoUrl)}
-                      alt="Service Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Wrench className="w-6 h-6 text-slate-400" />
-                  )}
-                </div>
-
-                <div className="space-y-2 flex-1 w-full">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setServicePhotoFile(file);
-                        const reader = new FileReader();
-                        reader.onload = () => setServicePhotoPreview(reader.result);
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#005A36] file:text-white hover:file:bg-[#00472A] cursor-pointer"
-                  />
-                  <input
-                    type="url"
-                    value={servicePhotoUrl}
-                    onChange={(e) => {
-                      setServicePhotoUrl(e.target.value);
-                      if (e.target.value) setServicePhotoPreview('');
-                    }}
-                    placeholder={reg.photoUrlPlaceholder}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Admin Approval Notice Banner */}
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-950 text-xs flex items-center gap-3">
-            <ShieldCheck className="w-5 h-5 text-[#005A36] flex-shrink-0" />
-            <p>
-              <strong>{isDe ? 'Admin-Freigabe:' : 'Admin Verification:'}</strong> {isDe
-                ? 'Deine Angaben werden vom Administrator geprüft und anschließend im Bereich "Besaitung & Ausrüstung" für alle sichtbar geschaltet.'
-                : 'Your registration will be verified by the admin and then published in the "Equipment & Stringing" directory.'}
-            </p>
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3.5 px-6 rounded-2xl font-black text-sm sm:text-base text-white bg-[#005A36] hover:bg-[#00472A] active:bg-[#003820] transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <Wrench className="w-5 h-5" />
-              <span>{submitting ? reg.submitting : (isDe ? 'Als Ausrüster / Besaiter registrieren' : 'Submit Equipment Registration')}</span>
-            </button>
-          </div>
-
-        </form>
+        </div>
       )}
 
     </div>

@@ -29,6 +29,7 @@ import {
   getVenueAmenities
 } from '../utils/calendar';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { safeFetchJson } from '../api/client';
 import BadmintonAvatar, { AVATAR_OPTIONS } from '../components/BadmintonAvatar';
 
@@ -40,6 +41,7 @@ const POPULAR_VENUES = [
 ];
 
 export default function SessionsPage({ onNavigate }) {
+  const { user, token, isAuthenticated } = useAuth();
   const { language } = useLanguage();
   const isDe = language === 'de';
 
@@ -127,13 +129,22 @@ export default function SessionsPage({ onNavigate }) {
 
   useEffect(() => {
     fetchSessions();
-    // Load active players for direct invites
-    safeFetchJson('/api/players').then(res => {
+    const headers = token ? { 'Authorization': `Bearer ${token}`, 'x-student-token': token } : {};
+    safeFetchJson('/api/community/members', { headers }).then(res => {
       if (res.ok && Array.isArray(res.data)) {
         setAvailablePlayers(res.data);
       }
     }).catch(() => {});
-  }, []);
+  }, [token]);
+
+  useEffect(() => {
+    if (user) {
+      if (user.name && !createHostName) setCreateHostName(user.name);
+      if (user.email && !createHostEmail) setCreateHostEmail(user.email);
+      if (user.name && !joinName) setJoinName(user.name);
+      if (user.email && !joinEmail) setJoinEmail(user.email);
+    }
+  }, [user]);
 
   const handleVenueChange = (e) => {
     const val = e.target.value;
@@ -186,7 +197,10 @@ export default function SessionsPage({ onNavigate }) {
 
       const res = await safeFetchJson('/api/game-sessions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}`, 'x-student-token': token } : {})
+        },
         body: JSON.stringify(payload)
       });
 
@@ -247,13 +261,15 @@ export default function SessionsPage({ onNavigate }) {
     setJoinError('');
     setJoinSuccessMsg('');
 
-    if (!joinName.trim() || !joinEmail.trim()) {
+    const emailToUse = (user?.email || joinEmail).trim().toLowerCase();
+
+    if (!joinName.trim() || !emailToUse) {
       setJoinError(isDe ? 'Bitte gib deinen Namen und deine E-Mail an.' : 'Please provide your name and email.');
       return;
     }
 
-    const verifiedStudentEmail = sessionStorage.getItem('tuc_student_email') || '';
-    const isStudentVerified = verifiedStudentEmail && verifiedStudentEmail === joinEmail.trim().toLowerCase();
+    const verifiedStudentEmail = user?.email || sessionStorage.getItem('tuc_student_email') || '';
+    const isStudentVerified = isAuthenticated || (verifiedStudentEmail && verifiedStudentEmail === emailToUse);
 
     if (!isStudentVerified && (!joinOtpCode || joinOtpCode.trim().length !== 6)) {
       setJoinError(isDe 
@@ -266,7 +282,7 @@ export default function SessionsPage({ onNavigate }) {
       setJoinSubmitting(true);
       const payload = {
         participant_name: joinName.trim(),
-        participant_email: joinEmail.trim().toLowerCase(),
+        participant_email: emailToUse,
         participant_phone: joinPhone.trim(),
         avatar_type: joinAvatar,
         notes: joinNotes.trim(),
@@ -275,7 +291,10 @@ export default function SessionsPage({ onNavigate }) {
 
       const res = await safeFetchJson(`/api/game-sessions/${joinModalSession.id}/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}`, 'x-student-token': token } : {})
+        },
         body: JSON.stringify(payload)
       });
 
@@ -1292,54 +1311,66 @@ export default function SessionsPage({ onNavigate }) {
                 <label className="font-bold text-slate-700 block">
                   {isDe ? 'Deine E-Mail-Adresse *' : 'Your Email Address *'}
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    required
-                    value={joinEmail}
-                    onChange={(e) => {
-                      setJoinEmail(e.target.value);
-                      if (joinOtpSent) {
-                        setJoinOtpSent(false);
-                        setJoinOtpCode('');
-                      }
-                    }}
-                    placeholder="name@example.com"
-                    className="flex-1 p-2.5 rounded-xl border border-slate-300 font-mono text-xs focus:border-[#005A36] outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSendJoinOtp}
-                    disabled={joinOtpSending || !joinEmail.includes('@')}
-                    className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] disabled:opacity-50 whitespace-nowrap shadow-xs"
-                  >
-                    {joinOtpSending ? (isDe ? 'Sendet...' : 'Sending...') : (joinOtpSent ? (isDe ? 'Code erneut' : 'Resend') : (isDe ? 'Code anfordern' : 'Send Code'))}
-                  </button>
-                </div>
-
-                {joinOtpError && (
-                  <p className="text-xs text-red-600 font-semibold">{joinOtpError}</p>
-                )}
-                {joinOtpSuccess && (
-                  <p className="text-xs text-emerald-700 font-semibold">{joinOtpSuccess}</p>
-                )}
-
-                {/* OTP Code Input */}
-                {joinOtpSent && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
-                    <label className="block text-xs font-bold text-emerald-950">
-                      {isDe ? '6-stelliger Bestätigungscode aus deiner E-Mail *' : '6-digit Confirmation Code *'}
-                    </label>
-                    <input
-                      type="text"
-                      maxLength="6"
-                      required
-                      value={joinOtpCode}
-                      onChange={(e) => setJoinOtpCode(e.target.value.replace(/\D/g, ''))}
-                      placeholder="123456"
-                      className="w-full p-2.5 rounded-xl border border-emerald-300 bg-white font-mono text-sm tracking-widest text-center font-bold focus:ring-2 focus:ring-[#005A36] outline-none"
-                    />
+                {isAuthenticated ? (
+                  <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                    <span className="font-mono font-bold text-emerald-950">{user?.email || joinEmail}</span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>{isDe ? 'Verifiziert (Zero OTP)' : 'Verified (Zero OTP)'}</span>
+                    </span>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        required
+                        value={joinEmail}
+                        onChange={(e) => {
+                          setJoinEmail(e.target.value);
+                          if (joinOtpSent) {
+                            setJoinOtpSent(false);
+                            setJoinOtpCode('');
+                          }
+                        }}
+                        placeholder="name@example.com"
+                        className="flex-1 p-2.5 rounded-xl border border-slate-300 font-mono text-xs focus:border-[#005A36] outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendJoinOtp}
+                        disabled={joinOtpSending || !joinEmail.includes('@')}
+                        className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] disabled:opacity-50 whitespace-nowrap shadow-xs"
+                      >
+                        {joinOtpSending ? (isDe ? 'Sendet...' : 'Sending...') : (joinOtpSent ? (isDe ? 'Code erneut' : 'Resend') : (isDe ? 'Code anfordern' : 'Send Code'))}
+                      </button>
+                    </div>
+
+                    {joinOtpError && (
+                      <p className="text-xs text-red-600 font-semibold">{joinOtpError}</p>
+                    )}
+                    {joinOtpSuccess && (
+                      <p className="text-xs text-emerald-700 font-semibold">{joinOtpSuccess}</p>
+                    )}
+
+                    {/* OTP Code Input */}
+                    {joinOtpSent && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
+                        <label className="block text-xs font-bold text-emerald-950">
+                          {isDe ? '6-stelliger Bestätigungscode aus deiner E-Mail *' : '6-digit Confirmation Code *'}
+                        </label>
+                        <input
+                          type="text"
+                          maxLength="6"
+                          required
+                          value={joinOtpCode}
+                          onChange={(e) => setJoinOtpCode(e.target.value.replace(/\D/g, ''))}
+                          placeholder="123456"
+                          className="w-full p-2.5 rounded-xl border border-emerald-300 bg-white font-mono text-sm tracking-widest text-center font-bold focus:ring-2 focus:ring-[#005A36] outline-none"
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

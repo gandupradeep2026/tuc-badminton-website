@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Globe, Lock, ShieldCheck, Heart } from 'lucide-react';
+import { Menu, X, Globe, Lock, ShieldCheck, Heart, User, LogIn, LogOut, Sparkles } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import DonationModal from './DonationModal';
 
 export default function SimpleHeader({ activePage, onNavigate }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const isDe = language === 'de';
+  const { user, isAuthenticated, openEntryModal, logout } = useAuth();
 
   const [donationSettings, setDonationSettings] = useState(null);
   const [donationModalOpen, setDonationModalOpen] = useState(false);
@@ -67,9 +69,9 @@ export default function SimpleHeader({ activePage, onNavigate }) {
       {/* Top University Brand Strip with Admin Gate Link & Live Server Badge */}
       <div className="bg-[#005A36] text-white text-[10px] sm:text-[11px] font-medium px-3 sm:px-6 lg:px-8 py-1.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 sm:gap-2 font-mono truncate">
-          <span className="font-bold tracking-wider uppercase text-emerald-300 flex-shrink-0">TU Chemnitz</span>
+          <span className="font-bold tracking-wider uppercase text-emerald-300 flex-shrink-0">🏸 Student Community</span>
           <span className="text-white/40">|</span>
-          <span className="text-white/90 truncate">{t.topbar.usz}</span>
+          <span className="text-white/90 truncate">{isDe ? 'Hochschulsport & Match-Plattform' : 'Student Badminton & Match Hub'}</span>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
@@ -102,14 +104,14 @@ export default function SimpleHeader({ activePage, onNavigate }) {
           className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group select-none min-w-0"
         >
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#005A36] text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-sm group-hover:scale-105 transition-transform flex-shrink-0">
-            TUC
+            BSC
           </div>
           <div className="min-w-0">
             <div className="font-black text-sm sm:text-base text-slate-900 tracking-tight leading-tight truncate">
-              TU Chemnitz <span className="text-[#005A36]">Badminton</span>
+              Badminton <span className="text-[#005A36]">Student Community</span>
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate hidden xs:block">
-              {t.nav.brandSub}
+              {isDe ? 'Campus Badminton & Match Hub' : 'Campus Badminton & Match Hub'}
             </div>
           </div>
         </div>

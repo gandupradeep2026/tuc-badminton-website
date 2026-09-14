@@ -13,6 +13,10 @@ const otpStore = new Map();
 // Value: { email: string, createdAt: number, lastActivity: number }
 const studentSessions = new Map();
 
+// Key: token (string)
+// Value: { email: string, name: string, createdAt: number, expiresAt: number }
+const studentUserSessions = new Map();
+
 const OTP_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_ATTEMPTS = 5;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
@@ -57,6 +61,14 @@ export function isUniversityEmail(email) {
   }
 
   return false;
+}
+
+export function validateEmailForRole(email, role = 'student') {
+  if (!email || typeof email !== 'string' || !email.includes('@')) return false;
+  if (role === 'trainer' || role === 'service') {
+    return true; // Trainers and sports gear service providers can use Gmail or general email
+  }
+  return isUniversityEmail(email); // Students must register with university email
 }
 
 /**
@@ -126,9 +138,15 @@ export function verifyOtp(email, code, scope = 'student_gate') {
   // Code verified! Remove it so it cannot be reused
   otpStore.delete(key);
 
-  // If this was for the student directory gate, generate a 30-minute student session token
-  if (scope === 'student_gate') {
-    const sessionToken = `tuc-student-${crypto.randomBytes(24).toString('hex')}`;
+  // If this was for app entry (one-time registration/login), generate a 30-day session token
+  if (scope === 'app_entry' || scope === 'student_gate') {
+    const sessionToken = `stu-${crypto.randomBytes(32).toString('hex')}`;
+    studentUserSessions.set(sessionToken, {
+      email: cleanEmail,
+      createdAt: now,
+      expiresAt: now + 30 * 24 * 60 * 60 * 1000 // 30 days
+    });
+    // Also keep in legacy studentSessions for backwards compatibility
     studentSessions.set(sessionToken, {
       email: cleanEmail,
       createdAt: now,
@@ -194,6 +212,34 @@ export function verifyEditSession(token, email) {
 
 export function invalidateEditSession(token) {
   if (token) editTokens.delete(token);
+}
+
+// Student User 30-Day App Sessions
+export function createStudentUserSession(email, name = '') {
+  const token = `stu-${crypto.randomBytes(32).toString('hex')}`;
+  const now = Date.now();
+  studentUserSessions.set(token, {
+    email: email.trim().toLowerCase(),
+    name: name ? name.trim() : '',
+    createdAt: now,
+    expiresAt: now + 30 * 24 * 60 * 60 * 1000 // 30 days
+  });
+  return token;
+}
+
+export function verifyStudentUserSession(token) {
+  if (!token || typeof token !== 'string') return null;
+  const session = studentUserSessions.get(token);
+  if (!session) return null;
+  if (Date.now() > session.expiresAt) {
+    studentUserSessions.delete(token);
+    return null;
+  }
+  return session;
+}
+
+export function invalidateStudentUserSession(token) {
+  if (token) studentUserSessions.delete(token);
 }
 
 // Periodic cleanup of expired entries (runs every 10 minutes)

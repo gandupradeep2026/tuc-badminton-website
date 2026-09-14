@@ -96,6 +96,16 @@ import {
   deletePlayerByEmail,
   getPlayerByEmail,
   getAllActivePlayerEmails,
+  createOrUpdateStudentUser,
+  getStudentUserByEmail,
+  createPlayerContactRequest,
+  getContactRequestByToken,
+  acceptContactRequest,
+  getContactRequestsForUser,
+  checkMutualAcceptedContact,
+  createSessionInvitation,
+  respondToSessionInvitation,
+  getSessionInvitations,
   db,
 } from './db.js';
 import { getSystemAndTrafficStats } from './statsService.js';
@@ -111,9 +121,14 @@ import {
   sendGameSessionBroadcastEmail,
   sendPersonalSessionInviteEmail,
   sendProfileDeletedEmail,
+  sendPlayRequestNotificationEmail,
+  sendPlayRequestAcceptedNotificationEmail,
+  sendMatchInvitationEmail,
+  sendInvitationResponseToHostEmail,
 } from './mailer.js';
 import {
   isUniversityEmail,
+  validateEmailForRole,
   createOtp,
   verifyOtp,
   verifyStudentSession,
@@ -121,6 +136,9 @@ import {
   createEditSession,
   verifyEditSession,
   invalidateEditSession,
+  createStudentUserSession,
+  verifyStudentUserSession,
+  invalidateStudentUserSession,
 } from './otp.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -348,6 +366,40 @@ function requireAdmin(req, res, next) {
   return res.status(401).json({ error: 'Unauthorized: Gültige Admin-Sitzung erforderlich.' });
 }
 
+// -------------------------------------------------------------
+// Student Auth & Session Middleware
+// -------------------------------------------------------------
+function getAuthenticatedStudentUser(req) {
+  const authHeader = req.headers.authorization;
+  let token = req.headers['x-student-token'];
+  if (!token && authHeader) {
+    if (authHeader.startsWith('Bearer ')) token = authHeader.substring(7);
+    else if (authHeader.startsWith('Student ')) token = authHeader.substring(8);
+  }
+  if (!token) return null;
+
+  const session = verifyStudentUserSession(token) || verifyStudentSession(token);
+  if (!session || !session.email) return null;
+
+  const user = getStudentUserByEmail(session.email) || {
+    email: session.email,
+    name: session.name || 'Student',
+    university: 'TU Chemnitz'
+  };
+
+  return { session, user, email: session.email };
+}
+
+function requireStudentUser(req, res, next) {
+  const auth = getAuthenticatedStudentUser(req);
+  if (!auth) {
+    return res.status(401).json({ error: 'Bitte melde dich mit deiner Universitäts-E-Mail-Adresse an.' });
+  }
+  req.studentUser = auth.user;
+  req.studentEmail = auth.email;
+  next();
+}
+
 function requireStudentOrAdmin(req, res, next) {
   const authHeader = req.headers.authorization;
   const adminTokenHeader = req.headers['x-admin-token'];
@@ -356,22 +408,16 @@ function requireStudentOrAdmin(req, res, next) {
     adminToken = authHeader.substring(7);
   }
   if (isValidSession(adminToken)) {
+    req.isAdmin = true;
     return next();
   }
 
-  const studentToken = req.headers['x-student-token'] || (authHeader && authHeader.startsWith('Student ') ? authHeader.substring(8) : null);
-  if (studentToken) {
-    const session = verifyStudentSession(studentToken);
-    if (session) {
-      req.studentSession = session;
-      return next();
-    }
+  const auth = getAuthenticatedStudentUser(req);
+  if (auth) {
+    req.studentUser = auth.user;
+    req.studentEmail = auth.email;
   }
-
-  return res.status(401).json({
-    locked: true,
-    error: 'Studenten-Verifikation erforderlich. Bitte bestätige deine Universitäts-E-Mail-Adresse, um das Spieler-Verzeichnis freizuschalten.'
-  });
+  next();
 }
 
 // -------------------------------------------------------------
@@ -749,6 +795,352 @@ app.post('/api/auth/student-logout', (req, res) => {
   res.json({ success: true, message: 'Erfolgreich abgemeldet.' });
 });
 
+// -------------------------------------------------------------
+// Badminton Student Community: One-Time Entry Auth Endpoints
+// -------------------------------------------------------------
+
+// Register or Request One-Time Entry Code
+app.post('/api/auth/register-entry', async (req, res) => {
+  try {
+    const { email, name, university, role } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Bitte gib eine gültige E-Mail-Adresse ein.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = role === 'trainer' || role === 'service' ? role : 'student';
+
+    if (!validateEmailForRole(cleanEmail, cleanRole)) {
+      if (cleanRole === 'student') {
+        return res.status(400).json({
+          error: 'Studierende müssen sich mit ihrer Universitäts-E-Mail-Adresse registrieren (z.B. @tu-chemnitz.de, @mytuc.org, @*.ac.*, @*.edu).'
+        });
+      } else {
+        return res.status(400).json({
+          error: 'Bitte gib eine gültige E-Mail-Adresse ein (z.B. Gmail).'
+        });
+      }
+    }
+
+    const studentUser = createOrUpdateStudentUser({
+      email: cleanEmail,
+      name: name ? name.trim() : (cleanRole === 'trainer' ? 'Trainer' : (cleanRole === 'service' ? 'Service Partner' : 'Student')),
+      university: university ? university.trim() : 'TU Chemnitz',
+      role: cleanRole
+    });
+
+    const otpRes = createOtp(cleanEmail, 'app_entry');
+    if (otpRes.error) {
+      return res.status(otpRes.status || 400).json({ error: otpRes.error });
+    }
+
+    await sendOtpVerificationEmail({
+      to: cleanEmail,
+      code: otpRes.code,
+      scope: 'app_entry',
+      expiresMinutes: otpRes.expiresMinutes
+    });
+
+    res.json({
+      success: true,
+      message: `Bestätigungscode wurde an ${cleanEmail} gesendet!`
+    });
+  } catch (err) {
+    console.error('Error in register-entry:', err);
+    res.status(500).json({ error: 'Fehler beim Senden des Bestätigungscodes.' });
+  }
+});
+
+// Verify Entry Code & Issue 30-Day Student Session Token
+app.post('/api/auth/verify-entry', (req, res) => {
+  try {
+    const { email, code, name, university, role } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'E-Mail und 6-stelliger Code sind erforderlich.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = role === 'trainer' || role === 'service' ? role : 'student';
+    const result = verifyOtp(cleanEmail, code, 'app_entry');
+    if (result.error) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    const studentUser = createOrUpdateStudentUser({
+      email: cleanEmail,
+      name: name ? name.trim() : undefined,
+      university: university ? university.trim() : undefined,
+      role: cleanRole
+    });
+
+    const sessionToken = result.sessionToken || createStudentUserSession(cleanEmail, studentUser.name);
+    const player = getPlayerByEmail(cleanEmail);
+
+    res.json({
+      success: true,
+      verified: true,
+      token: sessionToken,
+      user: studentUser,
+      playerProfile: player || null
+    });
+  } catch (err) {
+    console.error('Error verifying app entry:', err);
+    res.status(500).json({ error: 'Fehler bei der Verifikation.' });
+  }
+});
+
+// Current Authenticated User Status
+app.get('/api/auth/me', (req, res) => {
+  const auth = getAuthenticatedStudentUser(req);
+  if (!auth) {
+    return res.json({ authenticated: false });
+  }
+
+  const player = getPlayerByEmail(auth.email);
+  res.json({
+    authenticated: true,
+    user: auth.user,
+    playerProfile: player || null
+  });
+});
+
+// Logout
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.headers['x-student-token'] || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.substring(7) : null);
+  if (token) {
+    invalidateStudentUserSession(token);
+    invalidateStudentSession(token);
+  }
+  res.json({ success: true, message: 'Erfolgreich abgemeldet.' });
+});
+
+// -------------------------------------------------------------
+// Streamlined Player Profile (Zero OTP - Authenticated Student)
+// -------------------------------------------------------------
+app.post('/api/players/profile', requireStudentUser, upload.single('photo'), (req, res) => {
+  try {
+    const email = req.studentEmail;
+    const {
+      name,
+      university,
+      skill_level,
+      preferred_category,
+      specialization,
+      phone,
+      avatar_type,
+      favorite_player,
+      photo_url_input
+    } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name ist erforderlich.' });
+    }
+
+    let photo_url = photo_url_input !== undefined ? photo_url_input.trim() : (req.body.photo_url || '');
+    if (req.file) {
+      photo_url = `/uploads/${req.file.filename}`;
+    }
+
+    const category = preferred_category || specialization || 'Doppel';
+    const uniName = university ? university.trim() : (req.studentUser?.university || 'TU Chemnitz');
+
+    const existingPlayer = getPlayerByEmail(email);
+    let player;
+    if (existingPlayer) {
+      player = updatePlayer(existingPlayer.id, {
+        name: name.trim(),
+        gender: req.body.gender === 'women' ? 'women' : (req.body.gender === 'men' ? 'men' : existingPlayer.gender),
+        university_name: uniName,
+        skill_level: skill_level ? skill_level.trim() : existingPlayer.skill_level,
+        specialization: category,
+        phone: phone !== undefined ? phone.trim() : existingPlayer.phone,
+        avatar_type: avatar_type || existingPlayer.avatar_type || 'badminton_smash',
+        favorite_player: favorite_player !== undefined ? favorite_player.trim() : existingPlayer.favorite_player,
+        photo_url: photo_url || existingPlayer.photo_url,
+      });
+    } else {
+      player = createPlayer({
+        name: name.trim(),
+        gender: req.body.gender === 'women' ? 'women' : 'men',
+        study_program: req.body.study_program ? req.body.study_program.trim() : 'Student',
+        specialization: category,
+        team: 'Badminton Student Community',
+        email,
+        phone: phone ? phone.trim() : '',
+        show_phone: 0, // Privacy shielded by default
+        favorite_player: favorite_player ? favorite_player.trim() : '',
+        skill_level: skill_level ? skill_level.trim() : 'Fortgeschritten',
+        university_type: uniName === 'TU Chemnitz' ? 'tu_chemnitz' : 'other',
+        university_name: uniName,
+        photo_url,
+        avatar_type: avatar_type || 'badminton_smash'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Dein Spielerprofil wurde erfolgreich gespeichert!',
+      player
+    });
+  } catch (err) {
+    console.error('Error saving player profile:', err);
+    res.status(500).json({ error: err.message || 'Fehler beim Speichern des Profils.' });
+  }
+});
+
+// -------------------------------------------------------------
+// Play Contact Requests (Strict Privacy Shielding: Request & Reply)
+// -------------------------------------------------------------
+app.post('/api/players/:id/contact-request', requireStudentUser, async (req, res) => {
+  try {
+    const targetPlayerId = parseInt(req.params.id, 10);
+    const targetPlayer = getPlayerById(targetPlayerId);
+    if (!targetPlayer) {
+      return res.status(404).json({ error: 'Spieler nicht gefunden.' });
+    }
+
+    const { message, phone } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Bitte gib eine kurze Nachricht für den Spieler ein.' });
+    }
+
+    if (targetPlayer.email.toLowerCase() === req.studentEmail.toLowerCase()) {
+      return res.status(400).json({ error: 'Du kannst dir nicht selbst eine Anfrage senden.' });
+    }
+
+    const requestRecord = createPlayerContactRequest({
+      from_name: req.studentUser.name || 'Badminton-Spieler',
+      from_email: req.studentEmail,
+      from_phone: phone ? phone.trim() : null,
+      to_player_id: targetPlayer.id,
+      to_name: targetPlayer.name,
+      to_email: targetPlayer.email,
+      message: message.trim()
+    });
+
+    // Send email notification to target player
+    sendPlayRequestNotificationEmail({
+      toEmail: targetPlayer.email,
+      toName: targetPlayer.name,
+      fromName: req.studentUser.name || 'Badminton-Spieler',
+      fromEmail: req.studentEmail,
+      fromPhone: phone ? phone.trim() : null,
+      message: message.trim(),
+      acceptToken: requestRecord.accept_token
+    }).catch(e => console.error('Error sending request notification email:', e));
+
+    res.json({
+      success: true,
+      message: `Deine Anfrage wurde erfolgreich an ${targetPlayer.name} gesendet! Sobald die Anfrage angenommen wird, erhaltet ihr gegenseitig eure Kontaktdaten.`
+    });
+  } catch (err) {
+    console.error('Error sending contact request:', err);
+    res.status(500).json({ error: 'Fehler beim Senden der Anfrage.' });
+  }
+});
+
+// Accept request via 1-click email token
+app.get('/api/players/requests/accept/:token', (req, res) => {
+  try {
+    const token = req.params.token;
+    const request = getContactRequestByToken(token);
+    if (!request) {
+      return res.status(404).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+          <h2>Anfrage nicht gefunden oder abgelaufen</h2>
+          <p><a href="https://130-61-242-26.sslip.io">Zurück zur Badminton Student Community</a></p>
+        </div>
+      `);
+    }
+
+    const accepted = acceptContactRequest(token, 'Anfrage per E-Mail-Bestätigung angenommen');
+
+    // Notify the requester that request was accepted
+    sendPlayRequestAcceptedNotificationEmail({
+      toEmail: request.from_email,
+      toName: request.from_name,
+      accepterName: request.to_name,
+      accepterEmail: request.to_email,
+      accepterPhone: null,
+      replyMessage: 'Die Spielanfrage wurde über den E-Mail-Link angenommen!'
+    }).catch(e => console.error('Error sending accept notification email:', e));
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="de">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Spielanfrage angenommen | Badminton Student Community</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+          .card { background: white; border-radius: 24px; max-width: 480px; width: 100%; padding: 36px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+          .badge { display: inline-block; padding: 6px 14px; background: #dcfce7; color: #166534; font-weight: 700; border-radius: 99px; font-size: 13px; margin-bottom: 16px; }
+          h1 { color: #005A36; font-size: 24px; margin: 0 0 12px 0; }
+          p { color: #475569; font-size: 15px; line-height: 1.6; }
+          .btn { display: inline-block; background: #005A36; color: white; text-decoration: none; padding: 12px 28px; border-radius: 14px; font-weight: 700; margin-top: 24px; transition: background 0.2s; }
+          .btn:hover { background: #00472A; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">✅ Erfolgreich verbunden!</div>
+          <h1>Spielanfrage angenommen</h1>
+          <p>Du hast die Spielanfrage von <strong>${request.from_name}</strong> erfolgreich bestätigt.</p>
+          <p>Eure Kontaktdaten wurden für die Spielabsprache freigegeben. ${request.from_name} wurde soeben per E-Mail benachrichtigt.</p>
+          <a href="https://130-61-242-26.sslip.io/#players" class="btn">🏸 Zurück zur Badminton Community</a>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Error accepting contact request:', err);
+    res.status(500).send('Fehler beim Bestätigen der Anfrage.');
+  }
+});
+
+// Reply to request in-app
+app.post('/api/players/requests/:id/reply', requireStudentUser, (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { reply_message } = req.body;
+    const requests = getContactRequestsForUser(req.studentEmail);
+    const reqItem = requests.incoming.find(r => r.id === id);
+    if (!reqItem) {
+      return res.status(404).json({ error: 'Anfrage nicht gefunden.' });
+    }
+
+    const accepted = acceptContactRequest(reqItem.accept_token, reply_message);
+
+    sendPlayRequestAcceptedNotificationEmail({
+      toEmail: reqItem.from_email,
+      toName: reqItem.from_name,
+      accepterName: reqItem.to_name,
+      accepterEmail: reqItem.to_email,
+      accepterPhone: req.studentUser.phone || null,
+      replyMessage: reply_message || 'Ich freue mich auf das Spiel!'
+    }).catch(e => console.error('Error sending reply notification email:', e));
+
+    res.json({
+      success: true,
+      message: 'Anfrage angenommen! Kontaktdaten wurden für die Absprache freigegeben.'
+    });
+  } catch (err) {
+    console.error('Error in request reply:', err);
+    res.status(500).json({ error: 'Fehler beim Antworten.' });
+  }
+});
+
+// Get My Requests (Incoming & Outgoing)
+app.get('/api/players/my-requests', requireStudentUser, (req, res) => {
+  try {
+    const data = getContactRequestsForUser(req.studentEmail);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Abrufen der Anfragen.' });
+  }
+});
+
 // 5. Player Self-Deletion via OTP
 app.post('/api/players/self-delete', async (req, res) => {
   try {
@@ -912,7 +1304,8 @@ app.get('/api/players', requireStudentOrAdmin, (req, res) => {
   try {
     const { gender } = req.query;
     const players = getAllPlayers(gender);
-    const publicPlayers = players.map(sanitizePublicPlayer);
+    const viewerEmail = req.studentEmail || null;
+    const publicPlayers = players.map(p => sanitizePublicPlayer(p, viewerEmail));
     res.json(publicPlayers);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve players list' });
@@ -2381,16 +2774,25 @@ app.post('/api/game-sessions', async (req, res) => {
       console.error('Error getting player emails for broadcast:', bErr);
     }
 
-    // Specific player invitations if requested
+    // Specific player invitations with 1-click Accept / Reject
     if (Array.isArray(req.body.invited_player_ids) && req.body.invited_player_ids.length > 0) {
       for (const pid of req.body.invited_player_ids) {
         try {
           const targetPlayer = getPlayerById(parseInt(pid, 10));
           if (targetPlayer && targetPlayer.email) {
-            sendPersonalSessionInviteEmail({
-              to: targetPlayer.email,
+            const inv = createSessionInvitation({
+              session_id: session.id,
+              inviter_name: session.host_name,
+              inviter_email: session.host_email,
+              invitee_name: targetPlayer.name,
+              invitee_email: targetPlayer.email
+            });
+            sendMatchInvitationEmail({
+              inviteeEmail: targetPlayer.email,
+              inviteeName: targetPlayer.name,
               hostName: session.host_name,
-              session
+              session,
+              token: inv.token
             }).catch(e => console.error(`Failed to send invite to player #${pid}:`, e));
           }
         } catch (invErr) {
@@ -2440,10 +2842,9 @@ app.post('/api/game-sessions/:id/join', async (req, res) => {
       return res.status(400).json({ error: 'Gültige E-Mail-Adresse erforderlich für die Teilnahmebestätigung.' });
     }
 
-    // Verify email with OTP unless user has active student token matching this email
-    const studentToken = req.headers['x-student-token'];
-    const currentStudent = studentToken ? verifyStudentSession(studentToken) : null;
-    const isAlreadyVerifiedStudent = currentStudent && currentStudent.email === participant_email.trim().toLowerCase();
+    // Verify email with OTP unless user has active student session
+    const studentAuth = getAuthenticatedStudentUser(req);
+    const isAlreadyVerifiedStudent = studentAuth && (!participant_email || studentAuth.email === participant_email.trim().toLowerCase());
 
     if (!isAlreadyVerifiedStudent) {
       if (!otp_code) {
@@ -2526,6 +2927,252 @@ app.post('/api/game-sessions/:id/manage', (req, res) => {
   } catch (err) {
     console.error('Error managing game session:', err);
     res.status(500).json({ error: 'Fehler bei der Verwaltung der Spielrunde.' });
+  }
+});
+
+// 4a. Invite Players to a Game Session
+app.post('/api/game-sessions/:id/invite', requireStudentUser, async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const session = getGameSessionById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Spielrunde nicht gefunden.' });
+    }
+
+    const { invitees } = req.body;
+    if (!Array.isArray(invitees) || invitees.length === 0) {
+      return res.status(400).json({ error: 'Bitte wähle mindestens einen Spieler zum Einladen aus.' });
+    }
+
+    const results = [];
+    for (const inv of invitees) {
+      let inviteeName = inv.name;
+      let inviteeEmail = inv.email;
+
+      if (!inviteeEmail && inv.id) {
+        const p = getPlayerById(inv.id);
+        if (p) {
+          inviteeName = p.name;
+          inviteeEmail = p.email;
+        }
+      }
+
+      if (inviteeEmail && inviteeEmail.includes('@')) {
+        const invRecord = createSessionInvitation({
+          session_id: sessionId,
+          inviter_name: req.studentUser.name || session.host_name,
+          inviter_email: req.studentEmail,
+          invitee_name: inviteeName || 'Badminton-Spieler',
+          invitee_email: inviteeEmail
+        });
+
+        sendMatchInvitationEmail({
+          inviteeEmail,
+          inviteeName: inviteeName || 'Badminton-Spieler',
+          inviterName: req.studentUser.name || session.host_name,
+          session,
+          token: invRecord.token
+        }).catch(e => console.error('Failed to send match invite email:', e));
+
+        results.push(invRecord);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${results.length} Einladung(en) erfolgreich per E-Mail versendet!`,
+      invitations: results
+    });
+  } catch (err) {
+    console.error('Error inviting players:', err);
+    res.status(500).json({ error: 'Fehler beim Versenden der Einladungen.' });
+  }
+});
+
+// 4b. 1-Click Respond to Match Invitation (Accept / Reject from Email)
+app.get('/api/game-sessions/invitations/respond/:token', (req, res) => {
+  try {
+    const token = req.params.token;
+    const action = req.query.action === 'reject' ? 'reject' : 'accept';
+
+    const result = respondToSessionInvitation(token, action);
+    if (result.error) {
+      return res.status(result.status || 400).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+          <h2>Einladung ungültig oder abgelaufen</h2>
+          <p><a href="https://130-61-242-26.sslip.io/#sessions">Zurück zu den Spielrunden</a></p>
+        </div>
+      `);
+    }
+
+    const { invitation, session } = result;
+
+    if (session && session.host_email) {
+      sendInvitationResponseToHostEmail({
+        hostEmail: session.host_email,
+        hostName: session.host_name,
+        inviteeName: invitation.invitee_name,
+        session,
+        action
+      }).catch(e => console.error('Error sending response to host:', e));
+    }
+
+    const isAccept = action === 'accept';
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="de">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Einladung ${isAccept ? 'Angenommen' : 'Abgelehnt'} | Badminton Student Community</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+          .card { background: white; border-radius: 24px; max-width: 480px; width: 100%; padding: 36px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+          .badge { display: inline-block; padding: 6px 14px; background: ${isAccept ? '#dcfce7' : '#fee2e2'}; color: ${isAccept ? '#166534' : '#991b1b'}; font-weight: 700; border-radius: 99px; font-size: 13px; margin-bottom: 16px; }
+          h1 { color: #005A36; font-size: 22px; margin: 0 0 12px 0; }
+          p { color: #475569; font-size: 14px; line-height: 1.6; }
+          .btn { display: inline-block; background: #005A36; color: white; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; margin-top: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge">${isAccept ? '✅ Erfolgreich eingetragen!' : 'ℹ️ Einladung abgelehnt'}</div>
+          <h1>${isAccept ? 'Du bist dabei!' : 'Einladung abgelehnt'}</h1>
+          <p>
+            ${isAccept 
+              ? `Du hast die Einladung zu <strong>${session ? session.title : 'der Spielrunde'}</strong> angenommen und wurdest als Mitspieler eingetragen.` 
+              : `Du hast die Einladung zu <strong>${session ? session.title : 'der Spielrunde'}</strong> abgelehnt.`}
+          </p>
+          <a href="https://130-61-242-26.sslip.io/#sessions" class="btn">🏸 Zu den Spielrunden</a>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('Error responding to invitation:', err);
+    res.status(500).send('Fehler bei der Antwort.');
+  }
+});
+
+// 4c. Get Invitations for a Session
+app.get('/api/game-sessions/:id/invitations', (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const invitations = getSessionInvitations(sessionId);
+    res.json(invitations);
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Laden der Einladungen.' });
+  }
+});
+
+// -------------------------------------------------------------
+// Unified Community Directory (Students, Trainers, Gear Providers)
+// -------------------------------------------------------------
+app.get('/api/community/members', requireStudentOrAdmin, (req, res) => {
+  try {
+    const { role, skill_level, category, gender, university, sort } = req.query;
+    const viewerEmail = req.studentEmail || null;
+
+    let members = [];
+
+    // 1. Players / Students
+    if (!role || role === 'all' || role === 'student') {
+      const players = getAllPlayers();
+      for (const p of players) {
+        const sanitized = sanitizePublicPlayer(p, viewerEmail);
+        members.push({
+          ...sanitized,
+          member_type: 'student',
+          role_label: 'Student / Spieler',
+          university: p.university_name || 'TU Chemnitz'
+        });
+      }
+    }
+
+    // 2. Trainers
+    if (!role || role === 'all' || role === 'trainer') {
+      const trainers = getAllTrainers();
+      for (const tr of trainers) {
+        members.push({
+          id: tr.id,
+          name: tr.name,
+          gender: tr.gender || 'any',
+          member_type: 'trainer',
+          role_label: tr.role || 'Trainer / Coach',
+          skill_level: 'Vereinsspieler / Profi',
+          preferred_category: tr.focus_areas || 'Technik & Taktik',
+          specialization: tr.focus_areas || 'Coaching',
+          university: 'TU Chemnitz & USZ',
+          photo_url: tr.photo_url || '',
+          avatar_type: 'badminton_defense',
+          experience_years: tr.experience_years || '',
+          hourly_rate: tr.hourly_rate || '',
+          has_contact_unlocked: !!viewerEmail,
+          email: tr.email,
+          phone: tr.show_phone ? tr.phone : undefined
+        });
+      }
+    }
+
+    // 3. Sports Gear Service Providers
+    if (!role || role === 'all' || role === 'service') {
+      const services = getAllEquipmentServices();
+      for (const s of services) {
+        members.push({
+          id: s.id,
+          name: s.name,
+          gender: 'any',
+          member_type: 'service',
+          role_label: s.service_type || 'Besaitungsservice',
+          skill_level: 'Experte',
+          preferred_category: 'Ausrüstung & Service',
+          specialization: s.service_type || 'Besaitung',
+          university: s.location_note || 'Chemnitz Campus',
+          photo_url: s.photo_url || '',
+          avatar_type: 'badminton_net_kill',
+          pricing_details: s.pricing_details || '',
+          has_contact_unlocked: !!viewerEmail,
+          email: s.email,
+          phone: s.show_phone ? s.phone : undefined
+        });
+      }
+    }
+
+    // Filter by skill level
+    if (skill_level && skill_level !== 'all') {
+      members = members.filter(m => m.skill_level && m.skill_level.toLowerCase().includes(skill_level.toLowerCase()));
+    }
+
+    // Filter by category
+    if (category && category !== 'all') {
+      members = members.filter(m => 
+        (m.preferred_category && m.preferred_category.toLowerCase().includes(category.toLowerCase())) ||
+        (m.specialization && m.specialization.toLowerCase().includes(category.toLowerCase()))
+      );
+    }
+
+    // Filter by gender
+    if (gender && gender !== 'all') {
+      members = members.filter(m => m.gender === gender || m.gender === 'any');
+    }
+
+    // Filter by university
+    if (university && university !== 'all') {
+      members = members.filter(m => m.university && m.university.toLowerCase().includes(university.toLowerCase()));
+    }
+
+    // Sort
+    if (sort === 'name') {
+      members.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      members.sort((a, b) => b.id - a.id);
+    }
+
+    res.json(members);
+  } catch (err) {
+    console.error('Error fetching community members:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Mitgliederliste.' });
   }
 });
 

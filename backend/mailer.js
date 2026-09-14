@@ -602,11 +602,17 @@ export async function sendParticipantConfirmationEmail({ participantEmail, parti
  */
 export async function sendOtpVerificationEmail({ to, code, scope = 'student_gate', expiresMinutes = 15 }) {
   const scopeDescriptions = {
+    app_entry: {
+      titleDe: '🎓 Badminton Student Community Login / Registrierung',
+      titleEn: '🎓 Badminton Student Community Login / Sign Up',
+      descDe: 'Verwende diesen Bestätigungscode, um dich einmalig bei der Badminton Student Community anzumelden und dein Profil freizuschalten.',
+      descEn: 'Use this verification code for your one-time sign in to Badminton Student Community and unlock all features.'
+    },
     student_gate: {
       titleDe: '🎓 Freischaltung des Spielerverzeichnisses',
       titleEn: '🎓 Student Directory Access Verification',
-      descDe: 'Verwende diesen Bestätigungscode, um das Spielerverzeichnis der TU Chemnitz freizuschalten. Nach 30 Minuten Inaktivität sperrt sich das Verzeichnis automatisch wieder.',
-      descEn: 'Use this verification code to unlock the student player directory. The directory will automatically lock after 30 minutes of inactivity.'
+      descDe: 'Verwende diesen Bestätigungscode, um das Spielerverzeichnis freizuschalten.',
+      descEn: 'Use this verification code to unlock the student player directory.'
     },
     register_player: {
       titleDe: '🏸 Spieler-Registrierung bestätigen',
@@ -880,6 +886,300 @@ export async function sendProfileDeletedEmail({ to, playerName }) {
     return { success: true };
   } catch (err) {
     console.error('[MAILER] Error sending profile deleted email:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Play Request Notification Email (Discreet contact inquiry)
+ */
+export async function sendPlayRequestNotificationEmail({
+  toEmail,
+  toName,
+  fromName,
+  fromEmail,
+  fromPhone,
+  message,
+  acceptToken
+}) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  console.log('\n=============================================================');
+  console.log('🏸 [SPIELANFRAGE EMPFANGEN]');
+  console.log(`An Spieler: ${toName} <${toEmail}>`);
+  console.log(`Von       : ${fromName} <${fromEmail}>`);
+  console.log(`Nachricht : ${message}`);
+  console.log('=============================================================\n');
+
+  if (!user || !pass) return { success: true, method: 'console_only' };
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    const acceptUrl = `https://130-61-242-26.sslip.io/api/players/requests/accept/${acceptToken}`;
+
+    await transporter.sendMail({
+      from: `"Badminton Student Community" <${user}>`,
+      to: toEmail,
+      subject: `🏸 Neue Spielanfrage von ${fromName}!`,
+      text: `Hallo ${toName},\n\n${fromName} hat dir eine Spielanfrage über die Badminton Student Community gesendet!\n\nNachricht von ${fromName}:\n"${message}"\n\n🔒 Deine Kontaktdaten bleiben geschützt, bis du die Anfrage annimmst.\n\nKlicke auf diesen Link, um die Anfrage anzunehmen und eure Kontaktdaten für die Spielabstimmung freizugeben:\n${acceptUrl}\n\nSportliche Grüße,\nBadminton Student Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 20px; font-weight: 900;">🏸 Neue Badminton-Spielanfrage!</h2>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">Hallo <strong>${toName}</strong>,</p>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+            <strong>${fromName}</strong> möchte gerne mit dir Badminton spielen und hat dir folgende Nachricht hinterlassen:
+          </p>
+
+          <div style="background-color: #f8fafc; border-left: 4px solid #005A36; padding: 16px; border-radius: 10px; margin: 20px 0;">
+            <p style="margin: 0; color: #1e293b; font-size: 14px; font-style: italic;">
+              "${message}"
+            </p>
+          </div>
+
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px; border-radius: 12px; margin: 20px 0;">
+            <p style="margin: 0; color: #166534; font-size: 12px; line-height: 1.5;">
+              🔒 <strong>Datenschutz-Garantie:</strong> Deine Kontaktdaten (Telefon & E-Mail) sind aktuell geschützt. Sie werden für ${fromName} erst sichtbar, wenn du diese Anfrage annimmst.
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="${acceptUrl}" style="background-color: #005A36; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 14px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(0,90,54,0.25);">
+              ✅ Spielanfrage annehmen & Kontaktdaten teilen
+            </a>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+            Badminton Student Community • Wenn du nicht antworten möchtest, kannst du diese E-Mail einfach ignorieren.
+          </p>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('[MAILER] Error sending play request email:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Play Request Accepted Notification Email
+ */
+export async function sendPlayRequestAcceptedNotificationEmail({
+  toEmail,
+  toName,
+  accepterName,
+  accepterEmail,
+  accepterPhone,
+  replyMessage
+}) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) return { success: true, method: 'console_only' };
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    await transporter.sendMail({
+      from: `"Badminton Student Community" <${user}>`,
+      replyTo: accepterEmail,
+      to: toEmail,
+      subject: `🎉 ${accepterName} hat deine Spielanfrage angenommen!`,
+      text: `Hallo ${toName},\n\ngroßartige Neuigkeiten! ${accepterName} hat deine Badminton-Spielanfrage angenommen.\n\nKontaktdaten von ${accepterName}:\n- E-Mail: ${accepterEmail}\n${accepterPhone ? `- Telefon / WhatsApp: ${accepterPhone}\n` : ''}${replyMessage ? `\nNachricht:\n"${replyMessage}"\n` : ''}\nIhr könnt euch nun direkt absprechen!\n\nSportliche Grüße,\nBadminton Student Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 20px; font-weight: 900;">🎉 Spielanfrage angenommen!</h2>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">Hallo <strong>${toName}</strong>,</p>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+            <strong>${accepterName}</strong> hat deine Spielanfrage angenommen! Ihr könnt euch nun direkt für ein Spiel verabreden.
+          </p>
+
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 18px; border-radius: 14px; margin: 20px 0;">
+            <h4 style="margin: 0 0 10px 0; color: #166534; font-size: 15px;">Kontaktdaten von ${accepterName}:</h4>
+            <p style="margin: 6px 0; font-size: 14px; color: #15803d;">✉️ <strong>E-Mail:</strong> <a href="mailto:${accepterEmail}" style="color: #005A36; font-weight: 700;">${accepterEmail}</a></p>
+            ${accepterPhone ? `<p style="margin: 6px 0; font-size: 14px; color: #15803d;">📱 <strong>Telefon / WhatsApp:</strong> <a href="https://wa.me/${accepterPhone.replace(/[^0-9]/g, '')}" style="color: #005A36; font-weight: 700;">${accepterPhone}</a></p>` : ''}
+          </div>
+
+          ${replyMessage ? `
+          <div style="background-color: #f8fafc; border-left: 4px solid #005A36; padding: 14px; border-radius: 8px; margin: 16px 0;">
+            <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Antwort von ${accepterName}:</span>
+            <p style="margin: 4px 0 0 0; color: #334155; font-size: 13px; font-style: italic;">"${replyMessage}"</p>
+          </div>` : ''}
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="mailto:${accepterEmail}?subject=Badminton%20Spiel" style="background-color: #005A36; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block;">
+              ✉️ ${accepterName} per E-Mail schreiben
+            </a>
+          </div>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('[MAILER] Error sending accepted request notification:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Send Match Invitation Email to a Player (Accept / Reject 1-Click)
+ */
+export async function sendMatchInvitationEmail({
+  inviteeEmail,
+  inviteeName,
+  inviterName,
+  session,
+  token
+}) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  console.log('\n=============================================================');
+  console.log('💌 [MATCH-EINLADUNG]');
+  console.log(`Eingeladener Spieler : ${inviteeName} <${inviteeEmail}>`);
+  console.log(`Gastgeber (Host)     : ${inviterName}`);
+  console.log(`Spielrunde           : ${session.title} (${session.session_date})`);
+  console.log('=============================================================\n');
+
+  if (!user || !pass) return { success: true, method: 'console_only' };
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    const acceptUrl = `https://130-61-242-26.sslip.io/api/game-sessions/invitations/respond/${token}?action=accept`;
+    const rejectUrl = `https://130-61-242-26.sslip.io/api/game-sessions/invitations/respond/${token}?action=reject`;
+
+    await transporter.sendMail({
+      from: `"Badminton Student Community" <${user}>`,
+      to: inviteeEmail,
+      subject: `🏸 Match-Einladung: ${inviterName} lädt dich zu "${session.title}" ein!`,
+      text: `Hallo ${inviteeName},\n\n${inviterName} hat dich zu einer Badminton-Spielrunde eingeladen!\n\nDetails:\n- Titel: ${session.title}\n- Ort: ${session.location_name}\n- Datum: ${session.session_date} ab ${session.start_time} Uhr\n\nTeilnahme annehmen:\n${acceptUrl}\n\nAblehnen:\n${rejectUrl}\n\nSportliche Grüße,\nBadminton Student Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 20px; font-weight: 900;">🏸 Du bist eingeladen!</h2>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">Hallo <strong>${inviteeName}</strong>,</p>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+            <strong>${inviterName}</strong> hat eine Spielrunde organisiert und lädt dich persönlich zum Mitspielen ein:
+          </p>
+
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 18px; margin: 20px 0;">
+            <h3 style="margin: 0 0 10px 0; color: #166534; font-size: 16px;">${session.title}</h3>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📍 <strong>Ort:</strong> ${session.location_name}</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📅 <strong>Termin:</strong> ${session.session_date} • ${session.start_time} Uhr</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">🏸 <strong>Format:</strong> ${session.game_format || 'Doppel'}</p>
+          </div>
+
+          <div style="display: flex; gap: 12px; justify-content: center; margin: 28px 0;">
+            <a href="${acceptUrl}" style="background-color: #005A36; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; font-size: 14px; display: inline-block;">
+              ✅ Einladung annehmen
+            </a>
+            <a href="${rejectUrl}" style="background-color: #f1f5f9; color: #64748b; text-decoration: none; padding: 14px 20px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block; border: 1px solid #cbd5e1;">
+              ❌ Ablehnen
+            </a>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+            Badminton Student Community • 1-Klick Antwort ohne Passwort
+          </p>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('[MAILER] Error sending match invite email:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Notify Host when an invited player accepts or rejects
+ */
+export async function sendInvitationResponseToHostEmail({
+  hostEmail,
+  hostName,
+  inviteeName,
+  session,
+  action
+}) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) return { success: true, method: 'console_only' };
+
+  const isAccept = action === 'accepted' || action === 'accept';
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    await transporter.sendMail({
+      from: `"Badminton Student Community" <${user}>`,
+      to: hostEmail,
+      subject: `${isAccept ? '✅' : '❌'} ${inviteeName} hat deine Match-Einladung ${isAccept ? 'angenommen' : 'abgelehnt'}!`,
+      text: `Hallo ${hostName},\n\n${inviteeName} hat deine Einladung zu "${session.title}" (${session.session_date}) ${isAccept ? 'angenommen und ist als Mitspieler eingetragen!' : 'leider abgelehnt.'}\n\nSportliche Grüße,\nBadminton Student Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 18px; font-weight: 900;">
+            ${isAccept ? '🎉 Einladung angenommen!' : 'ℹ️ Einladung abgelehnt'}
+          </h2>
+          <p style="color: #334155; font-size: 14px;">Hallo <strong>${hostName}</strong>,</p>
+          <p style="color: #334155; font-size: 14px;">
+            <strong>${inviteeName}</strong> hat deine Einladung für die Spielrunde <strong>"${session.title}"</strong> am <strong>${session.session_date}</strong> ${isAccept ? 'angenommen!' : 'abgelehnt.'}
+          </p>
+          ${isAccept ? `
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 14px; border-radius: 12px; margin: 16px 0;">
+            <p style="margin: 0; color: #166534; font-weight: 700; font-size: 13px;">
+              ✅ ${inviteeName} wurde automatisch als Mitspieler zur Spielrunde hinzugefügt.
+            </p>
+          </div>` : ''}
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="https://130-61-242-26.sslip.io/#sessions" style="background-color: #005A36; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 13px; display: inline-block;">
+              🏸 Spielrunden ansehen
+            </a>
+          </div>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('[MAILER] Error sending invite response to host:', err.message);
     return { success: false, error: err.message };
   }
 }

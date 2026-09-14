@@ -421,6 +421,56 @@ export function initDatabase() {
   try { db.exec("ALTER TABLE game_sessions ADD COLUMN intensity_level TEXT DEFAULT 'casual';"); } catch (e) {}
   try { db.exec("ALTER TABLE game_sessions ADD COLUMN total_cost REAL DEFAULT 0;"); } catch (e) {}
 
+  // 8. Registered Student Users (For one-time app entry verification)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS student_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      university TEXT DEFAULT 'TU Chemnitz',
+      role TEXT DEFAULT 'student',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_login_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  try { db.exec("ALTER TABLE student_users ADD COLUMN role TEXT DEFAULT 'student';"); } catch (e) {}
+
+  // 9. Player Contact / Play Requests (Strict privacy shielding: details only unlocked on reply/accept)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS player_contact_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_name TEXT NOT NULL,
+      from_email TEXT NOT NULL,
+      from_phone TEXT,
+      to_player_id INTEGER NOT NULL,
+      to_name TEXT NOT NULL,
+      to_email TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT DEFAULT 'pending', -- 'pending' | 'accepted' | 'declined'
+      reply_message TEXT,
+      accept_token TEXT UNIQUE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      replied_at DATETIME
+    );
+  `);
+
+  // 10. Game Session Invitations (Accept / Reject)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS game_session_invitations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL,
+      inviter_name TEXT NOT NULL,
+      inviter_email TEXT NOT NULL,
+      invitee_name TEXT NOT NULL,
+      invitee_email TEXT NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      status TEXT DEFAULT 'pending', -- 'pending' | 'accepted' | 'rejected'
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      responded_at DATETIME,
+      FOREIGN KEY (session_id) REFERENCES game_sessions(id) ON DELETE CASCADE
+    );
+  `);
+
   // Create a minimal valid sample PDF for the seeded tournament announcement
   const samplePdfPath = path.join(uploadsDir, 'ausschreibung_shm_2026.pdf');
   if (!fs.existsSync(samplePdfPath)) {
@@ -1068,33 +1118,31 @@ export function createRegistration(data) {
 }
 
 // Players (Men & Women Squads)
-export function sanitizePublicPlayer(player) {
+export function sanitizePublicPlayer(player, viewerEmail = null) {
   if (!player) return null;
 
-  // Anonymize name: "Pradeep Gandu" -> "Pradeep G."
-  let displayName = player.name ? player.name.trim() : 'Badminton-Spieler';
-  const nameParts = displayName.split(/\s+/);
-  if (nameParts.length > 1) {
-    const firstName = nameParts[0];
-    const lastInitial = nameParts[nameParts.length - 1].charAt(0).toUpperCase();
-    displayName = `${firstName} ${lastInitial}.`;
-  }
+  // Full name is shown, sensitive contact details remain shielded
+  const displayName = player.name ? player.name.trim() : 'Badminton-Spieler';
+
+  // Check if mutual contact has been unlocked between viewer and player
+  const hasUnlockedContact = viewerEmail ? checkMutualAcceptedContact(viewerEmail, player.email) : false;
 
   return {
     id: player.id,
     name: displayName,
     gender: player.gender,
-    study_program: player.study_program || 'TU Chemnitz Student',
-    specialization: player.specialization || '',
-    team: player.team || 'TUC Shuttlers',
-    photo_url: player.photo_url || '',
-    avatar_type: player.avatar_type || 'badminton_smash',
-    favorite_player: player.favorite_player || '',
     skill_level: player.skill_level || 'Fortgeschritten',
-    university_type: player.university_type || 'tu_chemnitz',
-    university_name: player.university_name || 'TU Chemnitz',
+    specialization: player.specialization || '',
+    preferred_category: player.specialization || '',
+    avatar_type: player.avatar_type || 'badminton_smash',
+    photo_url: player.photo_url || '',
     created_at: player.created_at,
-    // Note: email & phone are strictly protected and never exposed in the public API
+    has_contact_unlocked: hasUnlockedContact,
+    // Only revealed after play request is accepted:
+    email: hasUnlockedContact ? player.email : undefined,
+    phone: hasUnlockedContact ? (player.phone || '') : undefined,
+    study_program: hasUnlockedContact ? (player.study_program || '') : undefined,
+    university_name: hasUnlockedContact ? (player.university_name || 'TU Chemnitz') : undefined,
   };
 }
 
@@ -2190,6 +2238,178 @@ export function getAllGameSessionsAdmin() {
 export function deleteGameSessionAdmin(id) {
   db.prepare("DELETE FROM game_session_participants WHERE session_id = ?").run(id);
   return db.prepare("DELETE FROM game_sessions WHERE id = ?").run(id);
+}
+
+// -------------------------------------------------------------
+// Student / Community Users & One-Time Entry Auth
+// -------------------------------------------------------------
+export function createOrUpdateStudentUser({ email, name, university, role }) {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanName = name ? name.trim() : 'Student';
+  const cleanUni = university ? university.trim() : 'TU Chemnitz';
+  const cleanRole = role ? role.trim() : 'student';
+
+  const existing = db.prepare('SELECT * FROM student_users WHERE email = ?').get(cleanEmail);
+  if (existing) {
+    db.prepare(`
+      UPDATE student_users
+      SET name = COALESCE(NULLIF(?, ''), name),
+          university = COALESCE(NULLIF(?, ''), university),
+          role = COALESCE(NULLIF(?, ''), role),
+          last_login_at = CURRENT_TIMESTAMP
+      WHERE email = ?
+    `).run(cleanName, cleanUni, cleanRole, cleanEmail);
+    return db.prepare('SELECT * FROM student_users WHERE email = ?').get(cleanEmail);
+  } else {
+    const res = db.prepare(`
+      INSERT INTO student_users (email, name, university, role)
+      VALUES (?, ?, ?, ?)
+    `).run(cleanEmail, cleanName, cleanUni, cleanRole);
+    return db.prepare('SELECT * FROM student_users WHERE id = ?').get(res.lastInsertRowid);
+  }
+}
+
+export function getStudentUserByEmail(email) {
+  if (!email) return null;
+  return db.prepare('SELECT * FROM student_users WHERE email = ?').get(email.trim().toLowerCase());
+}
+
+// -------------------------------------------------------------
+// Match / Game Session Player Invitations (Accept / Reject)
+// -------------------------------------------------------------
+export function createSessionInvitation({ session_id, inviter_name, inviter_email, invitee_name, invitee_email }) {
+  const token = crypto.randomBytes(24).toString('hex');
+  const res = db.prepare(`
+    INSERT INTO game_session_invitations (
+      session_id, inviter_name, inviter_email, invitee_name, invitee_email, token, status
+    ) VALUES (?, ?, ?, ?, ?, ?, 'pending')
+  `).run(
+    session_id,
+    inviter_name.trim(),
+    inviter_email.trim().toLowerCase(),
+    invitee_name.trim(),
+    invitee_email.trim().toLowerCase(),
+    token
+  );
+  return db.prepare('SELECT * FROM game_session_invitations WHERE id = ?').get(res.lastInsertRowid);
+}
+
+export function getSessionInvitationByToken(token) {
+  if (!token) return null;
+  return db.prepare('SELECT * FROM game_session_invitations WHERE token = ?').get(token);
+}
+
+export function respondToSessionInvitation(token, action = 'accept') {
+  const invitation = getSessionInvitationByToken(token);
+  if (!invitation) return { error: 'Einladung nicht gefunden oder abgelaufen.', status: 404 };
+
+  const isAccept = action === 'accept';
+  const newStatus = isAccept ? 'accepted' : 'rejected';
+
+  db.prepare(`
+    UPDATE game_session_invitations
+    SET status = ?,
+        responded_at = CURRENT_TIMESTAMP
+    WHERE token = ?
+  `).run(newStatus, token);
+
+  const updatedInv = getSessionInvitationByToken(token);
+  const session = getGameSessionById(invitation.session_id);
+
+  if (isAccept && session && session.status === 'open') {
+    // Check if participant already added
+    const existing = db.prepare(`
+      SELECT id FROM game_session_participants
+      WHERE session_id = ? AND participant_email = ?
+    `).get(invitation.session_id, invitation.invitee_email);
+
+    if (!existing) {
+      joinGameSession({
+        session_id: invitation.session_id,
+        participant_name: invitation.invitee_name,
+        participant_email: invitation.invitee_email,
+        participant_phone: '',
+        skill_level: 'Fortgeschritten',
+        message: 'Einladung angenommen!'
+      });
+    }
+  }
+
+  return { success: true, invitation: updatedInv, session: getGameSessionById(invitation.session_id), action: newStatus };
+}
+
+export function getSessionInvitations(sessionId) {
+  return db.prepare('SELECT * FROM game_session_invitations WHERE session_id = ? ORDER BY id DESC').all(sessionId);
+}
+
+// -------------------------------------------------------------
+// Player Contact Requests (Privacy-Shielded Release)
+// -------------------------------------------------------------
+export function createPlayerContactRequest({ from_name, from_email, from_phone, to_player_id, to_name, to_email, message }) {
+  const accept_token = crypto.randomBytes(24).toString('hex');
+  const res = db.prepare(`
+    INSERT INTO player_contact_requests (
+      from_name, from_email, from_phone,
+      to_player_id, to_name, to_email,
+      message, accept_token, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+  `).run(
+    from_name.trim(),
+    from_email.trim().toLowerCase(),
+    from_phone ? from_phone.trim() : null,
+    to_player_id,
+    to_name.trim(),
+    to_email.trim().toLowerCase(),
+    message.trim(),
+    accept_token
+  );
+  return db.prepare('SELECT * FROM player_contact_requests WHERE id = ?').get(res.lastInsertRowid);
+}
+
+export function getContactRequestByToken(token) {
+  if (!token) return null;
+  return db.prepare('SELECT * FROM player_contact_requests WHERE accept_token = ?').get(token);
+}
+
+export function acceptContactRequest(token, reply_message) {
+  const req = getContactRequestByToken(token);
+  if (!req) return null;
+  db.prepare(`
+    UPDATE player_contact_requests
+    SET status = 'accepted',
+        reply_message = ?,
+        replied_at = CURRENT_TIMESTAMP
+    WHERE accept_token = ?
+  `).run(reply_message ? reply_message.trim() : 'Anfrage angenommen!', token);
+  return getContactRequestByToken(token);
+}
+
+export function getContactRequestsForUser(email) {
+  if (!email) return { incoming: [], outgoing: [] };
+  const cleanEmail = email.trim().toLowerCase();
+  const incoming = db.prepare('SELECT * FROM player_contact_requests WHERE to_email = ? ORDER BY id DESC').all(cleanEmail);
+  const outgoing = db.prepare('SELECT * FROM player_contact_requests WHERE from_email = ? ORDER BY id DESC').all(cleanEmail);
+  return { incoming, outgoing };
+}
+
+export function checkMutualAcceptedContact(email1, email2) {
+  if (!email1 || !email2) return false;
+  const e1 = email1.trim().toLowerCase();
+  const e2 = email2.trim().toLowerCase();
+  if (e1 === e2) return true;
+
+  try {
+    const match = db.prepare(`
+      SELECT id FROM player_contact_requests
+      WHERE status = 'accepted' AND (
+        (from_email = ? AND to_email = ?) OR
+        (from_email = ? AND to_email = ?)
+      ) LIMIT 1
+    `).get(e1, e2, e2, e1);
+    return !!match;
+  } catch (e) {
+    return false;
+  }
 }
 
 export { db };
