@@ -94,6 +94,7 @@ import {
   getAllGameSessionsAdmin,
   deleteGameSessionAdmin,
   deletePlayerByEmail,
+  getPlayerByEmail,
   getAllActivePlayerEmails,
   db,
 } from './db.js';
@@ -117,6 +118,9 @@ import {
   verifyOtp,
   verifyStudentSession,
   invalidateStudentSession,
+  createEditSession,
+  verifyEditSession,
+  invalidateEditSession,
 } from './otp.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -663,8 +667,8 @@ app.post('/api/auth/otp/send', async (req, res) => {
       });
     }
 
-    // Check if player exists when deleting profile
-    if (validScope === 'delete_profile') {
+    // Check if player exists when deleting or editing profile
+    if (validScope === 'delete_profile' || validScope === 'edit_profile') {
       const allEmails = getAllActivePlayerEmails();
       if (!allEmails.includes(cleanEmail)) {
         return res.status(404).json({
@@ -776,6 +780,131 @@ app.post('/api/players/self-delete', async (req, res) => {
   } catch (err) {
     console.error('Error self-deleting player:', err);
     res.status(500).json({ error: 'Fehler beim Löschen des Profils.' });
+  }
+});
+
+// 6. Player Self-Edit Verification (Verify OTP & Return Player Data + Edit Session)
+app.post('/api/players/self-edit/verify', (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'E-Mail und Bestätigungscode sind erforderlich.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const otpResult = verifyOtp(cleanEmail, code, 'edit_profile');
+    if (otpResult.error) {
+      return res.status(otpResult.status || 400).json({ error: otpResult.error });
+    }
+
+    const player = getPlayerByEmail(cleanEmail);
+    if (!player) {
+      return res.status(404).json({ error: 'Kein Spielerprofil unter dieser E-Mail gefunden.' });
+    }
+
+    const editToken = createEditSession(cleanEmail);
+
+    res.json({
+      success: true,
+      verified: true,
+      editToken,
+      player: {
+        id: player.id,
+        name: player.name,
+        gender: player.gender,
+        study_program: player.study_program,
+        specialization: player.specialization,
+        team: player.team,
+        email: player.email,
+        phone: player.phone || '',
+        show_phone: player.show_phone,
+        favorite_player: player.favorite_player || '',
+        skill_level: player.skill_level || 'Fortgeschritten',
+        university_type: player.university_type || 'tu_chemnitz',
+        university_name: player.university_name || 'TU Chemnitz',
+        photo_url: player.photo_url || '',
+        avatar_type: player.avatar_type || 'badminton_smash',
+      }
+    });
+  } catch (err) {
+    console.error('Error verifying edit OTP:', err);
+    res.status(500).json({ error: 'Fehler bei der Code-Überprüfung.' });
+  }
+});
+
+// 7. Player Self-Edit Submission (Update Profile with Edit Token)
+app.put('/api/players/self-edit', upload.single('photo'), (req, res) => {
+  try {
+    const {
+      email,
+      edit_token,
+      name,
+      gender,
+      study_program,
+      specialization,
+      team,
+      phone,
+      show_phone,
+      favorite_player,
+      skill_level,
+      university_type,
+      university_name,
+      avatar_type,
+      photo_url_input,
+    } = req.body;
+
+    if (!email || !edit_token) {
+      return res.status(401).json({ error: 'Autorisierung ungültig. Bitte fordere einen neuen Code an.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!verifyEditSession(edit_token, cleanEmail)) {
+      return res.status(401).json({ error: 'Deine Bearbeitungssitzung ist abgelaufen. Bitte fordere einen neuen Bestätigungscode an.' });
+    }
+
+    const existingPlayer = getPlayerByEmail(cleanEmail);
+    if (!existingPlayer) {
+      return res.status(404).json({ error: 'Spielerprofil nicht gefunden.' });
+    }
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name ist erforderlich.' });
+    }
+
+    let photo_url = photo_url_input !== undefined ? photo_url_input.trim() : (req.body.photo_url !== undefined ? req.body.photo_url : undefined);
+    if (req.file) {
+      photo_url = `/uploads/${req.file.filename}`;
+    }
+
+    const isShowPhone = show_phone !== undefined ? (show_phone === true || show_phone === 'true' || show_phone === 1 || show_phone === '1' ? 1 : 0) : undefined;
+
+    const updated = updatePlayer(existingPlayer.id, {
+      name: name.trim(),
+      gender: gender === 'women' ? 'women' : 'men',
+      study_program: study_program ? study_program.trim() : existingPlayer.study_program,
+      specialization: specialization ? specialization.trim() : existingPlayer.specialization,
+      team: team ? team.trim() : existingPlayer.team,
+      email: cleanEmail,
+      phone: phone !== undefined ? phone.trim() : existingPlayer.phone,
+      show_phone: isShowPhone !== undefined ? isShowPhone : existingPlayer.show_phone,
+      favorite_player: favorite_player !== undefined ? favorite_player.trim() : existingPlayer.favorite_player,
+      skill_level: skill_level ? skill_level.trim() : existingPlayer.skill_level,
+      university_type: university_type ? university_type.trim() : existingPlayer.university_type,
+      university_name: university_name ? university_name.trim() : existingPlayer.university_name,
+      avatar_type: avatar_type || existingPlayer.avatar_type || 'badminton_smash',
+      photo_url,
+    });
+
+    invalidateEditSession(edit_token);
+
+    res.json({
+      success: true,
+      message: 'Dein Spielerprofil wurde erfolgreich aktualisiert!',
+      player: updated
+    });
+  } catch (err) {
+    console.error('Error in player self-edit:', err);
+    res.status(500).json({ error: err.message || 'Fehler beim Aktualisieren des Profils.' });
   }
 });
 

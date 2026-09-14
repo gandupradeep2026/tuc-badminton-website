@@ -168,6 +168,34 @@ export function invalidateStudentSession(token) {
   if (token) studentSessions.delete(token);
 }
 
+// Edit Session Tokens for Self-Editing Profiles
+const editTokens = new Map();
+
+export function createEditSession(email) {
+  const token = `edit-${crypto.randomBytes(24).toString('hex')}`;
+  editTokens.set(token, {
+    email: email.trim().toLowerCase(),
+    expiresAt: Date.now() + 15 * 60 * 1000 // 15 mins
+  });
+  return token;
+}
+
+export function verifyEditSession(token, email) {
+  if (!token) return false;
+  const session = editTokens.get(token);
+  if (!session) return false;
+  if (Date.now() > session.expiresAt) {
+    editTokens.delete(token);
+    return false;
+  }
+  if (email && session.email !== email.trim().toLowerCase()) return false;
+  return true;
+}
+
+export function invalidateEditSession(token) {
+  if (token) editTokens.delete(token);
+}
+
 // Periodic cleanup of expired entries (runs every 10 minutes)
 setInterval(() => {
   const now = Date.now();
@@ -176,5 +204,8 @@ setInterval(() => {
   }
   for (const [token, session] of studentSessions.entries()) {
     if (now - session.lastActivity > INACTIVITY_TIMEOUT_MS) studentSessions.delete(token);
+  }
+  for (const [token, session] of editTokens.entries()) {
+    if (now > session.expiresAt) editTokens.delete(token);
   }
 }, 10 * 60 * 1000);

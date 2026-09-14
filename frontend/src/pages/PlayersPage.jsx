@@ -20,12 +20,14 @@ import {
   LogOut, 
   ArrowRight,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Edit3
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { safeFetchJson, getUploadUrl } from '../api/client';
 import PartnerRequestModal from '../components/PartnerRequestModal';
 import SelfDeleteModal from '../components/SelfDeleteModal';
+import SelfEditModal from '../components/SelfEditModal';
 import BadmintonAvatar from '../components/BadmintonAvatar';
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -43,6 +45,7 @@ export default function PlayersPage({ onNavigate }) {
   const [sessionExpiredNotice, setSessionExpiredNotice] = useState(false);
   const [partnerModalPlayer, setPartnerModalPlayer] = useState(null);
   const [selfDeleteOpen, setSelfDeleteOpen] = useState(false);
+  const [selfEditOpen, setSelfEditOpen] = useState(false);
 
   // Student Gate Form State
   const [gateEmail, setGateEmail] = useState('');
@@ -369,6 +372,14 @@ export default function PlayersPage({ onNavigate }) {
                 <span>{isDe ? 'Mitmachen & Registrieren' : 'Join / Register'}</span>
               </button>
             )}
+            <button
+              onClick={() => setSelfEditOpen(true)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#005A36] hover:text-[#00472A] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
+              title={isDe ? 'Eigenes Spielerprofil bearbeiten' : 'Edit my profile'}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>{isDe ? 'Profil bearbeiten' : 'Edit Profile'}</span>
+            </button>
             <button
               onClick={() => setSelfDeleteOpen(true)}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors"
@@ -729,6 +740,15 @@ export default function PlayersPage({ onNavigate }) {
         isOpen={selfDeleteOpen}
         onClose={() => setSelfDeleteOpen(false)}
         onDeleted={() => {
+          fetchPlayers();
+        }}
+      />
+
+      {/* Self Edit Modal */}
+      <SelfEditModal
+        isOpen={selfEditOpen}
+        onClose={() => setSelfEditOpen(false)}
+        onUpdated={() => {
           fetchPlayers();
         }}
       />

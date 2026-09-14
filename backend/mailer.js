@@ -625,6 +625,12 @@ export async function sendOtpVerificationEmail({ to, code, scope = 'student_gate
       titleEn: '⚠️ Confirm Profile Deletion',
       descDe: 'Achtung: Mit diesem Code bestätigst du die unwiderrufliche Löschung deines Spielerprofils aus der Datenbank.',
       descEn: 'Warning: Using this code will permanently delete your player profile from the database.'
+    },
+    edit_profile: {
+      titleDe: '✏️ Spielerprofil bearbeiten',
+      titleEn: '✏️ Edit Player Profile',
+      descDe: 'Verwende diesen Bestätigungscode, um dich zu authentifizieren und dein Spielerprofil sicher zu bearbeiten.',
+      descEn: 'Use this verification code to authenticate and edit your player profile securely.'
     }
   };
 
