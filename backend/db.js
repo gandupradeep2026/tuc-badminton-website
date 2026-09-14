@@ -363,6 +363,48 @@ export function initDatabase() {
   try { db.exec("ALTER TABLE players ADD COLUMN university_name TEXT DEFAULT 'TU Chemnitz';"); } catch (e) {}
   try { db.exec("ALTER TABLE players ADD COLUMN status TEXT DEFAULT 'approved';"); } catch (e) {}
   try { db.exec("ALTER TABLE players ADD COLUMN show_phone INTEGER DEFAULT 0;"); } catch (e) {}
+  try { db.exec("ALTER TABLE players ADD COLUMN avatar_type TEXT DEFAULT 'badminton_smash';"); } catch (e) {}
+  try { db.exec("ALTER TABLE players ADD COLUMN is_public INTEGER DEFAULT 1;"); } catch (e) {}
+  try { db.exec("ALTER TABLE players ADD COLUMN privacy_mode TEXT DEFAULT 'shielded';"); } catch (e) {}
+
+  // 7. Looking for Group (LFG) / Spontaneous Game Sessions
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS game_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      host_name TEXT NOT NULL,
+      host_email TEXT NOT NULL,
+      host_phone TEXT,
+      location_name TEXT NOT NULL,
+      location_address TEXT,
+      session_date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT,
+      game_format TEXT NOT NULL DEFAULT 'doubles',
+      max_players INTEGER NOT NULL DEFAULT 4,
+      current_players INTEGER NOT NULL DEFAULT 1,
+      skill_level TEXT NOT NULL DEFAULT 'all',
+      cost_note TEXT,
+      description TEXT,
+      manage_pin TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS game_session_participants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL,
+      participant_name TEXT NOT NULL,
+      participant_email TEXT NOT NULL,
+      participant_phone TEXT,
+      skill_level TEXT DEFAULT 'intermediate',
+      message TEXT,
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (session_id) REFERENCES game_sessions(id) ON DELETE CASCADE
+    );
+  `);
 
   // Schema upgrades for trainers (phone, hochschulsport_approved, hochschulsport_note, status, show_phone)
   try { db.exec("ALTER TABLE trainers ADD COLUMN phone TEXT;"); } catch (e) {}
@@ -1018,11 +1060,45 @@ export function createRegistration(data) {
 }
 
 // Players (Men & Women Squads)
+export function sanitizePublicPlayer(player) {
+  if (!player) return null;
+
+  // Anonymize name: "Pradeep Gandu" -> "Pradeep G."
+  let displayName = player.name ? player.name.trim() : 'Badminton-Spieler';
+  const nameParts = displayName.split(/\s+/);
+  if (nameParts.length > 1) {
+    const firstName = nameParts[0];
+    const lastInitial = nameParts[nameParts.length - 1].charAt(0).toUpperCase();
+    displayName = `${firstName} ${lastInitial}.`;
+  }
+
+  return {
+    id: player.id,
+    name: displayName,
+    gender: player.gender,
+    study_program: player.study_program || 'TU Chemnitz Student',
+    specialization: player.specialization || '',
+    team: player.team || 'TUC Shuttlers',
+    photo_url: player.photo_url || '',
+    avatar_type: player.avatar_type || 'badminton_smash',
+    favorite_player: player.favorite_player || '',
+    skill_level: player.skill_level || 'Fortgeschritten',
+    university_type: player.university_type || 'tu_chemnitz',
+    university_name: player.university_name || 'TU Chemnitz',
+    created_at: player.created_at,
+    // Note: email & phone are strictly protected and never exposed in the public API
+  };
+}
+
 export function getAllPlayers(gender) {
   if (gender && (gender === 'men' || gender === 'women')) {
-    return db.prepare("SELECT * FROM players WHERE gender = ? AND status = 'approved' ORDER BY id ASC").all(gender);
+    return db.prepare("SELECT * FROM players WHERE gender = ? AND status = 'approved' AND (is_public IS NULL OR is_public = 1) ORDER BY id ASC").all(gender);
   }
-  return db.prepare("SELECT * FROM players WHERE status = 'approved' ORDER BY gender ASC, id ASC").all();
+  return db.prepare("SELECT * FROM players WHERE status = 'approved' AND (is_public IS NULL OR is_public = 1) ORDER BY gender ASC, id ASC").all();
+}
+
+export function getAllPlayersAdmin() {
+  return db.prepare("SELECT * FROM players ORDER BY id DESC").all();
 }
 
 export function getPendingPlayers() {
@@ -1057,6 +1133,8 @@ export function registerPlayerSubmission({
   university_type,
   university_name,
   photo_url,
+  avatar_type,
+  is_public,
 }) {
   const cleanEmail = email.trim().toLowerCase();
   const existing = getPlayerByEmail(cleanEmail);
@@ -1078,6 +1156,8 @@ export function registerPlayerSubmission({
         skill_level = ?,
         university_type = ?,
         university_name = ?,
+        avatar_type = ?,
+        is_public = ?,
         photo_url = CASE WHEN ? != '' THEN ? ELSE photo_url END
       WHERE id = ?
     `);
@@ -1093,6 +1173,8 @@ export function registerPlayerSubmission({
       skill_level ? skill_level.trim() : existing.skill_level,
       university_type ? university_type.trim() : existing.university_type,
       university_name ? university_name.trim() : existing.university_name,
+      avatar_type || existing.avatar_type || 'badminton_smash',
+      is_public !== undefined ? (is_public ? 1 : 0) : (existing.is_public !== undefined ? existing.is_public : 1),
       photo_url || '',
       photo_url || '',
       existing.id
@@ -1102,9 +1184,11 @@ export function registerPlayerSubmission({
 
   const stmt = db.prepare(`
     INSERT INTO players (
-      name, gender, study_program, specialization, team, email, phone, show_phone, favorite_player, skill_level, university_type, university_name, photo_url, status
+      name, gender, study_program, specialization, team, email, phone, show_phone,
+      favorite_player, skill_level, university_type, university_name, photo_url,
+      avatar_type, is_public, status
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
   `);
   const result = stmt.run(
     name ? name.trim() : 'Badminton-Spieler',
@@ -1119,7 +1203,9 @@ export function registerPlayerSubmission({
     skill_level ? skill_level.trim() : 'Fortgeschritten',
     university_type ? university_type.trim() : 'tu_chemnitz',
     university_name ? university_name.trim() : 'TU Chemnitz',
-    photo_url || ''
+    photo_url || '',
+    avatar_type || 'badminton_smash',
+    is_public !== undefined ? (is_public ? 1 : 0) : 1
   );
   return db.prepare('SELECT * FROM players WHERE id = ?').get(result.lastInsertRowid);
 }
@@ -1887,6 +1973,182 @@ export function updateDonationSettings({
     sponsor_info !== undefined ? sponsor_info.trim() : (existing.sponsor_info || '')
   );
   return getDonationSettings();
+}
+
+// -------------------------------------------------------------
+// Looking for Group (LFG) / Spontaneous Game Sessions
+// -------------------------------------------------------------
+export function getPublicGameSessions() {
+  const sessions = db.prepare(`
+    SELECT 
+      id, title, host_name, location_name, location_address,
+      session_date, start_time, end_time, game_format,
+      max_players, current_players, skill_level, cost_note,
+      description, status, created_at
+    FROM game_sessions 
+    WHERE status IN ('open', 'full')
+    ORDER BY session_date ASC, start_time ASC
+  `).all();
+
+  for (const s of sessions) {
+    const participants = db.prepare(`
+      SELECT id, participant_name, skill_level, joined_at 
+      FROM game_session_participants 
+      WHERE session_id = ? 
+      ORDER BY id ASC
+    `).all(s.id);
+    s.participants = participants;
+  }
+
+  return sessions;
+}
+
+export function getGameSessionById(id) {
+  return db.prepare('SELECT * FROM game_sessions WHERE id = ?').get(id);
+}
+
+export function createGameSession(data) {
+  const {
+    title,
+    host_name,
+    host_email,
+    host_phone,
+    location_name,
+    location_address,
+    session_date,
+    start_time,
+    end_time,
+    game_format = 'doubles',
+    max_players = 4,
+    current_players = 1,
+    skill_level = 'all',
+    cost_note,
+    description,
+    manage_pin
+  } = data;
+
+  const stmt = db.prepare(`
+    INSERT INTO game_sessions (
+      title, host_name, host_email, host_phone, location_name, location_address,
+      session_date, start_time, end_time, game_format, max_players, current_players,
+      skill_level, cost_note, description, manage_pin, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+  `);
+
+  const info = stmt.run(
+    title ? title.trim() : 'Badminton Spielrunde',
+    host_name ? host_name.trim() : 'Spieler',
+    host_email.trim().toLowerCase(),
+    host_phone ? host_phone.trim() : '',
+    location_name ? location_name.trim() : 'Feels Good Club Chemnitz',
+    location_address ? location_address.trim() : '',
+    session_date.trim(),
+    start_time.trim(),
+    end_time ? end_time.trim() : '',
+    game_format || 'doubles',
+    Number(max_players) || 4,
+    Math.max(1, Number(current_players) || 1),
+    skill_level || 'all',
+    cost_note ? cost_note.trim() : '',
+    description ? description.trim() : '',
+    manage_pin ? String(manage_pin).trim() : '1234'
+  );
+
+  const newId = Number(info.lastInsertRowid);
+  return getGameSessionById(newId);
+}
+
+export function joinGameSession({ session_id, participant_name, participant_email, participant_phone, skill_level, message }) {
+  const session = getGameSessionById(session_id);
+  if (!session) {
+    return { error: 'Spielrunde nicht gefunden.', status: 404 };
+  }
+  if (session.status !== 'open' || session.current_players >= session.max_players) {
+    return { error: 'Diese Spielrunde ist leider bereits voll besetzt.', status: 400 };
+  }
+
+  // Insert participant
+  const insertStmt = db.prepare(`
+    INSERT INTO game_session_participants (
+      session_id, participant_name, participant_email, participant_phone, skill_level, message
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  insertStmt.run(
+    session_id,
+    participant_name.trim(),
+    participant_email.trim().toLowerCase(),
+    participant_phone ? participant_phone.trim() : '',
+    skill_level || 'intermediate',
+    message ? message.trim() : ''
+  );
+
+  // Increment current_players and check if full
+  const newCount = session.current_players + 1;
+  const newStatus = newCount >= session.max_players ? 'full' : 'open';
+
+  db.prepare(`
+    UPDATE game_sessions 
+    SET current_players = ?, status = ? 
+    WHERE id = ?
+  `).run(newCount, newStatus, session_id);
+
+  const updatedSession = getGameSessionById(session_id);
+  return { 
+    success: true, 
+    session: updatedSession,
+    participant: {
+      participant_name: participant_name.trim(),
+      participant_email: participant_email.trim().toLowerCase(),
+      participant_phone: participant_phone ? participant_phone.trim() : '',
+      skill_level: skill_level || 'intermediate',
+      message: message ? message.trim() : ''
+    }
+  };
+}
+
+export function manageGameSession({ id, pin, action }) {
+  const session = getGameSessionById(id);
+  if (!session) {
+    return { error: 'Spielrunde nicht gefunden.', status: 404 };
+  }
+
+  // Verify PIN
+  if (session.manage_pin !== String(pin).trim()) {
+    return { error: 'Ungültige PIN für diese Spielrunde.', status: 403 };
+  }
+
+  if (action === 'close') {
+    db.prepare("UPDATE game_sessions SET status = 'full' WHERE id = ?").run(id);
+  } else if (action === 'reopen') {
+    db.prepare("UPDATE game_sessions SET status = 'open' WHERE id = ?").run(id);
+  } else if (action === 'cancel') {
+    db.prepare("UPDATE game_sessions SET status = 'cancelled' WHERE id = ?").run(id);
+  } else if (action === 'delete') {
+    db.prepare("DELETE FROM game_session_participants WHERE session_id = ?").run(id);
+    db.prepare("DELETE FROM game_sessions WHERE id = ?").run(id);
+    return { success: true, deleted: true };
+  }
+
+  return { success: true, session: getGameSessionById(id) };
+}
+
+export function getAllGameSessionsAdmin() {
+  const sessions = db.prepare(`
+    SELECT * FROM game_sessions ORDER BY id DESC
+  `).all();
+
+  for (const s of sessions) {
+    s.participants = db.prepare(`
+      SELECT * FROM game_session_participants WHERE session_id = ? ORDER BY id ASC
+    `).all(s.id);
+  }
+
+  return sessions;
+}
+
+export function deleteGameSessionAdmin(id) {
+  db.prepare("DELETE FROM game_session_participants WHERE session_id = ?").run(id);
+  return db.prepare("DELETE FROM game_sessions WHERE id = ?").run(id);
 }
 
 export { db };

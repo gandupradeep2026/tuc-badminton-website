@@ -386,3 +386,215 @@ export async function sendForwardedInquiryToTarget({ inquiry, target }) {
   }
 }
 
+export async function sendGameSessionCreatedEmail({ hostEmail, hostName, session, managePin }) {
+  console.log('\n=============================================================');
+  console.log('🏸 [SPIELRUNDE ERSTELLT - BESTÄTIGUNG]');
+  console.log(`Gastgeber: ${hostName} <${hostEmail}>`);
+  console.log(`Titel    : ${session.title}`);
+  console.log(`Ort & Tag: ${session.location_name} | ${session.session_date} ${session.start_time}`);
+  console.log(`PIN      : ${managePin}`);
+  console.log('=============================================================\n');
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) {
+    return { success: true, method: 'console_only' };
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    await transporter.sendMail({
+      from: `"TU Chemnitz Badminton Community" <${user}>`,
+      to: hostEmail,
+      subject: `🏸 Deine Spielrunde ist online: "${session.title}" (${session.session_date})`,
+      text: `Hallo ${hostName},\n\ndeine Badminton-Spielrunde wurde erfolgreich veröffentlicht!\n\nDetails:\n- Titel: ${session.title}\n- Ort: ${session.location_name}${session.location_address ? ` (${session.location_address})` : ''}\n- Datum & Uhrzeit: ${session.session_date} ab ${session.start_time} Uhr\n- Format: ${session.game_format}\n- Spieler gesucht: ${session.max_players - session.current_players} freie Plätze\n\nDeine Verwaltungs-PIN lautet: ${managePin}\nMit dieser PIN kannst du die Spielrunde auf der Website jederzeit als voll markieren oder absagen.\n\nSobald sich Mitspieler eintragen, wirst du sofort per E-Mail benachrichtigt.\n\nLink zur Spielrunden-Übersicht:\nhttps://130-61-242-26.sslip.io/#sessions\n\nViel Spaß beim Match!\nTU Chemnitz Badminton Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 20px; font-weight: 900;">🏸 Spielrunde erfolgreich online!</h2>
+          <p style="color: #334155; font-size: 14px;">Hallo <strong>${hostName}</strong>,</p>
+          <p style="color: #334155; font-size: 14px;">deine Ausschreibung für ein Badminton-Match ist ab sofort für alle Spieler sichtbar:</p>
+
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <h3 style="margin: 0 0 10px 0; color: #166534; font-size: 16px;">${session.title}</h3>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📍 <strong>Ort:</strong> ${session.location_name} ${session.location_address ? `(${session.location_address})` : ''}</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📅 <strong>Termin:</strong> ${session.session_date} • ${session.start_time} Uhr</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">👥 <strong>Plätze:</strong> ${session.current_players} von ${session.max_players} besetzt (${session.max_players - session.current_players} noch frei)</p>
+            ${session.cost_note ? `<p style="margin: 4px 0; font-size: 13px; color: #15803d;">💶 <strong>Kosten:</strong> ${session.cost_note}</p>` : ''}
+          </div>
+
+          <div style="background-color: #f8fafc; border: 2px dashed #005A36; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: center;">
+            <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Deine persönliche Verwaltungs-PIN:</span>
+            <span style="font-size: 28px; font-weight: 900; letter-spacing: 6px; color: #005A36; font-family: monospace;">${managePin}</span>
+            <span style="font-size: 11px; color: #64748b; display: block; margin-top: 4px;">Mit dieser PIN kannst du die Spielrunde auf der Website verwalten, schließen oder absagen.</span>
+          </div>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="https://130-61-242-26.sslip.io/#sessions" style="background-color: #005A36; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block;">
+              🏸 Zu den Spielrunden auf der Website
+            </a>
+          </div>
+        </div>
+      `,
+    });
+
+    return { success: true, method: 'smtp' };
+  } catch (err) {
+    console.error('[MAILER] Error sending session created email:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendGameSessionJoinNotification({ hostEmail, hostName, session, participant }) {
+  console.log('\n=============================================================');
+  console.log('🎉 [NEUER MITSPIELER BEIGETRETEN]');
+  console.log(`Gastgeber  : ${hostName} <${hostEmail}>`);
+  console.log(`Mitspieler : ${participant.participant_name} <${participant.participant_email}>`);
+  console.log(`Spielrunde : ${session.title} (${session.session_date})`);
+  console.log('=============================================================\n');
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) {
+    return { success: true, method: 'console_only' };
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    await transporter.sendMail({
+      from: `"TU Chemnitz Badminton Community" <${user}>`,
+      replyTo: participant.participant_email,
+      to: hostEmail,
+      subject: `🎉 Neuer Mitspieler: ${participant.participant_name} hat sich für "${session.title}" eingetragen!`,
+      text: `Hallo ${hostName},\n\ngute Neuigkeiten! ${participant.participant_name} spielt bei deiner Spielrunde mit!\n\nSpielrunde: ${session.title}\nOrt: ${session.location_name}\nTermin: ${session.session_date} ab ${session.start_time} Uhr\nAktueller Stand: ${session.current_players} / ${session.max_players} Spieler\n\nKontakt des Mitspielers:\n- Name: ${participant.participant_name}\n- E-Mail: ${participant.participant_email}\n- Telefon/WhatsApp: ${participant.participant_phone || 'Keine'}\n- Spielstärke: ${participant.skill_level || 'Freizeit'}\n${participant.message ? `- Nachricht: "${participant.message}"\n` : ''}\nDu kannst direkt auf diese E-Mail antworten, um dich mit ${participant.participant_name} abzustimmen.\n\nTU Chemnitz Badminton Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 20px; font-weight: 900;">🎉 Ein neuer Mitspieler ist dabei!</h2>
+          <p style="color: #334155; font-size: 14px;">Hallo <strong>${hostName}</strong>,</p>
+          <p style="color: #334155; font-size: 14px;">
+            <strong>${participant.participant_name}</strong> hat sich für deine Spielrunde <strong>"${session.title}"</strong> eingetragen!
+          </p>
+
+          <div style="background-color: #f0fdf4; border-left: 4px solid #005A36; padding: 14px 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0; color: #166534; font-weight: 700; font-size: 14px;">
+              Status: ${session.current_players} von ${session.max_players} Plätzen besetzt ${session.status === 'full' ? '🔥 (Jetzt VOLL!)' : `(noch ${session.max_players - session.current_players} frei)`}
+            </p>
+            <p style="margin: 4px 0 0 0; color: #166534; font-size: 12px;">
+              📍 ${session.location_name} • 📅 ${session.session_date} um ${session.start_time} Uhr
+            </p>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px;">
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #64748b; font-weight: 600; width: 140px;">👤 Name:</td>
+              <td style="padding: 8px 0; color: #0f172a; font-weight: 700;">${participant.participant_name}</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #64748b; font-weight: 600;">✉️ E-Mail:</td>
+              <td style="padding: 8px 0; color: #0f172a;"><a href="mailto:${participant.participant_email}">${participant.participant_email}</a></td>
+            </tr>
+            ${participant.participant_phone ? `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #64748b; font-weight: 600;">📱 Telefon / WhatsApp:</td>
+              <td style="padding: 8px 0; color: #0f172a;">${participant.participant_phone}</td>
+            </tr>` : ''}
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 8px 0; color: #64748b; font-weight: 600;">🏸 Spielstärke:</td>
+              <td style="padding: 8px 0; color: #0f172a;">${participant.skill_level || 'Freizeit'}</td>
+            </tr>
+          </table>
+
+          ${participant.message ? `
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin: 16px 0;">
+            <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px;">Nachricht des Mitspielers:</span>
+            <p style="margin: 0; color: #334155; font-size: 13px; font-style: italic;">"${participant.message}"</p>
+          </div>` : ''}
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="mailto:${participant.participant_email}?subject=${encodeURIComponent(`Badminton: ${session.title}`)}" style="background-color: #005A36; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; display: inline-block;">
+              ✉️ ${participant.participant_name} direkt per E-Mail antworten
+            </a>
+          </div>
+        </div>
+      `,
+    });
+
+    return { success: true, method: 'smtp' };
+  } catch (err) {
+    console.error('[MAILER] Error sending join notification to host:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function sendParticipantConfirmationEmail({ participantEmail, participantName, session, hostName }) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) {
+    return { success: true, method: 'console_only' };
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    await transporter.sendMail({
+      from: `"TU Chemnitz Badminton Community" <${user}>`,
+      to: participantEmail,
+      subject: `🏸 Teilnahme bestätigt: "${session.title}" am ${session.session_date}`,
+      text: `Hallo ${participantName},\n\ndeine Teilnahme für die Spielrunde "${session.title}" ist bestätigt!\n\nTermin: ${session.session_date} ab ${session.start_time} Uhr\nOrt: ${session.location_name}${session.location_address ? ` (${session.location_address})` : ''}\nGastgeber: ${hostName}\n\nDer Gastgeber hat deine Kontaktdaten erhalten und meldet sich ggf. vor dem Match bei dir.\n\nViel Spaß beim Spiel!\nTU Chemnitz Badminton Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 20px; font-weight: 900;">🏸 Deine Teilnahme ist bestätigt!</h2>
+          <p style="color: #334155; font-size: 14px;">Hallo <strong>${participantName}</strong>,</p>
+          <p style="color: #334155; font-size: 14px;">du bist bei der Spielrunde von <strong>${hostName}</strong> dabei:</p>
+
+          <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <h3 style="margin: 0 0 8px 0; color: #166534; font-size: 15px;">${session.title}</h3>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📍 <strong>Ort:</strong> ${session.location_name} ${session.location_address ? `(${session.location_address})` : ''}</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📅 <strong>Termin:</strong> ${session.session_date} • ${session.start_time} Uhr</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">👤 <strong>Gastgeber:</strong> ${hostName}</p>
+            ${session.cost_note ? `<p style="margin: 4px 0; font-size: 13px; color: #15803d;">💶 <strong>Kosten-Notiz:</strong> ${session.cost_note}</p>` : ''}
+          </div>
+
+          <p style="color: #64748b; font-size: 12px; line-height: 1.5;">
+            Der Gastgeber wurde benachrichtigt und kann sich bei Bedarf zur Feinabstimmung bei dir melden. Bitte erscheine pünktlich in Sportkleidung mit sauberen Hallenschuhen!
+          </p>
+        </div>
+      `,
+    });
+
+    return { success: true, method: 'smtp' };
+  } catch (err) {
+    console.error('[MAILER] Error sending participant confirmation email:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+

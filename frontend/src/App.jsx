@@ -8,6 +8,7 @@ const HomePage = lazy(() => import('./pages/HomePage'));
 const TrainersPage = lazy(() => import('./pages/TrainersPage'));
 const PlayersPage = lazy(() => import('./pages/PlayersPage'));
 const ServicesPage = lazy(() => import('./pages/ServicesPage'));
+const SessionsPage = lazy(() => import('./pages/SessionsPage'));
 const TournamentsPage = lazy(() => import('./pages/TournamentsPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const RegistrationPage = lazy(() => import('./pages/RegistrationPage'));
@@ -40,7 +41,7 @@ function AppContent() {
   // Read initial page from URL hash if present
   const getPageFromHash = () => {
     const hash = window.location.hash.replace('#', '').toLowerCase();
-    if (['trainers', 'players', 'services', 'tournaments', 'gallery', 'register', 'admin'].includes(hash)) {
+    if (['sessions', 'trainers', 'players', 'services', 'tournaments', 'gallery', 'register', 'admin'].includes(hash)) {
       return hash;
     }
     return 'home';
@@ -89,6 +90,10 @@ function AppContent() {
 
           {activePage === 'services' && (
             <ServicesPage onNavigate={navigateTo} />
+          )}
+
+          {activePage === 'sessions' && (
+            <SessionsPage onNavigate={navigateTo} />
           )}
 
           {activePage === 'tournaments' && (

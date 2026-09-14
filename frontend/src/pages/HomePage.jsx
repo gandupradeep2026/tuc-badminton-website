@@ -149,6 +149,13 @@ export default function HomePage({ onNavigate }) {
               <span>{isDe ? 'Mitmachen & Registrieren' : 'Join & Register'}</span>
             </button>
             <button
+              onClick={() => onNavigate('sessions')}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-emerald-500/25 border border-emerald-400/50 text-white hover:bg-emerald-500/40 active:bg-white/20 transition-colors shadow-sm"
+            >
+              <span>{isDe ? '🤝 Match-Treff & Spielrunden' : '🤝 Find Games / LFG'}</span>
+              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 text-amber-300" />
+            </button>
+            <button
               onClick={() => onNavigate('trainers')}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-white text-[#005A36] hover:bg-emerald-50 active:bg-slate-100 transition-colors shadow-sm"
             >
@@ -410,7 +417,7 @@ export default function HomePage({ onNavigate }) {
           {h.exploreTitle}
         </h2>
 
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           
           {/* Trainer Card */}
           <div 
@@ -456,10 +463,34 @@ export default function HomePage({ onNavigate }) {
             </div>
           </div>
 
+          {/* Spielrunden / Match-Treff (LFG) Card */}
+          <div 
+            onClick={() => onNavigate('sessions')}
+            className="group p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#005A36] active:scale-[0.99] transition-all cursor-pointer shadow-sm hover:shadow-md flex flex-col justify-between space-y-4"
+          >
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#005A36] flex items-center justify-center font-bold text-lg">
+                🤝
+              </div>
+              <h3 className="font-bold text-base text-slate-900 group-hover:text-[#005A36] transition-colors">
+                {isDe ? 'Match-Treff & Spielrunden' : 'Badminton Match Finder'}
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {isDe 
+                  ? 'Finde spontan Mitspieler für Feels Good Club oder Uni-Hallen ohne feste Vereinsbindung.' 
+                  : 'Find players spontaneously for Feels Good Club or university gyms.'}
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#005A36] pt-1">
+              <span>{isDe ? 'Spielrunden ansehen' : 'Explore Sessions'}</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
           {/* Turniere Card */}
           <div 
             onClick={() => onNavigate('tournaments')}
-            className="group p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#005A36] active:scale-[0.99] transition-all cursor-pointer shadow-sm hover:shadow-md flex flex-col justify-between space-y-4 sm:col-span-2 md:col-span-1"
+            className="group p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#005A36] active:scale-[0.99] transition-all cursor-pointer shadow-sm hover:shadow-md flex flex-col justify-between space-y-4"
           >
             <div className="space-y-2">
               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-[#005A36] flex items-center justify-center font-bold text-lg">

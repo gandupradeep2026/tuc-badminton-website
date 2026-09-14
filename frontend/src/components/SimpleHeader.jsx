@@ -28,6 +28,7 @@ export default function SimpleHeader({ activePage, onNavigate }) {
     { id: 'home', label: t.nav.home, icon: '🏛️' },
     { id: 'trainers', label: t.nav.trainers, icon: '👥' },
     { id: 'players', label: t.nav.players, icon: '🏸' },
+    { id: 'sessions', label: isDe ? 'Spielrunden' : 'Find Games', icon: '🤝' },
     { id: 'services', label: isDe ? 'Besaitung & Ausrüstung' : 'Services & Gear', icon: '🔧' },
     { id: 'tournaments', label: t.nav.tournaments, icon: '🏆' },
     { id: 'gallery', label: t.nav.gallery, icon: '📸' },

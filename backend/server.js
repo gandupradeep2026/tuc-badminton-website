@@ -85,6 +85,14 @@ import {
   markContactInquiryForwarded,
   updateContactInquiryStatus,
   deleteContactInquiry,
+  sanitizePublicPlayer,
+  getPublicGameSessions,
+  getGameSessionById,
+  createGameSession,
+  joinGameSession,
+  manageGameSession,
+  getAllGameSessionsAdmin,
+  deleteGameSessionAdmin,
   db,
 } from './db.js';
 import { getSystemAndTrafficStats } from './statsService.js';
@@ -92,7 +100,10 @@ import {
   sendPasswordResetEmail,
   sendPartnerRequestEmail,
   sendInquiryToAdminEmail,
-  sendForwardedInquiryToTarget
+  sendForwardedInquiryToTarget,
+  sendGameSessionCreatedEmail,
+  sendGameSessionJoinNotification,
+  sendParticipantConfirmationEmail,
 } from './mailer.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -594,7 +605,8 @@ app.get('/api/players', (req, res) => {
   try {
     const { gender } = req.query;
     const players = getAllPlayers(gender);
-    res.json(players);
+    const publicPlayers = players.map(sanitizePublicPlayer);
+    res.json(publicPlayers);
   } catch (err) {
     res.status(500).json({ error: 'Failed to retrieve players list' });
   }
@@ -1495,6 +1507,8 @@ app.post('/api/register/player', upload.single('photo'), (req, res) => {
       university_type: university_type ? university_type.trim() : 'tu_chemnitz',
       university_name: university_name ? university_name.trim() : 'TU Chemnitz',
       photo_url,
+      avatar_type: req.body.avatar_type || 'badminton_smash',
+      is_public: req.body.is_public === false || req.body.is_public === 'false' || req.body.is_public === 0 || req.body.is_public === '0' ? 0 : 1,
     });
 
     res.status(201).json({
@@ -1923,6 +1937,238 @@ app.delete('/api/admin/inquiries/:id', requireAdmin, (req, res) => {
     res.json({ success: true, message: 'Anfrage gelöscht' });
   } catch (err) {
     res.status(500).json({ error: 'Fehler beim Löschen der Anfrage' });
+  }
+});
+
+// -------------------------------------------------------------
+// Looking for Group (LFG) / Spontaneous Game Sessions
+// -------------------------------------------------------------
+const sessionLimits = new Map();
+
+// 1. Public: Get All Active Game Sessions
+app.get('/api/game-sessions', (req, res) => {
+  try {
+    const sessions = getPublicGameSessions();
+    res.json(sessions);
+  } catch (err) {
+    console.error('Error fetching game sessions:', err);
+    res.status(500).json({ error: 'Fehler beim Laden der Spielrunden.' });
+  }
+});
+
+// 2. Public: Create a Game Session
+app.post('/api/game-sessions', async (req, res) => {
+  try {
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const now = Date.now();
+    const timestamps = (sessionLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000);
+    if (timestamps.length >= 5) {
+      return res.status(429).json({ error: 'Zu viele Spielrunden erstellt. Bitte warte einige Minuten.' });
+    }
+    timestamps.push(now);
+    sessionLimits.set(clientIp, timestamps);
+
+    const {
+      title,
+      host_name,
+      host_email,
+      host_phone,
+      location_name,
+      location_address,
+      session_date,
+      start_time,
+      end_time,
+      game_format,
+      max_players,
+      current_players,
+      skill_level,
+      cost_note,
+      description,
+      manage_pin
+    } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Titel der Spielrunde ist erforderlich.' });
+    }
+    if (!host_name || !host_name.trim()) {
+      return res.status(400).json({ error: 'Dein Name / Spitzname ist erforderlich.' });
+    }
+    if (!host_email || !host_email.trim() || !host_email.includes('@')) {
+      return res.status(400).json({ error: 'Eine gültige E-Mail-Adresse ist erforderlich, um Benachrichtigungen zu erhalten.' });
+    }
+    if (!location_name || !location_name.trim()) {
+      return res.status(400).json({ error: 'Spielort ist erforderlich (z.B. Feels Good Club).' });
+    }
+    if (!session_date || !session_date.trim()) {
+      return res.status(400).json({ error: 'Datum ist erforderlich.' });
+    }
+    if (!start_time || !start_time.trim()) {
+      return res.status(400).json({ error: 'Start-Uhrzeit ist erforderlich.' });
+    }
+
+    const pin = manage_pin && String(manage_pin).trim().length >= 4 
+      ? String(manage_pin).trim() 
+      : String(Math.floor(1000 + Math.random() * 9000));
+
+    const session = createGameSession({
+      title,
+      host_name,
+      host_email,
+      host_phone,
+      location_name,
+      location_address,
+      session_date,
+      start_time,
+      end_time,
+      game_format: game_format || 'doubles',
+      max_players: Number(max_players) || 4,
+      current_players: Number(current_players) || 1,
+      skill_level: skill_level || 'all',
+      cost_note,
+      description,
+      manage_pin: pin
+    });
+
+    // Send confirmation email to host with PIN
+    sendGameSessionCreatedEmail({
+      hostEmail: host_email.trim(),
+      hostName: host_name.trim(),
+      session,
+      managePin: pin
+    }).catch(e => console.error('Failed to send session created email:', e));
+
+    res.status(201).json({
+      success: true,
+      message: 'Spielrunde erfolgreich veröffentlicht!',
+      session: {
+        id: session.id,
+        title: session.title,
+        location_name: session.location_name,
+        session_date: session.session_date,
+        start_time: session.start_time,
+        status: session.status
+      },
+      pin
+    });
+  } catch (err) {
+    console.error('Error creating game session:', err);
+    res.status(500).json({ error: 'Fehler beim Erstellen der Spielrunde.' });
+  }
+});
+
+// 3. Public: Join a Game Session
+app.post('/api/game-sessions/:id/join', async (req, res) => {
+  try {
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const now = Date.now();
+    const timestamps = (sessionLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000);
+    if (timestamps.length >= 10) {
+      return res.status(429).json({ error: 'Zu viele Anfragen. Bitte warte einen Moment.' });
+    }
+    timestamps.push(now);
+    sessionLimits.set(clientIp, timestamps);
+
+    const sessionId = parseInt(req.params.id, 10);
+    const { participant_name, participant_email, participant_phone, skill_level, message } = req.body;
+
+    if (!participant_name || !participant_name.trim()) {
+      return res.status(400).json({ error: 'Dein Name / Spitzname ist erforderlich.' });
+    }
+    if (!participant_email || !participant_email.trim() || !participant_email.includes('@')) {
+      return res.status(400).json({ error: 'Gültige E-Mail-Adresse erforderlich für die Teilnahmebestätigung.' });
+    }
+
+    const result = joinGameSession({
+      session_id: sessionId,
+      participant_name,
+      participant_email,
+      participant_phone,
+      skill_level,
+      message
+    });
+
+    if (result.error) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    const { session, participant } = result;
+
+    // Send notifications to both host and participant
+    if (session.host_email) {
+      sendGameSessionJoinNotification({
+        hostEmail: session.host_email,
+        hostName: session.host_name,
+        session,
+        participant
+      }).catch(e => console.error('Failed to notify host:', e));
+    }
+
+    sendParticipantConfirmationEmail({
+      participantEmail: participant.participant_email,
+      participantName: participant.participant_name,
+      session,
+      hostName: session.host_name
+    }).catch(e => console.error('Failed to send participant confirmation:', e));
+
+    res.json({
+      success: true,
+      message: `Du bist erfolgreich eingetragen! Eine Bestätigung wurde an ${participant.participant_email} gesendet.`,
+      session: {
+        id: session.id,
+        current_players: session.current_players,
+        max_players: session.max_players,
+        status: session.status
+      }
+    });
+  } catch (err) {
+    console.error('Error joining game session:', err);
+    res.status(500).json({ error: 'Fehler beim Eintragen in die Spielrunde.' });
+  }
+});
+
+// 4. Public: Manage Game Session (Close / Cancel with PIN)
+app.post('/api/game-sessions/:id/manage', (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    const { pin, action } = req.body;
+
+    if (!pin) {
+      return res.status(400).json({ error: 'Bitte gib deine 4-stellige PIN ein.' });
+    }
+    if (!['close', 'reopen', 'cancel', 'delete'].includes(action)) {
+      return res.status(400).json({ error: 'Ungültige Aktion.' });
+    }
+
+    const result = manageGameSession({ id: sessionId, pin, action });
+    if (result.error) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    res.json({ success: true, message: 'Spielrunde erfolgreich aktualisiert!', ...result });
+  } catch (err) {
+    console.error('Error managing game session:', err);
+    res.status(500).json({ error: 'Fehler bei der Verwaltung der Spielrunde.' });
+  }
+});
+
+// 5. Admin: List All Sessions
+app.get('/api/admin/game-sessions', requireAdmin, (req, res) => {
+  try {
+    const sessions = getAllGameSessionsAdmin();
+    res.json(sessions);
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Laden aller Spielrunden.' });
+  }
+});
+
+// 6. Admin: Delete Session
+app.delete('/api/admin/game-sessions/:id', requireAdmin, (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.id, 10);
+    deleteGameSessionAdmin(sessionId);
+    res.json({ success: true, message: 'Spielrunde erfolgreich gelöscht.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Fehler beim Löschen der Spielrunde.' });
   }
 });
 

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { getApiUrl, safeFetchJson, saveOfflineSubmission, fileToDataUrl, getUploadUrl } from '../api/client';
+import BadmintonAvatar, { AVATAR_OPTIONS } from '../components/BadmintonAvatar';
 
 export default function RegistrationPage({ onNavigate }) {
   const { language, t } = useLanguage();
@@ -48,6 +49,8 @@ export default function RegistrationPage({ onNavigate }) {
   const [playerUniType, setPlayerUniType] = useState('tuc'); // 'tuc' | 'other'
   const [playerUniName, setPlayerUniName] = useState('TU Chemnitz');
   const [playerStudy, setPlayerStudy] = useState('');
+  const [playerAvatarType, setPlayerAvatarType] = useState('badminton_smash');
+  const [playerIsPublic, setPlayerIsPublic] = useState(true);
   const [playerPhotoFile, setPlayerPhotoFile] = useState(null);
   const [playerPhotoPreview, setPlayerPhotoPreview] = useState('');
   const [playerPhotoUrl, setPlayerPhotoUrl] = useState('');
@@ -141,6 +144,8 @@ export default function RegistrationPage({ onNavigate }) {
         university_type: playerUniType,
         university_name: playerUniType === 'other' ? playerUniName.trim() : 'TU Chemnitz',
         study_program: playerStudy.trim(),
+        avatar_type: playerAvatarType,
+        is_public: playerIsPublic ? 1 : 0,
       };
 
       let photoDataUrl = playerPhotoUrl.trim();
@@ -820,24 +825,58 @@ export default function RegistrationPage({ onNavigate }) {
               />
             </div>
 
-            {/* Profile Photo (Upload or URL) */}
-            <div className="sm:col-span-2 space-y-2 pt-2 border-t border-slate-100">
-              <label className="font-bold text-slate-700 block">
-                {reg.photoLabel}
-              </label>
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <div className="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center flex-shrink-0">
-                  {playerPhotoPreview || playerPhotoUrl ? (
-                    <img 
-                      src={playerPhotoPreview || getUploadUrl(playerPhotoUrl)} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover" 
-                    />
-                  ) : (
-                    <Users className="w-8 h-8 text-slate-400" />
-                  )}
+            {/* Badminton Sport Avatar Picker */}
+            <div className="sm:col-span-2 space-y-3 pt-2 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label className="font-bold text-slate-800 block text-xs sm:text-sm">
+                    {isDe ? '🏸 Wähle dein Badminton-Avatar (Kein Foto nötig)' : '🏸 Choose Badminton Avatar (No photo needed)'}
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    {isDe ? 'Bleibe geschützt und wähle eines unserer sportlichen Badminton-Icons:' : 'Protect your privacy with one of our badminton icons:'}
+                  </p>
                 </div>
-                <div className="flex-1 w-full space-y-2">
+                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 self-start sm:self-auto">
+                  <span className="text-[11px] text-slate-500 font-bold">{isDe ? 'Vorschau:' : 'Preview:'}</span>
+                  <BadmintonAvatar avatarType={playerAvatarType} photoUrl={playerPhotoPreview || playerPhotoUrl} name={playerName} size="sm" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {AVATAR_OPTIONS.map((opt) => {
+                  const isSelected = playerAvatarType === opt.id && !playerPhotoPreview && !playerPhotoUrl;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setPlayerAvatarType(opt.id);
+                        setPlayerPhotoFile(null);
+                        setPlayerPhotoPreview('');
+                        setPlayerPhotoUrl('');
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2.5 ${
+                        isSelected 
+                          ? 'border-[#005A36] bg-emerald-50/80 shadow-xs ring-1 ring-[#005A36]' 
+                          : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <BadmintonAvatar avatarType={opt.id} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-[11px] block truncate text-slate-900">{isDe ? opt.nameDe : opt.nameEn}</span>
+                        <span className="text-[10px] text-slate-400 block truncate">{isDe ? opt.descDe : opt.descEn}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Optional Custom Photo Upload */}
+              <details className="mt-2 text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <summary className="cursor-pointer font-bold text-slate-700 select-none">
+                  {isDe ? '📷 Optional: Eigenes Profilfoto verwenden' : '📷 Optional: Upload custom profile photo instead'}
+                </summary>
+                <div className="mt-3 space-y-2">
                   <input
                     type="file"
                     accept="image/*"
@@ -848,7 +887,7 @@ export default function RegistrationPage({ onNavigate }) {
                         setPlayerPhotoPreview(URL.createObjectURL(file));
                       }
                     }}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#005A36] file:text-white hover:file:bg-[#00472A] cursor-pointer"
+                    className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#005A36] file:text-white hover:file:bg-[#00472A] cursor-pointer"
                   />
                   <input
                     type="url"
@@ -858,10 +897,38 @@ export default function RegistrationPage({ onNavigate }) {
                       if (e.target.value) setPlayerPhotoPreview('');
                     }}
                     placeholder={reg.photoUrlPlaceholder}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-mono"
+                    className="w-full p-2 rounded-xl border border-slate-200 text-xs font-mono"
                   />
                 </div>
+              </details>
+            </div>
+
+            {/* Privacy Shield & Public Directory Visibility Toggle */}
+            <div className="sm:col-span-2 p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-2">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-[#005A36] flex-shrink-0" />
+                <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                  {isDe ? 'Datenschutz & Schutz deiner Privatsphäre' : 'Privacy & Directory Shield'}
+                </span>
               </div>
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={playerIsPublic}
+                  onChange={(e) => setPlayerIsPublic(e.target.checked)}
+                  className="mt-1 rounded border-slate-300 text-[#005A36] focus:ring-[#005A36] w-4 h-4"
+                />
+                <div className="text-xs text-slate-700 leading-relaxed">
+                  <span className="font-bold block text-slate-900">
+                    {isDe ? 'Profil im öffentlichen Spielerverzeichnis anzeigen' : 'List profile in public player directory'}
+                  </span>
+                  <span className="text-slate-500 text-[11px] block mt-0.5">
+                    {isDe 
+                      ? 'Dein Nachname wird automatisch geschützt (z. B. "Max M."). E-Mail & Telefon sind für Dritte niemals sichtbar — Anfragen werden per Mailer diskret weitergeleitet.'
+                      : 'Your last name is automatically abbreviated (e.g. "Max M."). Email & phone are never shown — inquiries are relayed discreetly via our secure server.'}
+                  </span>
+                </div>
+              </label>
             </div>
 
           </div>

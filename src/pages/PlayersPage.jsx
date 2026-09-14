@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, GraduationCap, Target, Mail, UserPlus, Star, School, Phone, Trophy } from 'lucide-react';
+import { Users, GraduationCap, Target, Mail, UserPlus, Star, School, Phone, Trophy, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { safeFetchJson, getUploadUrl } from '../api/client';
 import { DEFAULT_PLAYERS } from '../data/mockData';
 import PartnerRequestModal from '../components/PartnerRequestModal';
+import BadmintonAvatar from '../components/BadmintonAvatar';
 
 export default function PlayersPage({ onNavigate }) {
   const [players, setPlayers] = useState(DEFAULT_PLAYERS);
@@ -56,26 +57,14 @@ export default function PlayersPage({ onNavigate }) {
         className="rounded-2xl p-4 sm:p-5 bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3.5"
       >
         <div className="space-y-3">
-          {/* Header with Photo & Basic Info */}
+          {/* Header with Badminton Avatar / Photo & Basic Info */}
           <div className="flex items-start gap-3 sm:gap-3.5">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0 flex items-center justify-center">
-              {player.photo_url && getUploadUrl(player.photo_url) ? (
-                <img
-                  src={getUploadUrl(player.photo_url)}
-                  alt={player.name}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full bg-[#005A36]/10 text-[#005A36] font-bold flex items-center justify-center text-lg sm:text-xl">
-                  {player.name ? player.name.charAt(0) : <Users className="w-6 h-6 text-slate-400" />}
-                </div>
-              )}
-            </div>
+            <BadmintonAvatar
+              photoUrl={player.photo_url}
+              avatarType={player.avatar_type}
+              name={player.name}
+              size="md"
+            />
 
             <div className="space-y-1 min-w-0 flex-1">
               <div className="flex items-center justify-between gap-1 flex-wrap">
@@ -146,33 +135,21 @@ export default function PlayersPage({ onNavigate }) {
           </div>
         </div>
 
-        {/* Email, Phone & Tournament Partner Request Buttons */}
-        <div className="pt-2 border-t border-slate-100 space-y-1.5">
+        {/* Privacy-Shielded Contact Action */}
+        <div className="pt-2 border-t border-slate-100 space-y-2">
           <button
             type="button"
             onClick={() => setPartnerModalPlayer(player)}
-            className="flex items-center justify-center gap-1.5 w-full py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#005A36] to-emerald-700 hover:from-[#00472A] hover:to-emerald-800 shadow-xs hover:shadow transition-all"
+            className="flex items-center justify-center gap-2 w-full py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#005A36] to-emerald-700 hover:from-[#00472A] hover:to-emerald-800 shadow-xs hover:shadow transition-all"
           >
-            <Trophy className="w-3.5 h-3.5 flex-shrink-0 text-amber-300" />
-            <span>{isDe ? '🏸 Turnierpartner anfragen' : '🏸 Request as Partner'}</span>
+            <Mail className="w-3.5 h-3.5 flex-shrink-0 text-emerald-200" />
+            <span>{isDe ? '🏸 Spieler diskret anfragen' : '🏸 Contact Player Privately'}</span>
           </button>
 
-          <a
-            href={`mailto:${player.email}?subject=${encodeURIComponent(pl.emailPrefix)}`}
-            className="flex items-center justify-center gap-1.5 w-full py-1.5 px-3 min-h-[36px] rounded-xl text-xs font-semibold text-slate-700 hover:text-white bg-slate-50 hover:bg-[#005A36] active:bg-[#00472A] border border-slate-200 transition-colors"
-          >
-            <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="truncate">{player.email}</span>
-          </a>
-          {player.phone && (player.show_phone === 1 || player.show_phone === true || player.show_phone === '1') && (
-            <a
-              href={`tel:${player.phone}`}
-              className="flex items-center justify-center gap-1.5 w-full py-1.5 px-3 min-h-[36px] rounded-xl text-xs font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
-            >
-              <Phone className="w-3.5 h-3.5 flex-shrink-0 text-[#005A36]" />
-              <span className="truncate">{player.phone}</span>
-            </a>
-          )}
+          <div className="flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 font-medium">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span className="truncate">{isDe ? 'E-Mail geschützt • Diskrete Weiterleitung' : 'Email protected • Discrete relay'}</span>
+          </div>
         </div>
       </div>
     );
@@ -240,6 +217,33 @@ export default function PlayersPage({ onNavigate }) {
             {pl.tabWomen} ({womenList.length})
           </button>
         </div>
+      </div>
+
+      {/* Privacy Shield Info Banner */}
+      <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-[#005A36] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+            <ShieldCheck className="w-5 h-5 text-emerald-200" />
+          </div>
+          <div>
+            <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
+              {isDe ? '🛡️ Schutz der Privatsphäre aller Studierenden' : '🛡️ Student Privacy Shield'}
+            </h4>
+            <p className="text-[11px] sm:text-xs text-emerald-800 leading-snug">
+              {isDe 
+                ? 'E-Mails, Telefonnummern und Nachnamen werden niemals öffentlich angezeigt. Kontaktanfragen werden sicher und diskret per Server an den Spieler weitergeleitet.'
+                : 'Emails, phone numbers, and last names are kept strictly private. Requests are relayed discreetly and securely via our server.'}
+            </p>
+          </div>
+        </div>
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('sessions')}
+            className="whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-bold bg-white text-[#005A36] hover:bg-emerald-100/60 border border-emerald-200 transition-colors shadow-xs self-end sm:self-auto"
+          >
+            {isDe ? '🤝 Zu den Spielrunden' : '🤝 Looking for Games?'}
+          </button>
+        )}
       </div>
 
       {loading && (
