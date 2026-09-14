@@ -15,7 +15,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Edit3,
   Sparkles,
   UserPlus,
   X
@@ -23,7 +22,6 @@ import {
 import { useLanguage } from '../context/LanguageContext';
 import StadiumCarousel from '../components/StadiumCarousel';
 import YouTubeSection from '../components/YouTubeSection';
-import TrainingTimingsModal from '../components/TrainingTimingsModal';
 import { getApiUrl, safeFetchJson } from '../api/client';
 
 export default function HomePage({ onNavigate }) {
@@ -33,10 +31,8 @@ export default function HomePage({ onNavigate }) {
   const [announcement, setAnnouncement] = useState(null);
   const [copied, setCopied] = useState(false);
   
-  // Dynamic Training Schedules & Quick-Edit Modal state
+  // Dynamic Training Schedules state
   const [schedules, setSchedules] = useState([]);
-  const [isTrainingEditOpen, setIsTrainingEditOpen] = useState(false);
-  const [adminToken, setAdminToken] = useState(() => localStorage.getItem('tuc_admin_token') || '');
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText('Thüringer Weg 11, 09126 Chemnitz, Deutschland');
@@ -57,13 +53,6 @@ export default function HomePage({ onNavigate }) {
 
   useEffect(() => {
     fetchSchedules();
-
-    // Re-check admin status if token changes in storage
-    const handleStorage = () => {
-      setAdminToken(localStorage.getItem('tuc_admin_token') || '');
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   useEffect(() => {
@@ -252,32 +241,9 @@ export default function HomePage({ onNavigate }) {
               <Clock className="w-4 h-4 text-[#005A36] flex-shrink-0" />
               <h3 className="font-bold text-sm sm:text-base text-slate-900 truncate">{h.scheduleTitle}</h3>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-[#005A36]">
-                {h.scheduleBadge}
-              </span>
-              {adminToken ? (
-                <button
-                  type="button"
-                  onClick={() => setIsTrainingEditOpen(true)}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[#005A36] border border-emerald-300 text-[10px] sm:text-[11px] font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-                  title="Trainingszeiten bearbeiten"
-                >
-                  <Edit3 className="w-3 h-3 text-[#005A36]" />
-                  <span>{h.editScheduleBtn || 'Bearbeiten'}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onNavigate('admin')}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 text-[10px] font-medium transition-colors cursor-pointer"
-                  title="Admin-Login für Bearbeitung"
-                >
-                  <Edit3 className="w-2.5 h-2.5" />
-                  <span className="hidden sm:inline">Admin-Edit</span>
-                </button>
-              )}
-            </div>
+            <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-[#005A36] border border-emerald-200 flex-shrink-0">
+              {h.scheduleBadge}
+            </span>
           </div>
 
           <div className="space-y-2.5 sm:space-y-3 text-xs">
@@ -334,17 +300,6 @@ export default function HomePage({ onNavigate }) {
                   <span className="font-mono text-[10px] sm:text-[11px] text-slate-400 self-start sm:self-auto">{h.hallNameShort}</span>
                 </div>
               </>
-            )}
-
-            {adminToken && (
-              <button
-                type="button"
-                onClick={() => setIsTrainingEditOpen(true)}
-                className="w-full mt-1.5 py-2 px-3 rounded-xl border border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98"
-              >
-                <Edit3 className="w-3.5 h-3.5 text-emerald-700" />
-                <span>{h.manageScheduleBtn || 'Trainingszeiten anpassen / Termine verwalten'}</span>
-              </button>
             )}
           </div>
         </div>
@@ -525,16 +480,6 @@ export default function HomePage({ onNavigate }) {
 
         </div>
       </section>
-
-      {/* Dynamic Training Timings Quick-Edit Modal for Admin */}
-      <TrainingTimingsModal
-        isOpen={isTrainingEditOpen}
-        onClose={() => setIsTrainingEditOpen(false)}
-        schedules={schedules}
-        onSaveSuccess={fetchSchedules}
-        adminToken={adminToken}
-      />
-
     </div>
   );
 }
