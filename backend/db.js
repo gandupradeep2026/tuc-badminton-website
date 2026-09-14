@@ -1981,12 +1981,15 @@ export function updateDonationSettings({
 export function getPublicGameSessions() {
   const sessions = db.prepare(`
     SELECT 
-      id, title, host_name, location_name, location_address,
-      session_date, start_time, end_time, game_format,
+      id, title, host_name,
+      location_name, location_name AS venue,
+      location_address, location_address AS address,
+      session_date, start_time, end_time,
+      game_format, game_format AS format,
       max_players, current_players, skill_level, cost_note,
       description, status, created_at
     FROM game_sessions 
-    WHERE status IN ('open', 'full')
+    WHERE status IN ('open', 'full', 'cancelled')
     ORDER BY session_date ASC, start_time ASC
   `).all();
 
@@ -2004,7 +2007,13 @@ export function getPublicGameSessions() {
 }
 
 export function getGameSessionById(id) {
-  return db.prepare('SELECT * FROM game_sessions WHERE id = ?').get(id);
+  const s = db.prepare('SELECT * FROM game_sessions WHERE id = ?').get(id);
+  if (s) {
+    s.venue = s.location_name;
+    s.address = s.location_address;
+    s.format = s.game_format;
+  }
+  return s;
 }
 
 export function createGameSession(data) {
@@ -2014,18 +2023,27 @@ export function createGameSession(data) {
     host_email,
     host_phone,
     location_name,
+    venue,
     location_address,
+    address,
     session_date,
     start_time,
     end_time,
-    game_format = 'doubles',
+    game_format = 'Doppel',
+    format,
     max_players = 4,
     current_players = 1,
     skill_level = 'all',
     cost_note,
     description,
-    manage_pin
+    manage_pin,
+    host_pin
   } = data;
+
+  const locName = location_name || venue || 'Feels Good Club Chemnitz';
+  const locAddr = location_address || address || '';
+  const gFormat = game_format || format || 'Doppel';
+  const pin = manage_pin || host_pin || '1234';
 
   const stmt = db.prepare(`
     INSERT INTO game_sessions (
@@ -2040,18 +2058,18 @@ export function createGameSession(data) {
     host_name ? host_name.trim() : 'Spieler',
     host_email.trim().toLowerCase(),
     host_phone ? host_phone.trim() : '',
-    location_name ? location_name.trim() : 'Feels Good Club Chemnitz',
-    location_address ? location_address.trim() : '',
+    locName ? locName.trim() : 'Feels Good Club Chemnitz',
+    locAddr ? locAddr.trim() : '',
     session_date.trim(),
     start_time.trim(),
     end_time ? end_time.trim() : '',
-    game_format || 'doubles',
+    gFormat || 'Doppel',
     Number(max_players) || 4,
     Math.max(1, Number(current_players) || 1),
     skill_level || 'all',
     cost_note ? cost_note.trim() : '',
     description ? description.trim() : '',
-    manage_pin ? String(manage_pin).trim() : '1234'
+    pin ? String(pin).trim() : '1234'
   );
 
   const newId = Number(info.lastInsertRowid);
@@ -2082,28 +2100,18 @@ export function joinGameSession({ session_id, participant_name, participant_emai
     message ? message.trim() : ''
   );
 
-  // Increment current_players and check if full
-  const newCount = session.current_players + 1;
-  const newStatus = newCount >= session.max_players ? 'full' : 'open';
-
+  // Increment current_players count
   db.prepare(`
     UPDATE game_sessions 
-    SET current_players = ?, status = ? 
+    SET current_players = current_players + 1,
+        status = CASE WHEN current_players + 1 >= max_players THEN 'full' ELSE 'open' END
     WHERE id = ?
-  `).run(newCount, newStatus, session_id);
+  `).run(session_id);
 
   const updatedSession = getGameSessionById(session_id);
-  return { 
-    success: true, 
-    session: updatedSession,
-    participant: {
-      participant_name: participant_name.trim(),
-      participant_email: participant_email.trim().toLowerCase(),
-      participant_phone: participant_phone ? participant_phone.trim() : '',
-      skill_level: skill_level || 'intermediate',
-      message: message ? message.trim() : ''
-    }
-  };
+  const participant = db.prepare('SELECT * FROM game_session_participants WHERE session_id = ? ORDER BY id DESC LIMIT 1').get(session_id);
+
+  return { session: updatedSession, participant };
 }
 
 export function manageGameSession({ id, pin, action }) {
@@ -2112,14 +2120,13 @@ export function manageGameSession({ id, pin, action }) {
     return { error: 'Spielrunde nicht gefunden.', status: 404 };
   }
 
-  // Verify PIN
-  if (session.manage_pin !== String(pin).trim()) {
+  if (String(session.manage_pin).trim() !== String(pin).trim()) {
     return { error: 'Ungültige PIN für diese Spielrunde.', status: 403 };
   }
 
   if (action === 'close') {
     db.prepare("UPDATE game_sessions SET status = 'full' WHERE id = ?").run(id);
-  } else if (action === 'reopen') {
+  } else if (action === 'reopen' || action === 'open') {
     db.prepare("UPDATE game_sessions SET status = 'open' WHERE id = ?").run(id);
   } else if (action === 'cancel') {
     db.prepare("UPDATE game_sessions SET status = 'cancelled' WHERE id = ?").run(id);
@@ -2134,7 +2141,7 @@ export function manageGameSession({ id, pin, action }) {
 
 export function getAllGameSessionsAdmin() {
   const sessions = db.prepare(`
-    SELECT * FROM game_sessions ORDER BY id DESC
+    SELECT *, location_name AS venue, location_address AS address, game_format AS format FROM game_sessions ORDER BY id DESC
   `).all();
 
   for (const s of sessions) {

@@ -1974,18 +1974,27 @@ app.post('/api/game-sessions', async (req, res) => {
       host_email,
       host_phone,
       location_name,
+      venue,
       location_address,
+      address,
       session_date,
       start_time,
       end_time,
       game_format,
+      format,
       max_players,
       current_players,
       skill_level,
       cost_note,
       description,
-      manage_pin
+      manage_pin,
+      host_pin
     } = req.body;
+
+    const finalLocation = location_name || venue || 'Feels Good Club Chemnitz';
+    const finalAddress = location_address || address || '';
+    const finalFormat = game_format || format || 'Doppel';
+    const finalPin = manage_pin || host_pin || '';
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Titel der Spielrunde ist erforderlich.' });
@@ -1996,7 +2005,7 @@ app.post('/api/game-sessions', async (req, res) => {
     if (!host_email || !host_email.trim() || !host_email.includes('@')) {
       return res.status(400).json({ error: 'Eine gültige E-Mail-Adresse ist erforderlich, um Benachrichtigungen zu erhalten.' });
     }
-    if (!location_name || !location_name.trim()) {
+    if (!finalLocation || !finalLocation.trim()) {
       return res.status(400).json({ error: 'Spielort ist erforderlich (z.B. Feels Good Club).' });
     }
     if (!session_date || !session_date.trim()) {
@@ -2006,8 +2015,8 @@ app.post('/api/game-sessions', async (req, res) => {
       return res.status(400).json({ error: 'Start-Uhrzeit ist erforderlich.' });
     }
 
-    const pin = manage_pin && String(manage_pin).trim().length >= 4 
-      ? String(manage_pin).trim() 
+    const pin = finalPin && String(finalPin).trim().length >= 4 
+      ? String(finalPin).trim() 
       : String(Math.floor(1000 + Math.random() * 9000));
 
     const session = createGameSession({
@@ -2015,12 +2024,12 @@ app.post('/api/game-sessions', async (req, res) => {
       host_name,
       host_email,
       host_phone,
-      location_name,
-      location_address,
+      location_name: finalLocation,
+      location_address: finalAddress,
       session_date,
       start_time,
       end_time,
-      game_format: game_format || 'doubles',
+      game_format: finalFormat,
       max_players: Number(max_players) || 4,
       current_players: Number(current_players) || 1,
       skill_level: skill_level || 'all',
@@ -2069,7 +2078,7 @@ app.post('/api/game-sessions/:id/join', async (req, res) => {
     sessionLimits.set(clientIp, timestamps);
 
     const sessionId = parseInt(req.params.id, 10);
-    const { participant_name, participant_email, participant_phone, skill_level, message } = req.body;
+    const { participant_name, participant_email, participant_phone, skill_level, message, notes } = req.body;
 
     if (!participant_name || !participant_name.trim()) {
       return res.status(400).json({ error: 'Dein Name / Spitzname ist erforderlich.' });
@@ -2083,8 +2092,8 @@ app.post('/api/game-sessions/:id/join', async (req, res) => {
       participant_name,
       participant_email,
       participant_phone,
-      skill_level,
-      message
+      skill_level: skill_level || 'Fortgeschritten',
+      message: message || notes || ''
     });
 
     if (result.error) {
@@ -2130,12 +2139,13 @@ app.post('/api/game-sessions/:id/join', async (req, res) => {
 app.post('/api/game-sessions/:id/manage', (req, res) => {
   try {
     const sessionId = parseInt(req.params.id, 10);
-    const { pin, action } = req.body;
+    const pin = req.body.pin || req.body.host_pin;
+    const action = req.body.action;
 
     if (!pin) {
       return res.status(400).json({ error: 'Bitte gib deine 4-stellige PIN ein.' });
     }
-    if (!['close', 'reopen', 'cancel', 'delete'].includes(action)) {
+    if (!['close', 'open', 'reopen', 'cancel', 'delete'].includes(action)) {
       return res.status(400).json({ error: 'Ungültige Aktion.' });
     }
 
