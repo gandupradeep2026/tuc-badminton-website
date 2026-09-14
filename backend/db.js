@@ -388,6 +388,9 @@ export function initDatabase() {
       description TEXT,
       manage_pin TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'open',
+      shuttlecock_type TEXT DEFAULT 'feather',
+      intensity_level TEXT DEFAULT 'casual',
+      total_cost REAL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -412,6 +415,11 @@ export function initDatabase() {
   try { db.exec("ALTER TABLE trainers ADD COLUMN hochschulsport_note TEXT;"); } catch (e) {}
   try { db.exec("ALTER TABLE trainers ADD COLUMN status TEXT DEFAULT 'approved';"); } catch (e) {}
   try { db.exec("ALTER TABLE trainers ADD COLUMN show_phone INTEGER DEFAULT 0;"); } catch (e) {}
+
+  // Schema upgrades for game_sessions (shuttlecock_type, intensity_level, total_cost)
+  try { db.exec("ALTER TABLE game_sessions ADD COLUMN shuttlecock_type TEXT DEFAULT 'feather';"); } catch (e) {}
+  try { db.exec("ALTER TABLE game_sessions ADD COLUMN intensity_level TEXT DEFAULT 'casual';"); } catch (e) {}
+  try { db.exec("ALTER TABLE game_sessions ADD COLUMN total_cost REAL DEFAULT 0;"); } catch (e) {}
 
   // Create a minimal valid sample PDF for the seeded tournament announcement
   const samplePdfPath = path.join(uploadsDir, 'ausschreibung_shm_2026.pdf');
@@ -2053,7 +2061,10 @@ export function createGameSession(data) {
     cost_note,
     description,
     manage_pin,
-    host_pin
+    host_pin,
+    shuttlecock_type = 'feather',
+    intensity_level = 'casual',
+    total_cost = 0
   } = data;
 
   const locName = location_name || venue || 'Feels Good Club Chemnitz';
@@ -2065,8 +2076,9 @@ export function createGameSession(data) {
     INSERT INTO game_sessions (
       title, host_name, host_email, host_phone, location_name, location_address,
       session_date, start_time, end_time, game_format, max_players, current_players,
-      skill_level, cost_note, description, manage_pin, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')
+      skill_level, cost_note, description, manage_pin, status,
+      shuttlecock_type, intensity_level, total_cost
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)
   `);
 
   const info = stmt.run(
@@ -2085,7 +2097,10 @@ export function createGameSession(data) {
     skill_level || 'all',
     cost_note ? cost_note.trim() : '',
     description ? description.trim() : '',
-    pin ? String(pin).trim() : '1234'
+    pin ? String(pin).trim() : '1234',
+    shuttlecock_type || 'feather',
+    intensity_level || 'casual',
+    Number(total_cost) || 0
   );
 
   const newId = Number(info.lastInsertRowid);

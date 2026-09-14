@@ -13,8 +13,21 @@ import {
   ShieldCheck, 
   Sparkles,
   Filter,
-  UserCheck
+  UserCheck,
+  Share2,
+  Download,
+  DollarSign,
+  Activity,
+  Flame,
+  Smile,
+  ChevronDown
 } from 'lucide-react';
+import {
+  downloadIcsCalendarFile,
+  getGoogleCalendarUrl,
+  getWhatsAppShareUrl,
+  getVenueAmenities
+} from '../utils/calendar';
 import { useLanguage } from '../context/LanguageContext';
 import { safeFetchJson } from '../api/client';
 import BadmintonAvatar, { AVATAR_OPTIONS } from '../components/BadmintonAvatar';
@@ -34,6 +47,8 @@ export default function SessionsPage({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [filterVenue, setFilterVenue] = useState('all');
   const [filterFormat, setFilterFormat] = useState('all');
+  const [filterShuttle, setFilterShuttle] = useState('all'); // 'all' | 'feather' | 'plastic'
+  const [filterIntensity, setFilterIntensity] = useState('all'); // 'all' | 'casual' | 'sparring'
   const [showOnlyOpen, setShowOnlyOpen] = useState(false);
 
   // Modals state
@@ -51,7 +66,10 @@ export default function SessionsPage({ onNavigate }) {
   const [createFormat, setCreateFormat] = useState('Doppel');
   const [createSkillLevel, setCreateSkillLevel] = useState('Alle Spielstärken');
   const [createMaxPlayers, setCreateMaxPlayers] = useState(4);
-  const [createCostNote, setCreateCostNote] = useState('Courtmiete geteilt (ca. 4€ p.P.)');
+  const [createCostNote, setCreateCostNote] = useState('Courtmiete geteilt');
+  const [createShuttlecock, setCreateShuttlecock] = useState('feather'); // 'feather' | 'plastic' | 'any'
+  const [createIntensity, setCreateIntensity] = useState('casual'); // 'casual' | 'sparring'
+  const [createTotalCost, setCreateTotalCost] = useState(24); // default 24€ for 2h court
   const [createDescription, setCreateDescription] = useState('');
   const [createHostName, setCreateHostName] = useState('');
   const [createHostEmail, setCreateHostEmail] = useState('');
@@ -160,6 +178,9 @@ export default function SessionsPage({ onNavigate }) {
         host_phone: createHostPhone.trim(),
         host_avatar_type: createHostAvatar,
         host_pin: createHostPin.trim(),
+        shuttlecock_type: createShuttlecock,
+        intensity_level: createIntensity,
+        total_cost: parseFloat(createTotalCost) || 0,
         invited_player_ids: invitedPlayerIds
       };
 
@@ -325,6 +346,15 @@ export default function SessionsPage({ onNavigate }) {
     if (showOnlyOpen && (s.status !== 'open' || (s.current_players >= s.max_players))) return false;
     if (filterVenue !== 'all' && !s.venue.toLowerCase().includes(filterVenue.toLowerCase())) return false;
     if (filterFormat !== 'all' && s.format !== filterFormat) return false;
+    if (filterShuttle !== 'all') {
+      const sType = s.shuttlecock_type || 'feather';
+      if (filterShuttle === 'feather' && sType !== 'feather' && sType !== 'any') return false;
+      if (filterShuttle === 'plastic' && sType !== 'plastic' && sType !== 'any') return false;
+    }
+    if (filterIntensity !== 'all') {
+      const sInt = s.intensity_level || 'casual';
+      if (sInt !== filterIntensity) return false;
+    }
     return true;
   });
 
@@ -423,6 +453,26 @@ export default function SessionsPage({ onNavigate }) {
             <option value="Spieleabend">Offener Spieleabend</option>
           </select>
 
+          <select
+            value={filterShuttle}
+            onChange={(e) => setFilterShuttle(e.target.value)}
+            className="p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700"
+          >
+            <option value="all">{isDe ? '🪶/🟡 Alle Bälle' : '🪶/🟡 All Shuttles'}</option>
+            <option value="feather">{isDe ? '🪶 Nur Federbälle' : '🪶 Feather Shuttles'}</option>
+            <option value="plastic">{isDe ? '🟡 Nur Plastik/Nylon' : '🟡 Plastic/Nylon'}</option>
+          </select>
+
+          <select
+            value={filterIntensity}
+            onChange={(e) => setFilterIntensity(e.target.value)}
+            className="p-2 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700"
+          >
+            <option value="all">{isDe ? '⚡ Alle Intensitäten' : '⚡ All Intensities'}</option>
+            <option value="casual">{isDe ? '😊 Casual / Lockeres Spiel' : '😊 Casual / Fun'}</option>
+            <option value="sparring">{isDe ? '🔥 Sparring / Intensiv' : '🔥 Sparring / Matchplay'}</option>
+          </select>
+
           <label className="flex items-center gap-1.5 cursor-pointer ml-1 text-slate-700 font-semibold select-none">
             <input
               type="checkbox"
@@ -503,9 +553,29 @@ export default function SessionsPage({ onNavigate }) {
                         : (isDe ? `Offen (${slotsLeft} frei)` : `Open (${slotsLeft} slots)`)}
                     </span>
 
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-[11px]">
-                      {session.format}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-bold text-[10px]">
+                        {session.format}
+                      </span>
+                      {/* Shuttlecock Badge */}
+                      <span className={`px-2 py-0.5 rounded-lg font-bold text-[10px] border ${
+                        session.shuttlecock_type === 'plastic'
+                          ? 'bg-amber-50 text-amber-900 border-amber-200'
+                          : session.shuttlecock_type === 'any'
+                          ? 'bg-slate-100 text-slate-700 border-slate-200'
+                          : 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                      }`}>
+                        {session.shuttlecock_type === 'plastic' ? '🟡 Plastik' : session.shuttlecock_type === 'any' ? '🏸 Beliebig' : '🪶 Federbälle'}
+                      </span>
+                      {/* Intensity Badge */}
+                      <span className={`px-2 py-0.5 rounded-lg font-bold text-[10px] border ${
+                        session.intensity_level === 'sparring'
+                          ? 'bg-rose-50 text-rose-900 border-rose-200'
+                          : 'bg-sky-50 text-sky-900 border-sky-200'
+                      }`}>
+                        {session.intensity_level === 'sparring' ? '🔥 Sparring' : '😊 Casual'}
+                      </span>
+                    </div>
                   </div>
 
                   <h3 className="text-base font-bold text-slate-900 leading-snug">
@@ -550,6 +620,25 @@ export default function SessionsPage({ onNavigate }) {
                     </div>
                   </div>
 
+                  {/* Venue Amenities Chips */}
+                  {(() => {
+                    const amenities = getVenueAmenities(session.venue);
+                    return (
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {amenities.map(a => (
+                          <span
+                            key={a.id}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100/90 text-slate-600 text-[10px] font-medium"
+                            title={isDe ? a.labelDe : a.labelEn}
+                          >
+                            <span>{a.icon}</span>
+                            <span className="truncate max-w-[120px]">{isDe ? a.labelDe : a.labelEn}</span>
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   {/* Level & Cost */}
                   <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
                     <span>Niveau: <strong className="text-slate-700">{session.skill_level}</strong></span>
@@ -559,6 +648,37 @@ export default function SessionsPage({ onNavigate }) {
                       </span>
                     )}
                   </div>
+
+                  {/* Dynamic Court Split Cost Calculator */}
+                  {(() => {
+                    const totalCost = Number(session.total_cost) || 0;
+                    if (totalCost <= 0) return null;
+                    const maxP = Number(session.max_players) || 4;
+                    const curP = Math.max(1, Number(session.current_players) || 1);
+                    const curSplit = (totalCost / curP).toFixed(2).replace('.', ',');
+                    const fullSplit = (totalCost / maxP).toFixed(2).replace('.', ',');
+                    const isFullSession = curP >= maxP;
+                    return (
+                      <div className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/80 text-[11px] text-emerald-950 space-y-1">
+                        <div className="flex items-center justify-between font-bold">
+                          <span className="flex items-center gap-1 text-[#005A36]">
+                            <DollarSign className="w-3.5 h-3.5" />
+                            <span>Court-Kostenrechner:</span>
+                          </span>
+                          <span className="font-mono">{totalCost.toFixed(2).replace('.', ',')} € Gesamt</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-emerald-900">
+                          <span>Aktuell ({curP} {curP === 1 ? 'Spieler' : 'Spieler'}): <strong>{curSplit} € p.P.</strong></span>
+                          <span>Bei Vollbelegung ({maxP}): <strong className="text-[#005A36]">{fullSplit} € p.P.</strong></span>
+                        </div>
+                        {!isFullSession && (
+                          <p className="text-[9.5px] text-emerald-700 font-medium italic pt-0.5 border-t border-emerald-200/50">
+                            🎉 Jeder neue Mitspieler senkt die Kosten für alle auf {(totalCost / (curP + 1)).toFixed(2).replace('.', ',')} €!
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Slot Visualizer & Host */}
                   <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
@@ -885,6 +1005,109 @@ export default function SessionsPage({ onNavigate }) {
                   </div>
                 </div>
 
+                {/* Match Quality: Shuttlecock & Intensity */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div>
+                    <label className="font-bold text-slate-800 block mb-1.5 text-xs">
+                      {isDe ? '🪶 Ballart (Shuttlecock)' : '🪶 Shuttlecock Type'}
+                    </label>
+                    <div className="grid grid-cols-3 gap-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setCreateShuttlecock('feather')}
+                        className={`py-2 px-1 rounded-xl font-bold border transition-all text-center ${
+                          createShuttlecock === 'feather'
+                            ? 'bg-[#005A36] text-white border-[#005A36]'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        🪶 Feder
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreateShuttlecock('plastic')}
+                        className={`py-2 px-1 rounded-xl font-bold border transition-all text-center ${
+                          createShuttlecock === 'plastic'
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        🟡 Plastik
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreateShuttlecock('any')}
+                        className={`py-2 px-1 rounded-xl font-bold border transition-all text-center ${
+                          createShuttlecock === 'any'
+                            ? 'bg-slate-800 text-white border-slate-800'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        🏸 Beliebig
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-800 block mb-1.5 text-xs">
+                      {isDe ? '⚡ Spiel-Intensität' : '⚡ Match Intensity'}
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setCreateIntensity('casual')}
+                        className={`py-2 px-2 rounded-xl font-bold border transition-all text-center flex items-center justify-center gap-1 ${
+                          createIntensity === 'casual'
+                            ? 'bg-sky-600 text-white border-sky-600'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Smile className="w-3.5 h-3.5" />
+                        <span>Casual</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreateIntensity('sparring')}
+                        className={`py-2 px-2 rounded-xl font-bold border transition-all text-center flex items-center justify-center gap-1 ${
+                          createIntensity === 'sparring'
+                            ? 'bg-rose-600 text-white border-rose-600'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Flame className="w-3.5 h-3.5" />
+                        <span>Sparring</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Total Court Cost & Live Split Calculation */}
+                  <div className="sm:col-span-2 pt-2 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex-1">
+                      <label className="font-bold text-slate-800 text-xs block">
+                        {isDe ? 'Gesamte Courtmiete (€)' : 'Total Court Booking Cost (€)'}
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        {isDe ? 'Wird automatisch unter allen Mitspielern aufgeteilt' : 'Will be split automatically among players'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={createTotalCost}
+                        onChange={(e) => setCreateTotalCost(e.target.value)}
+                        placeholder="24"
+                        className="w-24 p-2 rounded-xl border border-slate-300 font-mono font-bold text-xs text-center"
+                      />
+                      <span className="text-xs font-bold text-slate-600">€</span>
+                      <span className="text-[11px] font-semibold text-[#005A36] bg-emerald-100/70 px-2 py-1 rounded-lg border border-emerald-200">
+                        {createTotalCost && createMaxPlayers > 0 ? `ca. ${(createTotalCost / createMaxPlayers).toFixed(2).replace('.', ',')} € p.P.` : '0 €'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
                     {isDe ? 'Notiz / Nachricht für Mitspieler (optional)' : 'Notes for Players (optional)'}
@@ -1013,9 +1236,39 @@ export default function SessionsPage({ onNavigate }) {
             )}
 
             {joinSuccessMsg && (
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
-                <span>{joinSuccessMsg}</span>
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs space-y-3">
+                <div className="flex items-center gap-2 font-bold text-sm text-emerald-950">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <span>{joinSuccessMsg}</span>
+                </div>
+                <div className="pt-2 border-t border-emerald-200 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => downloadIcsCalendarFile(joinModalSession, isDe)}
+                    className="py-2 px-3 rounded-xl font-bold bg-[#005A36] text-white hover:bg-[#00472A] flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{isDe ? 'In Kalender eintragen (.ics)' : 'Add to Calendar (.ics)'}</span>
+                  </button>
+                  <a
+                    href={getGoogleCalendarUrl(joinModalSession, isDe)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="py-2 px-3 rounded-xl font-bold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Google Calendar</span>
+                  </a>
+                  <a
+                    href={getWhatsAppShareUrl(joinModalSession, isDe)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="py-2 px-3 rounded-xl font-bold bg-[#25D366] text-white hover:bg-[#20ba59] flex items-center gap-1.5 ml-auto"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>WhatsApp</span>
+                  </a>
+                </div>
               </div>
             )}
 

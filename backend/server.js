@@ -2175,7 +2175,10 @@ app.post('/api/game-sessions', async (req, res) => {
       cost_note,
       description,
       manage_pin,
-      host_pin
+      host_pin,
+      shuttlecock_type,
+      intensity_level,
+      total_cost
     } = req.body;
 
     const finalLocation = location_name || venue || 'Feels Good Club Chemnitz';
@@ -2222,7 +2225,10 @@ app.post('/api/game-sessions', async (req, res) => {
       skill_level: skill_level || 'all',
       cost_note,
       description,
-      manage_pin: pin
+      manage_pin: pin,
+      shuttlecock_type: shuttlecock_type || 'feather',
+      intensity_level: intensity_level || 'casual',
+      total_cost: Number(total_cost) || 0
     });
 
     // Send confirmation email to host with PIN
