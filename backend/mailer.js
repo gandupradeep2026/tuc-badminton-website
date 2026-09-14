@@ -637,6 +637,18 @@ export async function sendOtpVerificationEmail({ to, code, scope = 'student_gate
       titleEn: '✏️ Edit Player Profile',
       descDe: 'Verwende diesen Bestätigungscode, um dich zu authentifizieren und dein Spielerprofil sicher zu bearbeiten.',
       descEn: 'Use this verification code to authenticate and edit your player profile securely.'
+    },
+    register_account: {
+      titleDe: '✨ Registrierung & E-Mail-Bestätigung',
+      titleEn: '✨ Registration & Email Verification',
+      descDe: 'Bitte gib diesen 6-stelligen Bestätigungscode ein, um dein Konto bei der Badminton Student Community zu erstellen.',
+      descEn: 'Please enter this 6-digit verification code to complete your registration with the Badminton Student Community.'
+    },
+    reset_password: {
+      titleDe: '🔑 Passwort zurücksetzen',
+      titleEn: '🔑 Password Reset Code',
+      descDe: 'Du hast das Zurücksetzen deines Passworts angefordert. Gib diesen Code ein, um dein neues Passwort festzulegen.',
+      descEn: 'You requested to reset your password. Enter this code to set your new password.'
     }
   };
 

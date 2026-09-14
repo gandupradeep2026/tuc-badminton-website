@@ -98,6 +98,10 @@ import {
   getAllActivePlayerEmails,
   createOrUpdateStudentUser,
   getStudentUserByEmail,
+  registerStudentUserWithPassword,
+  authenticateStudentUserWithPassword,
+  setStudentUserResetCode,
+  resetStudentUserPasswordWithCode,
   createPlayerContactRequest,
   getContactRequestByToken,
   acceptContactRequest,
@@ -796,8 +800,239 @@ app.post('/api/auth/student-logout', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// Badminton Student Community: One-Time Entry Auth Endpoints
+// Badminton Student Community: Email & Password Authentication Endpoints
 // -------------------------------------------------------------
+const pendingRegistrations = new Map();
+
+// 1. Request One-Time Registration with Password & Email OTP
+app.post('/api/auth/register-request', async (req, res) => {
+  try {
+    const { email, name, university, role, password } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Please enter a valid email address. / Bitte gib eine gültige E-Mail-Adresse ein.' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long. / Das Passwort muss mindestens 6 Zeichen lang sein.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanRole = role === 'trainer' || role === 'service' ? role : 'student';
+
+    if (!validateEmailForRole(cleanEmail, cleanRole)) {
+      if (cleanRole === 'student') {
+        return res.status(400).json({
+          error: 'Students must register with their university email address (e.g. @tu-chemnitz.de, @mytuc.org, @*.ac.*, @*.edu).'
+        });
+      } else {
+        return res.status(400).json({
+          error: 'Trainers and service providers can register with a Gmail or standard email address.'
+        });
+      }
+    }
+
+    // Check if user already exists with password
+    const existing = getStudentUserByEmail(cleanEmail);
+    if (existing && existing.password_hash) {
+      return res.status(400).json({
+        error: 'An account with this email already exists. Please log in with your password. / Ein Konto mit dieser E-Mail existiert bereits. Bitte logge dich ein.'
+      });
+    }
+
+    // Save pending registration
+    pendingRegistrations.set(cleanEmail, {
+      email: cleanEmail,
+      name: name ? name.trim() : (cleanRole === 'trainer' ? 'Trainer' : (cleanRole === 'service' ? 'Service Partner' : 'Student')),
+      university: university ? university.trim() : 'TU Chemnitz',
+      role: cleanRole,
+      password: String(password),
+      timestamp: Date.now()
+    });
+
+    const otpRes = createOtp(cleanEmail, 'register_account');
+    if (otpRes.error) {
+      return res.status(otpRes.status || 400).json({ error: otpRes.error });
+    }
+
+    await sendOtpVerificationEmail({
+      to: cleanEmail,
+      code: otpRes.code,
+      scope: 'register_account',
+      expiresMinutes: otpRes.expiresMinutes
+    });
+
+    res.json({
+      success: true,
+      message: `A 6-digit confirmation code was sent to ${cleanEmail}. / Ein 6-stelliger Bestätigungscode wurde an ${cleanEmail} gesendet!`
+    });
+  } catch (err) {
+    console.error('Error in register-request:', err);
+    res.status(500).json({ error: 'Failed to send registration verification code.' });
+  }
+});
+
+// 2. Confirm Registration with 6-Digit OTP Code
+app.post('/api/auth/register-confirm', (req, res) => {
+  try {
+    const { email, code, password, name, university, role } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Email and 6-digit code are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const result = verifyOtp(cleanEmail, code, 'register_account');
+    if (result.error) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    const pending = pendingRegistrations.get(cleanEmail);
+    const finalPassword = password || pending?.password;
+    if (!finalPassword) {
+      return res.status(400).json({ error: 'Password required to complete registration.' });
+    }
+
+    const finalName = name || pending?.name || 'Student';
+    const finalUni = university || pending?.university || 'TU Chemnitz';
+    const finalRole = role || pending?.role || 'student';
+
+    const user = registerStudentUserWithPassword({
+      email: cleanEmail,
+      name: finalName,
+      university: finalUni,
+      role: finalRole,
+      password: finalPassword
+    });
+
+    pendingRegistrations.delete(cleanEmail);
+
+    const sessionToken = createStudentUserSession(cleanEmail, user.name);
+    const player = getPlayerByEmail(cleanEmail);
+
+    res.json({
+      success: true,
+      verified: true,
+      token: sessionToken,
+      user,
+      playerProfile: player || null,
+      message: 'Registration successful! Welcome to Badminton Student Community.'
+    });
+  } catch (err) {
+    console.error('Error in register-confirm:', err);
+    res.status(500).json({ error: 'Registration confirmation failed.' });
+  }
+});
+
+// 3. User Login with Email & Password (Zero OTP!)
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Please enter both your email and password. / Bitte E-Mail und Passwort eingeben.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = authenticateStudentUserWithPassword(cleanEmail, password);
+
+    if (!user) {
+      // Check if user exists without password (migrated user)
+      const existingUser = getStudentUserByEmail(cleanEmail);
+      if (existingUser && !existingUser.password_hash) {
+        return res.status(401).json({
+          error: 'Your account was created with email-only login. Please click "Forgot password?" to set your password. / Bitte klicke auf "Passwort vergessen?", um dein Passwort erstmalig festzulegen.'
+        });
+      }
+      return res.status(401).json({ error: 'Invalid email or password. / E-Mail oder Passwort ungültig.' });
+    }
+
+    const sessionToken = createStudentUserSession(cleanEmail, user.name);
+    const player = getPlayerByEmail(cleanEmail);
+
+    res.json({
+      success: true,
+      token: sessionToken,
+      user,
+      playerProfile: player || null,
+      message: `Welcome back, ${user.name}!`
+    });
+  } catch (err) {
+    console.error('Error in login:', err);
+    res.status(500).json({ error: 'Login failed. Please try again.' });
+  }
+});
+
+// 4. Request Password Reset Code
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = getStudentUserByEmail(cleanEmail);
+
+    // Only send if user exists
+    if (user) {
+      const otpRes = createOtp(cleanEmail, 'reset_password');
+      if (!otpRes.error) {
+        setStudentUserResetCode(cleanEmail, otpRes.code);
+        await sendOtpVerificationEmail({
+          to: cleanEmail,
+          code: otpRes.code,
+          scope: 'reset_password',
+          expiresMinutes: otpRes.expiresMinutes
+        });
+      }
+    }
+
+    // Always respond success to prevent email enumeration
+    res.json({
+      success: true,
+      message: 'If an account exists with this email, a 6-digit password reset code has been sent.'
+    });
+  } catch (err) {
+    console.error('Error in forgot-password:', err);
+    res.status(500).json({ error: 'Failed to request password reset code.' });
+  }
+});
+
+// 5. Reset Password with 6-Digit Code
+app.post('/api/auth/reset-password', (req, res) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ error: 'Email, reset code, and new password are required.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const otpVerify = verifyOtp(cleanEmail, code, 'reset_password');
+    if (otpVerify.error) {
+      return res.status(otpVerify.status || 400).json({ error: otpVerify.error });
+    }
+
+    const resetRes = resetStudentUserPasswordWithCode(cleanEmail, code, newPassword);
+    if (resetRes.error) {
+      return res.status(resetRes.status || 400).json({ error: resetRes.error });
+    }
+
+    const sessionToken = createStudentUserSession(cleanEmail, resetRes.user.name);
+    const player = getPlayerByEmail(cleanEmail);
+
+    res.json({
+      success: true,
+      token: sessionToken,
+      user: resetRes.user,
+      playerProfile: player || null,
+      message: 'Your password has been successfully reset! You are now logged in.'
+    });
+  } catch (err) {
+    console.error('Error in reset-password:', err);
+    res.status(500).json({ error: 'Failed to reset password.' });
+  }
+});
 
 // Register or Request One-Time Entry Code
 app.post('/api/auth/register-entry', async (req, res) => {

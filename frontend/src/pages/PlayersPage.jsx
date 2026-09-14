@@ -31,6 +31,28 @@ import SelfDeleteModal from '../components/SelfDeleteModal';
 import SelfEditModal from '../components/SelfEditModal';
 import BadmintonAvatar from '../components/BadmintonAvatar';
 
+// Helper functions for bilingual display of data stored in database
+export const formatSkillLevel = (level, isDe) => {
+  if (!level) return '';
+  if (isDe) return level;
+  const l = level.toLowerCase();
+  if (l.includes('anfänger') || l.includes('beginner')) return 'Beginner';
+  if (l.includes('fortgeschritten') || l.includes('intermediate') || l.includes('advanced')) return 'Intermediate';
+  if (l.includes('profi') || l.includes('wettkampf')) return 'Advanced / Tournament';
+  if (l.includes('verein') || l.includes('liga') || l.includes('club')) return 'Club / League';
+  return level;
+};
+
+export const formatDiscipline = (disc, isDe) => {
+  if (!disc) return '';
+  if (isDe) return disc;
+  const d = disc.trim();
+  if (d.toLowerCase() === 'einzel') return 'Singles';
+  if (d.toLowerCase() === 'doppel') return 'Doubles';
+  if (d.toLowerCase() === 'mixed') return 'Mixed';
+  return disc;
+};
+
 export default function PlayersPage({ onNavigate }) {
   const { user, token, isAuthenticated, logout, openEntryModal } = useAuth();
   const { language, t } = useLanguage();
@@ -171,7 +193,7 @@ export default function PlayersPage({ onNavigate }) {
             {/* Skill Level Badge */}
             {member.skill_level && (
               <span className="text-[9px] font-extrabold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                {member.skill_level}
+                {formatSkillLevel(member.skill_level, isDe)}
               </span>
             )}
           </div>
@@ -233,7 +255,7 @@ export default function PlayersPage({ onNavigate }) {
           <div className="space-y-1 pt-1.5 border-t border-slate-100">
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1">
               <Target className="w-3 h-3 text-[#005A36]" />
-              <span>{isDe ? 'Kategorien & Disziplinen' : 'Categories & Focus'}</span>
+              <span>{isDe ? 'Kategorien & Disziplinen' : 'Categories & Disciplines'}</span>
             </span>
             <div className="flex flex-wrap gap-1.5">
               {specializations.map((spec, idx) => (
@@ -241,7 +263,7 @@ export default function PlayersPage({ onNavigate }) {
                   key={idx}
                   className="px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-medium text-slate-700 border border-slate-200"
                 >
-                  {spec}
+                  {formatDiscipline(spec, isDe)}
                 </span>
               ))}
             </div>
@@ -259,7 +281,7 @@ export default function PlayersPage({ onNavigate }) {
             <span>
               {isDe 
                 ? (isTrainer ? '🏸 Trainer diskret anfragen' : (isService ? '🔧 Service anfragen' : '💬 Spielanfrage senden')) 
-                : '💬 Send Play Request'}
+                : (isTrainer ? '🏸 Request Coach Discretely' : (isService ? '🔧 Request Service' : '💬 Send Play Request'))}
             </span>
           </button>
 
@@ -383,16 +405,16 @@ export default function PlayersPage({ onNavigate }) {
 
             <div className="mt-5 p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-left text-xs space-y-2 text-emerald-950">
               <div className="flex items-start gap-2">
-                <span className="font-bold">🎓 Studierende:</span>
-                <span>Registrierung & Login mit Hochschul-E-Mail (z.B. @tu-chemnitz.de).</span>
+                <span className="font-bold">{isDe ? '🎓 Studierende:' : '🎓 Students:'}</span>
+                <span>{isDe ? 'Registrierung & Login mit Hochschul-E-Mail (z.B. @tu-chemnitz.de).' : 'Register & login with university email (e.g. @tu-chemnitz.de).'}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-bold">👥 Trainer & Service:</span>
-                <span>Registrierung & Login mit Google Mail / Gmail.</span>
+                <span className="font-bold">{isDe ? '👥 Trainer & Service:' : '👥 Trainers & Service:'}</span>
+                <span>{isDe ? 'Registrierung & Login mit Google Mail / Gmail.' : 'Register & login with Google Mail / Gmail.'}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="font-bold">✨ Einmalige Bestätigung:</span>
-                <span>Einmaliger 6-stelliger Bestätigungscode per E-Mail – danach uneingeschränkter Zugang!</span>
+                <span className="font-bold">{isDe ? '✨ Einmalige Bestätigung:' : '✨ One-time verification:'}</span>
+                <span>{isDe ? 'Einmaliger Bestätigungscode per E-Mail – danach dauerhafter Login mit Passwort (Zero OTP)!' : 'One-time confirmation code via email — then permanent login with password (zero OTP)!'}</span>
               </div>
             </div>
 

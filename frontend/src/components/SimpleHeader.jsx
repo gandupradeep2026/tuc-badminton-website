@@ -30,11 +30,11 @@ export default function SimpleHeader({ activePage, onNavigate }) {
     { id: 'home', label: t.nav.home, icon: '🏛️' },
     { id: 'trainers', label: t.nav.trainers, icon: '👥' },
     { id: 'players', label: t.nav.players, icon: '🏸' },
-    { id: 'sessions', label: isDe ? 'Host a Game' : 'Host a Game', icon: '🏸' },
-    { id: 'services', label: isDe ? 'Besaitung & Ausrüstung' : 'Services & Gear', icon: '🔧' },
+    { id: 'sessions', label: isDe ? 'Spielrunden' : 'Host a Game', icon: '🏸' },
+    { id: 'services', label: isDe ? 'Besaitung & Ausrüstung' : 'Stringing & Gear', icon: '🔧' },
     { id: 'tournaments', label: t.nav.tournaments, icon: '🏆' },
     { id: 'gallery', label: t.nav.gallery, icon: '📸' },
-    { id: 'register', label: t.nav.register || 'Registrieren', icon: '✍️' },
+    { id: 'register', label: isDe ? 'Registrieren' : 'Register', icon: '✍️' },
   ];
 
   // Close mobile menu on page change or ESC
@@ -71,12 +71,12 @@ export default function SimpleHeader({ activePage, onNavigate }) {
         <div className="flex items-center gap-1.5 sm:gap-2 font-mono truncate">
           <span className="font-bold tracking-wider uppercase text-emerald-300 flex-shrink-0">🏸 Student Community</span>
           <span className="text-white/40">|</span>
-          <span className="text-white/90 truncate">{isDe ? 'Hochschulsport & Match-Plattform' : 'Student Badminton & Match Hub'}</span>
+          <span className="text-white/90 truncate">{isDe ? 'Hochschulsport & Match-Plattform' : 'University Sports & Match Hub'}</span>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <div className="hidden lg:block text-white/80 font-mono text-xs">
-            {t.topbar.venue}
+            {isDe ? 'Sporthalle Thüringer Weg 11' : 'Sports Hall Thüringer Weg 11'}
           </div>
           
           {/* Admin link button */}
@@ -152,6 +152,31 @@ export default function SimpleHeader({ activePage, onNavigate }) {
             </button>
           )}
 
+          {/* User Auth Status / Login Button */}
+          {isAuthenticated ? (
+            <div className="hidden sm:flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-xs">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-emerald-950 truncate max-w-[120px]">{user?.name || user?.email}</span>
+              <button
+                type="button"
+                onClick={logout}
+                className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-white transition-colors cursor-pointer"
+                title={isDe ? 'Abmelden' : 'Log out'}
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={openEntryModal}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] shadow-2xs transition-all cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>{isDe ? 'Anmelden' : 'Log In'}</span>
+            </button>
+          )}
+
           {/* Language Toggle Switch (Always visible on all screens) */}
           <div className="flex items-center p-0.5 bg-slate-100 rounded-xl border border-slate-200">
             <button
@@ -198,6 +223,34 @@ export default function SimpleHeader({ activePage, onNavigate }) {
         <div className="md:hidden fixed inset-x-0 top-[calc(4rem+27px)] bottom-0 z-40 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-white border-b border-slate-200 px-4 py-4 space-y-2 shadow-xl animate-in slide-in-from-top-2 duration-150 max-h-[80vh] overflow-y-auto">
             
+            {/* Mobile Auth Button */}
+            <div className="pb-2 mb-2 border-b border-slate-100">
+              {isAuthenticated ? (
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span className="font-bold text-xs text-emerald-950">{user?.name || user?.email}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { logout(); setMobileMenuOpen(false); }}
+                    className="text-xs font-bold text-red-600 bg-white px-2 py-1 rounded-lg border border-red-200"
+                  >
+                    {isDe ? 'Abmelden' : 'Log Out'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { openEntryModal(); setMobileMenuOpen(false); }}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>{isDe ? 'Anmelden / Registrieren' : 'Log In / Register'}</span>
+                </button>
+              )}
+            </div>
+
             <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 pb-1">
               Navigation
             </div>

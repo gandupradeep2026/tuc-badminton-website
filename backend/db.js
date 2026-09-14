@@ -434,6 +434,10 @@ export function initDatabase() {
     );
   `);
   try { db.exec("ALTER TABLE student_users ADD COLUMN role TEXT DEFAULT 'student';"); } catch (e) {}
+  try { db.exec("ALTER TABLE student_users ADD COLUMN password_hash TEXT;"); } catch (e) {}
+  try { db.exec("ALTER TABLE student_users ADD COLUMN password_salt TEXT;"); } catch (e) {}
+  try { db.exec("ALTER TABLE student_users ADD COLUMN reset_code TEXT;"); } catch (e) {}
+  try { db.exec("ALTER TABLE student_users ADD COLUMN reset_code_expires INTEGER;"); } catch (e) {}
 
   // 9. Player Contact / Play Requests (Strict privacy shielding: details only unlocked on reply/accept)
   db.exec(`
@@ -743,6 +747,9 @@ startxref
 
   console.log(`[DB] Database initialized successfully at ${dbPath}`);
 }
+
+// Ensure database tables and column migrations are always initialized on import
+initDatabase();
 
 // -------------------------------------------------------------
 // Query Helpers
@@ -2272,6 +2279,113 @@ export function createOrUpdateStudentUser({ email, name, university, role }) {
 export function getStudentUserByEmail(email) {
   if (!email) return null;
   return db.prepare('SELECT * FROM student_users WHERE email = ?').get(email.trim().toLowerCase());
+}
+
+export function hashUserPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return { hash, salt };
+}
+
+export function verifyUserPassword(candidatePassword, storedHash, storedSalt) {
+  try {
+    if (!candidatePassword || !storedHash || !storedSalt) return false;
+    const candidateHash = crypto.scryptSync(candidatePassword, storedSalt, 64).toString('hex');
+    const bufA = Buffer.from(candidateHash, 'hex');
+    const bufB = Buffer.from(storedHash, 'hex');
+    return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+  } catch (err) {
+    console.error('Password verification error:', err);
+    return false;
+  }
+}
+
+export function registerStudentUserWithPassword({ email, name, university, role, password }) {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanName = name ? name.trim() : 'Student';
+  const cleanUni = university ? university.trim() : 'TU Chemnitz';
+  const cleanRole = role ? role.trim() : 'student';
+
+  const { hash, salt } = hashUserPassword(password);
+
+  const existing = db.prepare('SELECT * FROM student_users WHERE email = ?').get(cleanEmail);
+  if (existing) {
+    db.prepare(`
+      UPDATE student_users
+      SET name = ?, university = ?, role = ?, password_hash = ?, password_salt = ?, last_login_at = CURRENT_TIMESTAMP
+      WHERE email = ?
+    `).run(cleanName, cleanUni, cleanRole, hash, salt, cleanEmail);
+    return db.prepare('SELECT id, email, name, university, role, created_at FROM student_users WHERE email = ?').get(cleanEmail);
+  } else {
+    const res = db.prepare(`
+      INSERT INTO student_users (email, name, university, role, password_hash, password_salt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(cleanEmail, cleanName, cleanUni, cleanRole, hash, salt);
+    return db.prepare('SELECT id, email, name, university, role, created_at FROM student_users WHERE id = ?').get(res.lastInsertRowid);
+  }
+}
+
+export function authenticateStudentUserWithPassword(email, password) {
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  if (!cleanEmail || !password) return null;
+
+  const user = db.prepare('SELECT * FROM student_users WHERE email = ?').get(cleanEmail);
+  if (!user || !user.password_hash || !user.password_salt) return null;
+
+  const isValid = verifyUserPassword(password, user.password_hash, user.password_salt);
+  if (!isValid) return null;
+
+  db.prepare('UPDATE student_users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    university: user.university,
+    role: user.role,
+    created_at: user.created_at
+  };
+}
+
+export function setStudentUserResetCode(email, code, expiresMs = 15 * 60 * 1000) {
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const expiresAt = Date.now() + expiresMs;
+  db.prepare(`
+    UPDATE student_users
+    SET reset_code = ?, reset_code_expires = ?
+    WHERE email = ?
+  `).run(code, expiresAt, cleanEmail);
+}
+
+export function resetStudentUserPasswordWithCode(email, code, newPassword) {
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const user = db.prepare('SELECT * FROM student_users WHERE email = ?').get(cleanEmail);
+  if (!user) return { error: 'Account not found.', status: 404 };
+
+  if (!user.reset_code || String(user.reset_code).trim() !== String(code).trim()) {
+    return { error: 'Invalid reset code.', status: 400 };
+  }
+
+  if (Date.now() > user.reset_code_expires) {
+    return { error: 'Reset code expired.', status: 400 };
+  }
+
+  const { hash, salt } = hashUserPassword(newPassword);
+  db.prepare(`
+    UPDATE student_users
+    SET password_hash = ?, password_salt = ?, reset_code = NULL, reset_code_expires = NULL, last_login_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(hash, salt, user.id);
+
+  return {
+    success: true,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      university: user.university,
+      role: user.role
+    }
+  };
 }
 
 // -------------------------------------------------------------

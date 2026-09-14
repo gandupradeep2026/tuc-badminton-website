@@ -424,6 +424,7 @@ export default function SelfEditModal({ isOpen, onClose, onUpdated }) {
                 <div className="flex gap-2">
                   {DISCIPLINE_OPTIONS.map(disc => {
                     const isSelected = specializations.includes(disc);
+                    const discLabel = disc === 'Einzel' ? (isDe ? 'Einzel' : 'Singles') : disc === 'Doppel' ? (isDe ? 'Doppel' : 'Doubles') : 'Mixed';
                     return (
                       <button
                         key={disc}
@@ -435,7 +436,7 @@ export default function SelfEditModal({ isOpen, onClose, onUpdated }) {
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
-                        {isSelected ? '✓ ' : '+ '}{disc}
+                        {isSelected ? '✓ ' : '+ '}{discLabel}
                       </button>
                     );
                   })}
@@ -453,10 +454,10 @@ export default function SelfEditModal({ isOpen, onClose, onUpdated }) {
                     onChange={(e) => setSkillLevel(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 bg-white"
                   >
-                    <option value="Hobby / Freizeit">Hobby / Freizeit</option>
-                    <option value="Fortgeschritten">Fortgeschritten</option>
-                    <option value="Erfahren">Erfahren</option>
-                    <option value="Wettkampf / Liga">Wettkampf / Liga</option>
+                    <option value="Hobby / Freizeit">{isDe ? 'Hobby / Freizeit' : 'Casual / Hobby'}</option>
+                    <option value="Fortgeschritten">{isDe ? 'Fortgeschritten' : 'Intermediate'}</option>
+                    <option value="Erfahren">{isDe ? 'Erfahren' : 'Advanced / Experienced'}</option>
+                    <option value="Wettkampf / Liga">{isDe ? 'Wettkampf / Liga' : 'Competitive / League'}</option>
                   </select>
                 </div>
 
@@ -492,7 +493,7 @@ export default function SelfEditModal({ isOpen, onClose, onUpdated }) {
                       }`}
                     >
                       <span className="text-xl leading-none">{av.icon}</span>
-                      <span className="text-[9px] font-bold text-slate-700 truncate w-full">{av.label}</span>
+                      <span className="text-[9px] font-bold text-slate-700 truncate w-full">{isDe ? (av.labelDe || av.nameDe || av.label) : (av.labelEn || av.nameEn || av.label)}</span>
                     </button>
                   ))}
                 </div>

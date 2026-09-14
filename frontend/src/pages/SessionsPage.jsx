@@ -40,6 +40,29 @@ const POPULAR_VENUES = [
   { name: 'Andere Sporthalle', address: 'Chemnitz' }
 ];
 
+// Helper functions for bilingual session formatting
+export const formatSessionType = (format, isDe) => {
+  if (!format) return '';
+  if (isDe) return format;
+  const f = format.toLowerCase();
+  if (f === 'doppel') return 'Doubles';
+  if (f === 'einzel') return 'Singles';
+  if (f === 'mixed') return 'Mixed';
+  if (f === 'spieleabend' || f.includes('offen')) return 'Open Play';
+  return format;
+};
+
+export const formatSessionSkill = (level, isDe) => {
+  if (!level) return '';
+  if (isDe) return level;
+  const l = level.toLowerCase();
+  if (l.includes('alle')) return 'All skill levels welcome';
+  if (l.includes('anfänger') || l.includes('hobby')) return 'Beginner / Hobby';
+  if (l.includes('fortgeschritten')) return 'Intermediate';
+  if (l.includes('wettkampf') || l.includes('liga')) return 'Competitive / League';
+  return level;
+};
+
 export default function SessionsPage({ onNavigate }) {
   const { user, token, isAuthenticated } = useAuth();
   const { language } = useLanguage();
@@ -574,7 +597,7 @@ export default function SessionsPage({ onNavigate }) {
 
                     <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-bold text-[10px]">
-                        {session.format}
+                        {formatSessionType(session.format, isDe)}
                       </span>
                       {/* Shuttlecock Badge */}
                       <span className={`px-2 py-0.5 rounded-lg font-bold text-[10px] border ${
@@ -584,7 +607,11 @@ export default function SessionsPage({ onNavigate }) {
                           ? 'bg-slate-100 text-slate-700 border-slate-200'
                           : 'bg-emerald-50 text-emerald-900 border-emerald-200'
                       }`}>
-                        {session.shuttlecock_type === 'plastic' ? '🟡 Plastik' : session.shuttlecock_type === 'any' ? '🏸 Beliebig' : '🪶 Federbälle'}
+                        {session.shuttlecock_type === 'plastic'
+                          ? (isDe ? '🟡 Plastik' : '🟡 Plastic')
+                          : session.shuttlecock_type === 'any'
+                          ? (isDe ? '🏸 Beliebig' : '🏸 Any')
+                          : (isDe ? '🪶 Federbälle' : '🪶 Feather')}
                       </span>
                       {/* Intensity Badge */}
                       <span className={`px-2 py-0.5 rounded-lg font-bold text-[10px] border ${
@@ -660,7 +687,7 @@ export default function SessionsPage({ onNavigate }) {
 
                   {/* Level & Cost */}
                   <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
-                    <span>Niveau: <strong className="text-slate-700">{session.skill_level}</strong></span>
+                    <span>{isDe ? 'Niveau:' : 'Level:'} <strong className="text-slate-700">{formatSessionSkill(session.skill_level, isDe)}</strong></span>
                     {session.cost_note && (
                       <span className="text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                         {session.cost_note}
@@ -682,17 +709,19 @@ export default function SessionsPage({ onNavigate }) {
                         <div className="flex items-center justify-between font-bold">
                           <span className="flex items-center gap-1 text-[#005A36]">
                             <DollarSign className="w-3.5 h-3.5" />
-                            <span>Court-Kostenrechner:</span>
+                            <span>{isDe ? 'Court-Kostenrechner:' : 'Court Cost Split Calculator:'}</span>
                           </span>
-                          <span className="font-mono">{totalCost.toFixed(2).replace('.', ',')} € Gesamt</span>
+                          <span className="font-mono">{isDe ? `${totalCost.toFixed(2).replace('.', ',')} € Gesamt` : `€${totalCost.toFixed(2)} Total`}</span>
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-emerald-900">
-                          <span>Aktuell ({curP} {curP === 1 ? 'Spieler' : 'Spieler'}): <strong>{curSplit} € p.P.</strong></span>
-                          <span>Bei Vollbelegung ({maxP}): <strong className="text-[#005A36]">{fullSplit} € p.P.</strong></span>
+                          <span>{isDe ? `Aktuell (${curP} Spieler):` : `Current (${curP} player${curP === 1 ? '' : 's'}):`} <strong>{isDe ? `${curSplit} € p.P.` : `€${(totalCost / curP).toFixed(2)} / person`}</strong></span>
+                          <span>{isDe ? `Bei Vollbelegung (${maxP}):` : `When full (${maxP}):`} <strong className="text-[#005A36]">{isDe ? `${fullSplit} € p.P.` : `€${(totalCost / maxP).toFixed(2)} / person`}</strong></span>
                         </div>
                         {!isFullSession && (
                           <p className="text-[9.5px] text-emerald-700 font-medium italic pt-0.5 border-t border-emerald-200/50">
-                            🎉 Jeder neue Mitspieler senkt die Kosten für alle auf {(totalCost / (curP + 1)).toFixed(2).replace('.', ',')} €!
+                            🎉 {isDe 
+                              ? `Jeder neue Mitspieler senkt die Kosten für alle auf ${(totalCost / (curP + 1)).toFixed(2).replace('.', ',')} €!` 
+                              : `Each new player lowers the cost for everyone to €${(totalCost / (curP + 1)).toFixed(2)}!`}
                           </p>
                         )}
                       </div>
@@ -892,7 +921,7 @@ export default function SessionsPage({ onNavigate }) {
                         }`}
                       >
                         <BadmintonAvatar avatarType={opt.id} size="sm" />
-                        <span className="text-[10px] font-bold truncate max-w-full">{opt.nameDe}</span>
+                        <span className="text-[10px] font-bold truncate max-w-full">{isDe ? opt.nameDe : opt.nameEn}</span>
                       </button>
                     ))}
                   </div>
@@ -969,10 +998,10 @@ export default function SessionsPage({ onNavigate }) {
                       onChange={(e) => setCreateFormat(e.target.value)}
                       className="w-full p-2 rounded-xl border border-slate-300 bg-white"
                     >
-                      <option value="Doppel">Doppel</option>
-                      <option value="Einzel">Einzel</option>
-                      <option value="Mixed">Mixed</option>
-                      <option value="Spieleabend">Offen</option>
+                      <option value="Doppel">{isDe ? 'Doppel' : 'Doubles'}</option>
+                      <option value="Einzel">{isDe ? 'Einzel' : 'Singles'}</option>
+                      <option value="Mixed">{isDe ? 'Mixed' : 'Mixed'}</option>
+                      <option value="Spieleabend">{isDe ? 'Offen / Treff' : 'Open Play'}</option>
                     </select>
                   </div>
 
@@ -985,10 +1014,10 @@ export default function SessionsPage({ onNavigate }) {
                       onChange={(e) => setCreateMaxPlayers(e.target.value)}
                       className="w-full p-2 rounded-xl border border-slate-300 bg-white"
                     >
-                      <option value="2">2 Spieler</option>
-                      <option value="4">4 Spieler</option>
-                      <option value="6">6 Spieler</option>
-                      <option value="8">8 Spieler</option>
+                      <option value="2">{isDe ? '2 Spieler' : '2 Players'}</option>
+                      <option value="4">{isDe ? '4 Spieler' : '4 Players'}</option>
+                      <option value="6">{isDe ? '6 Spieler' : '6 Players'}</option>
+                      <option value="8">{isDe ? '8 Spieler' : '8 Players'}</option>
                     </select>
                   </div>
                 </div>
@@ -1003,10 +1032,10 @@ export default function SessionsPage({ onNavigate }) {
                       onChange={(e) => setCreateSkillLevel(e.target.value)}
                       className="w-full p-2.5 rounded-xl border border-slate-300 bg-white"
                     >
-                      <option value="Alle Spielstärken">Alle Spielstärken willkommen</option>
-                      <option value="Anfänger">Anfänger / Hobby</option>
-                      <option value="Fortgeschritten">Fortgeschritten</option>
-                      <option value="Wettkampf / Liga">Wettkampf / Liga</option>
+                      <option value="Alle Spielstärken">{isDe ? 'Alle Spielstärken willkommen' : 'All skill levels welcome'}</option>
+                      <option value="Anfänger">{isDe ? 'Anfänger / Hobby' : 'Beginner / Hobby'}</option>
+                      <option value="Fortgeschritten">{isDe ? 'Fortgeschritten' : 'Intermediate'}</option>
+                      <option value="Wettkampf / Liga">{isDe ? 'Wettkampf / Liga' : 'Competitive / League'}</option>
                     </select>
                   </div>
 
@@ -1018,7 +1047,7 @@ export default function SessionsPage({ onNavigate }) {
                       type="text"
                       value={createCostNote}
                       onChange={(e) => setCreateCostNote(e.target.value)}
-                      placeholder="z.B. Courtmiete geteilt"
+                      placeholder={isDe ? 'z.B. Courtmiete geteilt' : 'e.g. Court fee split evenly'}
                       className="w-full p-2.5 rounded-xl border border-slate-300"
                     />
                   </div>
@@ -1040,7 +1069,7 @@ export default function SessionsPage({ onNavigate }) {
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        🪶 Feder
+                        🪶 {isDe ? 'Feder' : 'Feather'}
                       </button>
                       <button
                         type="button"
@@ -1051,7 +1080,7 @@ export default function SessionsPage({ onNavigate }) {
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        🟡 Plastik
+                        🟡 {isDe ? 'Plastik' : 'Plastic'}
                       </button>
                       <button
                         type="button"
@@ -1062,7 +1091,7 @@ export default function SessionsPage({ onNavigate }) {
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        🏸 Beliebig
+                        🏸 {isDe ? 'Beliebig' : 'Any'}
                       </button>
                     </div>
                   </div>

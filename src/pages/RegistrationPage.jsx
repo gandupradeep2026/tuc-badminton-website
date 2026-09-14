@@ -548,7 +548,7 @@ export default function RegistrationPage({ onNavigate }) {
                       type="email"
                       readOnly
                       disabled
-                      value={user?.email || 'Wird nach Login verknüpft'}
+                      value={user?.email || (isDe ? 'Wird nach Login verknüpft' : 'Linked after login')}
                       className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-xs sm:text-sm font-mono text-slate-700 cursor-not-allowed"
                     />
                   </div>
@@ -583,6 +583,7 @@ export default function RegistrationPage({ onNavigate }) {
                   <div className="flex gap-2">
                     {['Einzel', 'Doppel', 'Mixed'].map((cat) => {
                       const isSel = playerDisciplines.includes(cat);
+                      const catLabel = cat === 'Einzel' ? (isDe ? 'Einzel' : 'Singles') : cat === 'Doppel' ? (isDe ? 'Doppel' : 'Doubles') : 'Mixed';
                       return (
                         <button
                           key={cat}
@@ -594,7 +595,7 @@ export default function RegistrationPage({ onNavigate }) {
                               : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                           }`}
                         >
-                          {cat}
+                          {catLabel}
                         </button>
                       );
                     })}
@@ -839,20 +840,25 @@ export default function RegistrationPage({ onNavigate }) {
                     {isDe ? 'Angebotene Services' : 'Offered Services'}
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {['Schläger-Besaitungsservice', 'Griffbandwechsel', 'Bälle & Zubehör', 'Schlägerverleih'].map((type) => {
-                      const isSel = serviceTypes.includes(type);
+                    {[
+                      { id: 'Schläger-Besaitungsservice', de: 'Schläger-Besaitungsservice', en: 'Racket Stringing Service' },
+                      { id: 'Griffbandwechsel', de: 'Griffbandwechsel', en: 'Grip Replacement' },
+                      { id: 'Bälle & Zubehör', de: 'Bälle & Zubehör', en: 'Shuttlecocks & Gear' },
+                      { id: 'Schlägerverleih', de: 'Schlägerverleih', en: 'Racket Rental' }
+                    ].map((item) => {
+                      const isSel = serviceTypes.includes(item.id);
                       return (
                         <button
-                          key={type}
+                          key={item.id}
                           type="button"
-                          onClick={() => toggleServiceType(type)}
+                          onClick={() => toggleServiceType(item.id)}
                           className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                             isSel
                               ? 'bg-[#005A36] border-[#005A36] text-white'
                               : 'bg-white border-slate-200 text-slate-600'
                           }`}
                         >
-                          {type}
+                          {isDe ? item.de : item.en}
                         </button>
                       );
                     })}
