@@ -152,7 +152,7 @@ export default function HomePage({ onNavigate }) {
               onClick={() => onNavigate('sessions')}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-emerald-500/25 border border-emerald-400/50 text-white hover:bg-emerald-500/40 active:bg-white/20 transition-colors shadow-sm"
             >
-              <span>{isDe ? '🤝 Match-Treff & Spielrunden' : '🤝 Find Games / LFG'}</span>
+              <span>{isDe ? '🏸 Host a Game & Mitspielen' : '🏸 Host a Game & Play'}</span>
               <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 text-amber-300" />
             </button>
             <button
@@ -463,26 +463,26 @@ export default function HomePage({ onNavigate }) {
             </div>
           </div>
 
-          {/* Spielrunden / Match-Treff (LFG) Card */}
+          {/* Spielrunden / Host a Game Card */}
           <div 
             onClick={() => onNavigate('sessions')}
             className="group p-5 rounded-2xl bg-white border border-slate-200 hover:border-[#005A36] active:scale-[0.99] transition-all cursor-pointer shadow-sm hover:shadow-md flex flex-col justify-between space-y-4"
           >
             <div className="space-y-2">
               <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#005A36] flex items-center justify-center font-bold text-lg">
-                🤝
+                🏸
               </div>
               <h3 className="font-bold text-base text-slate-900 group-hover:text-[#005A36] transition-colors">
-                {isDe ? 'Match-Treff & Spielrunden' : 'Badminton Match Finder'}
+                {isDe ? '🏸 Host a Game & Mitspielen' : '🏸 Host a Game & Play'}
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
                 {isDe 
-                  ? 'Finde spontan Mitspieler für Feels Good Club oder Uni-Hallen ohne feste Vereinsbindung.' 
-                  : 'Find players spontaneously for Feels Good Club or university gyms.'}
+                  ? 'Hoste eigene Spiele im Feels Good Club oder schließe dich offenen Badminton-Runden in Chemnitz an.' 
+                  : 'Host your own games at Feels Good Club or join open badminton matches in Chemnitz.'}
               </p>
             </div>
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#005A36] pt-1">
-              <span>{isDe ? 'Spielrunden ansehen' : 'Explore Sessions'}</span>
+              <span>{isDe ? 'Spielrunden & Matches ansehen' : 'Explore Matches & Host'}</span>
               <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </div>

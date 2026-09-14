@@ -55,6 +55,42 @@ export default function RegistrationPage({ onNavigate }) {
   const [playerPhotoPreview, setPlayerPhotoPreview] = useState('');
   const [playerPhotoUrl, setPlayerPhotoUrl] = useState('');
 
+  // Email OTP verification state for player registration
+  const [playerOtpCode, setPlayerOtpCode] = useState('');
+  const [playerOtpSent, setPlayerOtpSent] = useState(false);
+  const [playerOtpSending, setPlayerOtpSending] = useState(false);
+  const [playerOtpError, setPlayerOtpError] = useState('');
+  const [playerOtpSuccess, setPlayerOtpSuccess] = useState('');
+
+  const handleSendPlayerOtp = async () => {
+    setPlayerOtpError('');
+    setPlayerOtpSuccess('');
+    if (!playerEmail.trim() || !playerEmail.includes('@')) {
+      setPlayerOtpError(isDe ? 'Bitte gib zuerst eine gültige E-Mail-Adresse ein.' : 'Please enter a valid email address first.');
+      return;
+    }
+    try {
+      setPlayerOtpSending(true);
+      const res = await safeFetchJson('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: playerEmail.trim().toLowerCase(),
+          scope: 'register_player'
+        })
+      });
+      if (!res.ok) {
+        throw new Error(res.error || (isDe ? 'Fehler beim Senden des Codes.' : 'Failed to send verification code.'));
+      }
+      setPlayerOtpSent(true);
+      setPlayerOtpSuccess(res.data?.message || (isDe ? '6-stelliger Code an deine E-Mail gesendet!' : '6-digit code sent to your email!'));
+    } catch (err) {
+      setPlayerOtpError(err.message || 'Error');
+    } finally {
+      setPlayerOtpSending(false);
+    }
+  };
+
   // -------------------------------------------------------------
   // Trainer Form State
   // -------------------------------------------------------------
@@ -125,6 +161,14 @@ export default function RegistrationPage({ onNavigate }) {
       return;
     }
 
+    if (!playerOtpCode || playerOtpCode.trim().length !== 6) {
+      setErrorMsg(isDe 
+        ? 'Bitte bestätige deine E-Mail-Adresse mit dem 6-stelligen Code vor dem Absenden.' 
+        : 'Please verify your email address with the 6-digit code before submitting.');
+      setSubmitting(false);
+      return;
+    }
+
     if (playerUniType === 'other' && !playerUniName.trim()) {
       setErrorMsg(isDe ? 'Bitte gib den Namen deiner Universität / Hochschule an.' : 'Please enter your university name.');
       setSubmitting(false);
@@ -146,6 +190,7 @@ export default function RegistrationPage({ onNavigate }) {
         study_program: playerStudy.trim(),
         avatar_type: playerAvatarType,
         is_public: playerIsPublic ? 1 : 0,
+        otp_code: playerOtpCode.trim(),
       };
 
       let photoDataUrl = playerPhotoUrl.trim();
@@ -695,29 +740,72 @@ export default function RegistrationPage({ onNavigate }) {
               />
             </div>
 
-            {/* Email Address */}
-            <div>
-              <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.emailLabel}
+            {/* Email Address with OTP Verification */}
+            <div className="space-y-2">
+              <label className="font-bold text-slate-700 block">
+                {reg.emailLabel} <span className="text-red-500">*</span>
               </label>
-              <input
-                type="email"
-                required
-                value={playerEmail}
-                onChange={(e) => setPlayerEmail(e.target.value)}
-                placeholder={reg.emailPlaceholder}
-                className="w-full p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  required
+                  value={playerEmail}
+                  onChange={(e) => {
+                    setPlayerEmail(e.target.value);
+                    if (playerOtpSent) {
+                      setPlayerOtpSent(false);
+                      setPlayerOtpCode('');
+                    }
+                  }}
+                  placeholder={reg.emailPlaceholder}
+                  className="flex-1 p-3 rounded-xl border border-slate-300 focus:border-[#005A36] focus:ring-2 focus:ring-[#005A36]/20 transition-all font-medium font-mono text-xs sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleSendPlayerOtp}
+                  disabled={playerOtpSending || !playerEmail.includes('@')}
+                  className="px-3.5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] active:scale-[0.99] transition-all disabled:opacity-50 whitespace-nowrap shadow-xs"
+                >
+                  {playerOtpSending ? (isDe ? 'Sendet...' : 'Sending...') : (playerOtpSent ? (isDe ? 'Code erneut' : 'Resend') : (isDe ? 'Code anfordern' : 'Send Code'))}
+                </button>
+              </div>
+
+              {playerOtpError && (
+                <p className="text-xs text-red-600 font-semibold">{playerOtpError}</p>
+              )}
+              {playerOtpSuccess && (
+                <p className="text-xs text-emerald-700 font-semibold">{playerOtpSuccess}</p>
+              )}
+
+              {/* 6-Digit OTP Code Input */}
+              {playerOtpSent && (
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-1.5 animate-in fade-in">
+                  <label className="block text-xs font-bold text-emerald-950">
+                    {isDe ? '6-stelliger Bestätigungscode aus deiner E-Mail *' : '6-digit Confirmation Code from Email *'}
+                  </label>
+                  <input
+                    type="text"
+                    maxLength="6"
+                    required
+                    value={playerOtpCode}
+                    onChange={(e) => setPlayerOtpCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    className="w-full p-2.5 rounded-xl border border-emerald-300 bg-white font-mono text-sm tracking-widest text-center font-bold focus:ring-2 focus:ring-[#005A36] outline-none"
+                  />
+                  <p className="text-[11px] text-emerald-800">
+                    {isDe ? 'Bitte gib die 6 Ziffern ein, die wir an deine E-Mail gesendet haben.' : 'Please enter the 6 digits sent to your inbox.'}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Phone Number / WhatsApp & Show/Hide Toggle */}
+            {/* Phone Number (Optional) & Show/Hide Toggle */}
             <div>
               <label className="font-bold text-slate-700 block mb-1.5">
-                {reg.phoneLabel}
+                {reg.phoneLabel} <span className="text-slate-400 font-normal text-xs">(optional)</span>
               </label>
               <input
                 type="tel"
-                required
                 value={playerPhone}
                 onChange={(e) => setPlayerPhone(e.target.value)}
                 placeholder={reg.phonePlaceholder}

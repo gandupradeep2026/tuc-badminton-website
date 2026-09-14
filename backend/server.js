@@ -93,6 +93,8 @@ import {
   manageGameSession,
   getAllGameSessionsAdmin,
   deleteGameSessionAdmin,
+  deletePlayerByEmail,
+  getAllActivePlayerEmails,
   db,
 } from './db.js';
 import { getSystemAndTrafficStats } from './statsService.js';
@@ -104,7 +106,18 @@ import {
   sendGameSessionCreatedEmail,
   sendGameSessionJoinNotification,
   sendParticipantConfirmationEmail,
+  sendOtpVerificationEmail,
+  sendGameSessionBroadcastEmail,
+  sendPersonalSessionInviteEmail,
+  sendProfileDeletedEmail,
 } from './mailer.js';
+import {
+  isUniversityEmail,
+  createOtp,
+  verifyOtp,
+  verifyStudentSession,
+  invalidateStudentSession,
+} from './otp.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -601,7 +614,146 @@ app.put('/api/trainers/:id', requireAdmin, upload.single('photo'), (req, res) =>
 // -------------------------------------------------------------
 // Players Endpoints (Men & Women Squads)
 // -------------------------------------------------------------
-app.get('/api/players', (req, res) => {
+
+// -------------------------------------------------------------
+// OTP Authentication & Student Verification Gate Endpoints
+// -------------------------------------------------------------
+
+// 1. Send OTP Code
+app.post('/api/auth/otp/send', async (req, res) => {
+  try {
+    const { email, scope } = req.body;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'Bitte gib eine gültige E-Mail-Adresse ein.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const validScope = scope || 'student_gate';
+
+    // University domain restriction for student directory access
+    if (validScope === 'student_gate' && !isUniversityEmail(cleanEmail)) {
+      return res.status(400).json({
+        error: 'Nur universitäre E-Mail-Adressen sind berechtigt (z.B. @tu-chemnitz.de, @mytuc.org, @*.ac.*, @*.edu).'
+      });
+    }
+
+    // Check if player exists when deleting profile
+    if (validScope === 'delete_profile') {
+      const allEmails = getAllActivePlayerEmails();
+      if (!allEmails.includes(cleanEmail)) {
+        return res.status(404).json({
+          error: 'Kein aktives Spielerprofil mit dieser E-Mail-Adresse gefunden.'
+        });
+      }
+    }
+
+    const otpRes = createOtp(cleanEmail, validScope);
+    if (otpRes.error) {
+      return res.status(otpRes.status || 400).json({ error: otpRes.error });
+    }
+
+    // Send the email
+    await sendOtpVerificationEmail({
+      to: cleanEmail,
+      code: otpRes.code,
+      scope: validScope,
+      expiresMinutes: otpRes.expiresMinutes
+    });
+
+    res.json({
+      success: true,
+      message: `Ein 6-stelliger Bestätigungscode wurde an ${cleanEmail} gesendet!`
+    });
+  } catch (err) {
+    console.error('Error sending OTP:', err);
+    res.status(500).json({ error: 'Fehler beim Senden des Bestätigungscodes. Bitte versuche es erneut.' });
+  }
+});
+
+// 2. Verify OTP Code
+app.post('/api/auth/otp/verify', (req, res) => {
+  try {
+    const { email, code, scope } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'E-Mail und Bestätigungscode sind erforderlich.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const validScope = scope || 'student_gate';
+
+    const result = verifyOtp(cleanEmail, code, validScope);
+    if (result.error) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      verified: true,
+      sessionToken: result.sessionToken || null
+    });
+  } catch (err) {
+    console.error('Error verifying OTP:', err);
+    res.status(500).json({ error: 'Fehler bei der Code-Überprüfung.' });
+  }
+});
+
+// 3. Verify Active Student Session & Refresh Inactivity
+app.get('/api/auth/student-session', (req, res) => {
+  const token = req.headers['x-student-token'];
+  if (!token) {
+    return res.json({ authenticated: false });
+  }
+  const session = verifyStudentSession(token);
+  if (!session) {
+    return res.json({ authenticated: false, expired: true });
+  }
+  res.json({ authenticated: true, email: session.email });
+});
+
+// 4. Student Logout / Relock
+app.post('/api/auth/student-logout', (req, res) => {
+  const token = req.headers['x-student-token'] || req.body.token;
+  if (token) {
+    invalidateStudentSession(token);
+  }
+  res.json({ success: true, message: 'Erfolgreich abgemeldet.' });
+});
+
+// 5. Player Self-Deletion via OTP
+app.post('/api/players/self-delete', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'E-Mail und Bestätigungscode sind erforderlich.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const otpResult = verifyOtp(cleanEmail, code, 'delete_profile');
+    if (otpResult.error) {
+      return res.status(otpResult.status || 400).json({ error: otpResult.error });
+    }
+
+    const deleted = deletePlayerByEmail(cleanEmail);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Kein Spielerprofil unter dieser E-Mail gefunden.' });
+    }
+
+    sendProfileDeletedEmail({
+      to: cleanEmail,
+      playerName: deleted.name
+    }).catch(e => console.error('Error sending profile deleted email:', e));
+
+    res.json({
+      success: true,
+      message: `Dein Spielerprofil (${deleted.name}) wurde erfolgreich gelöscht.`
+    });
+  } catch (err) {
+    console.error('Error self-deleting player:', err);
+    res.status(500).json({ error: 'Fehler beim Löschen des Profils.' });
+  }
+});
+
+app.get('/api/players', requireStudentOrAdmin, (req, res) => {
   try {
     const { gender } = req.query;
     const players = getAllPlayers(gender);
@@ -1482,9 +1634,18 @@ app.post('/api/register/player', upload.single('photo'), (req, res) => {
     if (!email || !email.trim() || !email.includes('@')) {
       return res.status(400).json({ error: 'Gültige E-Mail-Adresse ist erforderlich.' });
     }
-    if (!phone || !phone.trim()) {
-      return res.status(400).json({ error: 'Telefonnummer ist erforderlich.' });
+    // Verify OTP code for registration
+    const otpCode = req.body.otp_code;
+    if (!otpCode) {
+      return res.status(400).json({ error: 'Bitte bestätige deine E-Mail-Adresse mit dem 6-stelligen Code vor der Registrierung.' });
     }
+    const otpCheck = verifyOtp(email, otpCode, 'register_player');
+    if (otpCheck.error) {
+      return res.status(otpCheck.status || 400).json({ error: otpCheck.error });
+    }
+
+    // Phone is optional
+    const playerPhone = phone && phone.trim() ? phone.trim() : '';
 
     let photo_url = photo_url_input ? photo_url_input.trim() : '';
     if (req.file) {
@@ -1500,7 +1661,7 @@ app.post('/api/register/player', upload.single('photo'), (req, res) => {
       specialization: specialization ? specialization.trim() : 'Einzel & Doppel',
       team: team ? team.trim() : 'Hochschulsport & Spielbetrieb',
       email: email.trim().toLowerCase(),
-      phone: phone.trim(),
+      phone: playerPhone,
       show_phone: isShowPhone,
       favorite_player: favorite_player ? favorite_player.trim() : '',
       skill_level: skill_level ? skill_level.trim() : 'Fortgeschritten',
@@ -2046,6 +2207,37 @@ app.post('/api/game-sessions', async (req, res) => {
       managePin: pin
     }).catch(e => console.error('Failed to send session created email:', e));
 
+    // Broadcast email to all active registered players
+    try {
+      const allPlayerEmails = getAllActivePlayerEmails();
+      if (allPlayerEmails.length > 0) {
+        sendGameSessionBroadcastEmail({
+          recipients: allPlayerEmails,
+          session
+        }).catch(e => console.error('Failed to broadcast game session to players:', e));
+      }
+    } catch (bErr) {
+      console.error('Error getting player emails for broadcast:', bErr);
+    }
+
+    // Specific player invitations if requested
+    if (Array.isArray(req.body.invited_player_ids) && req.body.invited_player_ids.length > 0) {
+      for (const pid of req.body.invited_player_ids) {
+        try {
+          const targetPlayer = getPlayerById(parseInt(pid, 10));
+          if (targetPlayer && targetPlayer.email) {
+            sendPersonalSessionInviteEmail({
+              to: targetPlayer.email,
+              hostName: session.host_name,
+              session
+            }).catch(e => console.error(`Failed to send invite to player #${pid}:`, e));
+          }
+        } catch (invErr) {
+          console.error(`Error inviting player #${pid}:`, invErr);
+        }
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: 'Spielrunde erfolgreich veröffentlicht!',
@@ -2078,13 +2270,28 @@ app.post('/api/game-sessions/:id/join', async (req, res) => {
     sessionLimits.set(clientIp, timestamps);
 
     const sessionId = parseInt(req.params.id, 10);
-    const { participant_name, participant_email, participant_phone, skill_level, message, notes } = req.body;
+    const { participant_name, participant_email, participant_phone, skill_level, message, notes, otp_code } = req.body;
 
     if (!participant_name || !participant_name.trim()) {
       return res.status(400).json({ error: 'Dein Name / Spitzname ist erforderlich.' });
     }
     if (!participant_email || !participant_email.trim() || !participant_email.includes('@')) {
       return res.status(400).json({ error: 'Gültige E-Mail-Adresse erforderlich für die Teilnahmebestätigung.' });
+    }
+
+    // Verify email with OTP unless user has active student token matching this email
+    const studentToken = req.headers['x-student-token'];
+    const currentStudent = studentToken ? verifyStudentSession(studentToken) : null;
+    const isAlreadyVerifiedStudent = currentStudent && currentStudent.email === participant_email.trim().toLowerCase();
+
+    if (!isAlreadyVerifiedStudent) {
+      if (!otp_code) {
+        return res.status(400).json({ error: 'Bitte bestätige deine E-Mail-Adresse mit dem Bestätigungscode vor dem Beitreten.' });
+      }
+      const otpCheck = verifyOtp(participant_email, otp_code, 'join_session');
+      if (otpCheck.error) {
+        return res.status(otpCheck.status || 400).json({ error: otpCheck.error });
+      }
     }
 
     const result = joinGameSession({

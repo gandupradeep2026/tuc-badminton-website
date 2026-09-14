@@ -597,4 +597,283 @@ export async function sendParticipantConfirmationEmail({ participantEmail, parti
   }
 }
 
+/**
+ * Send 6-Digit OTP Verification Email
+ */
+export async function sendOtpVerificationEmail({ to, code, scope = 'student_gate', expiresMinutes = 15 }) {
+  const scopeDescriptions = {
+    student_gate: {
+      titleDe: '🎓 Freischaltung des Spielerverzeichnisses',
+      titleEn: '🎓 Student Directory Access Verification',
+      descDe: 'Verwende diesen Bestätigungscode, um das Spielerverzeichnis der TU Chemnitz freizuschalten. Nach 30 Minuten Inaktivität sperrt sich das Verzeichnis automatisch wieder.',
+      descEn: 'Use this verification code to unlock the student player directory. The directory will automatically lock after 30 minutes of inactivity.'
+    },
+    register_player: {
+      titleDe: '🏸 Spieler-Registrierung bestätigen',
+      titleEn: '🏸 Verify Player Registration',
+      descDe: 'Verwende diesen Code, um deine E-Mail-Adresse für die Aufnahme in das TU Chemnitz Badminton-Team zu bestätigen.',
+      descEn: 'Use this code to verify your email address for joining the TU Chemnitz Badminton player roster.'
+    },
+    join_session: {
+      titleDe: '🤝 Spielteilnahme bestätigen',
+      titleEn: '🤝 Confirm Match Spot Booking',
+      descDe: 'Verwende diesen Code, um deine Teilnahme an der Spielrunde verbindlich zu bestätigen.',
+      descEn: 'Use this code to confirm your spot in the badminton match session.'
+    },
+    delete_profile: {
+      titleDe: '⚠️ Profil-Löschung bestätigen',
+      titleEn: '⚠️ Confirm Profile Deletion',
+      descDe: 'Achtung: Mit diesem Code bestätigst du die unwiderrufliche Löschung deines Spielerprofils aus der Datenbank.',
+      descEn: 'Warning: Using this code will permanently delete your player profile from the database.'
+    }
+  };
 
+  const info = scopeDescriptions[scope] || scopeDescriptions.student_gate;
+
+  console.log('\n=============================================================');
+  console.log('🔑 [OTP SICHERHEITSCODE]');
+  console.log(`Empfänger                    : ${to}`);
+  console.log(`Zweck                        : ${scope} (${info.titleDe})`);
+  console.log(`6-stelliger Bestätigungscode : [ ${code} ]`);
+  console.log(`Gültigkeit                   : ${expiresMinutes} Minuten`);
+  console.log('=============================================================\n');
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) {
+    return { success: true, method: 'console_only', code };
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    await transporter.sendMail({
+      from: `"TU Chemnitz Badminton" <${user}>`,
+      to,
+      subject: `[Sicherheitscode: ${code}] ${info.titleDe}`,
+      text: `Hallo,\n\ndein Bestätigungscode für die TU Chemnitz Badminton Community lautet:\n\n[ ${code} ]\n\n${info.descDe}\n\nDieser Code ist ${expiresMinutes} Minuten gültig. Gib ihn niemals an andere Personen weiter.\n\nSportliche Grüße,\nTU Chemnitz Badminton Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <div style="display: flex; align-items: center; margin-bottom: 16px;">
+            <h2 style="color: #005A36; margin: 0; font-size: 20px; font-weight: 900;">TU Chemnitz Badminton</h2>
+          </div>
+          
+          <h3 style="color: #0f172a; margin: 0 0 10px 0; font-size: 16px;">${info.titleDe}</h3>
+          <p style="color: #475569; font-size: 13px; line-height: 1.6; margin: 0 0 20px 0;">
+            ${info.descDe}
+          </p>
+
+          <div style="background: #f0fdf4; border: 2px dashed #005A36; padding: 18px; border-radius: 16px; text-align: center; margin: 20px 0;">
+            <span style="font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #005A36; font-family: monospace;">${code}</span>
+          </div>
+
+          <p style="color: #64748b; font-size: 11px; line-height: 1.5; margin-bottom: 0;">
+            ⏱️ Gültigkeitsdauer: <strong>${expiresMinutes} Minuten</strong>. Wenn du diese Anfrage nicht gestellt hast, kannst du diese E-Mail einfach ignorieren.
+          </p>
+        </div>
+      `,
+    });
+
+    return { success: true, method: 'smtp' };
+  } catch (err) {
+    console.error('[MAILER] Error sending OTP verification email:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Broadcast notification email to all registered players when a new game session is hosted
+ */
+export async function sendGameSessionBroadcastEmail({ recipients, session }) {
+  if (!Array.isArray(recipients) || recipients.length === 0) return { success: true, count: 0 };
+
+  const validEmails = recipients.filter(email => email && email.includes('@'));
+  if (validEmails.length === 0) return { success: true, count: 0 };
+
+  console.log(`[MAILER] Broadcasting game session #${session.id} to ${validEmails.length} registered player(s)`);
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) {
+    return { success: true, method: 'console_only', count: validEmails.length };
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    const venue = session.venue || session.location_name || 'Feels Good Club Chemnitz';
+    const address = session.address || session.location_address || '';
+    const format = session.format || session.game_format || 'Doppel';
+    const spotsLeft = Math.max(1, (session.max_players || 4) - (session.current_players || 1));
+
+    // Send using BCC to respect student privacy among players
+    await transporter.sendMail({
+      from: `"TU Chemnitz Badminton" <${user}>`,
+      to: user, // Sender as To
+      bcc: validEmails, // All registered players in BCC
+      subject: `🏸 Neues Spiel gehostet: ${session.title} (${format}) am ${session.session_date}!`,
+      text: `Hallo Badminton-Community!\n\n${session.host_name} hat eine neue Spielrunde gehostet:\n\nFormat: ${format} (${session.skill_level || 'Alle Spielstärken'})\nOrt: ${venue} ${address ? `(${address})` : ''}\nDatum & Zeit: ${session.session_date} von ${session.start_time} bis ${session.end_time || 'Ende'} Uhr\nFreie Plätze: ${spotsLeft} von ${session.max_players}\n\nMöchtest du mitspielen? Klicke auf den folgenden Link:\nhttps://130-61-242-26.sslip.io/#/sessions\n\nSportliche Grüße,\nTU Chemnitz Badminton Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <div style="background: #005A36; padding: 16px 20px; border-radius: 14px; color: #ffffff; margin-bottom: 20px;">
+            <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; opacity: 0.8;">Community Match-Alert</span>
+            <h2 style="margin: 4px 0 0 0; font-size: 18px; font-weight: 900;">🏸 Neues Spiel gehostet!</h2>
+          </div>
+
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">Hallo Badminton-Freunde,</p>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+            <strong>${session.host_name}</strong> hat gerade eine neue Spielrunde auf unserer Plattform erstellt:
+          </p>
+
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 18px 0;">
+            <h3 style="margin: 0 0 10px 0; color: #005A36; font-size: 16px;">${session.title}</h3>
+            <p style="margin: 6px 0; font-size: 13px; color: #334155;">📍 <strong>Ort:</strong> ${venue} ${address ? `(${address})` : ''}</p>
+            <p style="margin: 6px 0; font-size: 13px; color: #334155;">📅 <strong>Termin:</strong> ${session.session_date} • ${session.start_time} - ${session.end_time || ''} Uhr</p>
+            <p style="margin: 6px 0; font-size: 13px; color: #334155;">🏸 <strong>Format:</strong> ${format} • Niveau: ${session.skill_level || 'Alle'}</p>
+            <p style="margin: 6px 0; font-size: 13px; color: #166534; font-weight: bold;">🟢 <strong>Freie Plätze:</strong> Noch ${spotsLeft} Platz/Plätze verfügbar</p>
+            ${session.cost_note ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">💶 <em>Kosten-Notiz: ${session.cost_note}</em></p>` : ''}
+            ${session.description ? `<p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b; font-style: italic;">"${session.description}"</p>` : ''}
+          </div>
+
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="https://130-61-242-26.sslip.io/#/sessions" style="display: inline-block; background-color: #005A36; color: #ffffff; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; text-decoration: none;">
+              🏸 Spielrunde ansehen & Mitspielen
+            </a>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 11px; text-align: center; margin-top: 24px;">
+            Du erhältst diese Nachricht, weil du als aktiver Spieler bei TU Chemnitz Badminton registriert bist.
+          </p>
+        </div>
+      `,
+    });
+
+    return { success: true, count: validEmails.length };
+  } catch (err) {
+    console.error('[MAILER] Error sending game session broadcast:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Send personalized VIP invitation to specifically chosen players
+ */
+export async function sendPersonalSessionInviteEmail({ to, hostName, session }) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) {
+    return { success: true, method: 'console_only' };
+  }
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    const venue = session.venue || session.location_name || 'Feels Good Club Chemnitz';
+    const format = session.format || session.game_format || 'Doppel';
+
+    await transporter.sendMail({
+      from: `"TU Chemnitz Badminton" <${user}>`,
+      to,
+      subject: `🏸 Persönliche Einladung von ${hostName}: Badminton Match am ${session.session_date}!`,
+      text: `Hallo!\n\n${hostName} hat dich persönlich zu einer Badminton-Runde eingeladen:\n\n${session.title} (${format})\nOrt: ${venue}\nTermin: ${session.session_date} ab ${session.start_time} Uhr\n\nSichere dir deinen Platz unter:\nhttps://130-61-242-26.sslip.io/#/sessions\n\nViel Spaß!\nTU Chemnitz Badminton`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 20px; font-weight: 900;">🏸 Du wurdest persönlich eingeladen!</h2>
+          <p style="color: #334155; font-size: 14px;">Hallo,</p>
+          <p style="color: #334155; font-size: 14px;"><strong>${hostName}</strong> hat eine Spielrunde erstellt und dich gezielt als Mitspieler eingeladen:</p>
+
+          <div style="background-color: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <h3 style="margin: 0 0 8px 0; color: #166534; font-size: 15px;">${session.title}</h3>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📍 <strong>Ort:</strong> ${venue}</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">📅 <strong>Termin:</strong> ${session.session_date} • ${session.start_time} Uhr</p>
+            <p style="margin: 4px 0; font-size: 13px; color: #15803d;">🏸 <strong>Format:</strong> ${format}</p>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0;">
+            <a href="https://130-61-242-26.sslip.io/#/sessions" style="display: inline-block; background-color: #005A36; color: #ffffff; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 14px; text-decoration: none;">
+              👉 Jetzt Platz sichern & Mitspielen
+            </a>
+          </div>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('[MAILER] Error sending personal invite email:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Confirmation email when a player self-deletes their profile
+ */
+export async function sendProfileDeletedEmail({ to, playerName }) {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465;
+
+  if (!user || !pass) return { success: true, method: 'console_only' };
+
+  try {
+    const nodemailer = await import('nodemailer');
+    const isGmail = host === 'smtp.gmail.com' || (!host && user.includes('@gmail.com'));
+    const transportConfig = isGmail
+      ? { service: 'gmail', auth: { user, pass } }
+      : { host: host || 'smtp.gmail.com', port, secure: port === 465, auth: { user, pass } };
+
+    const transporter = nodemailer.default.createTransport(transportConfig);
+
+    await transporter.sendMail({
+      from: `"TU Chemnitz Badminton" <${user}>`,
+      to,
+      subject: `[Bestätigung] Dein Spielerprofil wurde gelöscht`,
+      text: `Hallo ${playerName || ''},\n\ndein Spieler-Profil auf der TU Chemnitz Badminton Plattform wurde auf deinen Wunsch hin vollständig und unwiderruflich aus der Datenbank gelöscht.\n\nFalls du in Zukunft wieder mitspielen möchtest, kannst du dich jederzeit neu registrieren.\n\nSportliche Grüße,\nTU Chemnitz Badminton Community`,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff;">
+          <h2 style="color: #005A36; margin: 0 0 12px 0; font-size: 18px; font-weight: 900;">Profil erfolgreich gelöscht</h2>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">Hallo <strong>${playerName || ''}</strong>,</p>
+          <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+            dein Spieler-Profil auf der TU Chemnitz Badminton Website wurde auf deinen Wunsch hin vollständig und unwiderruflich aus unserer Datenbank entfernt.
+          </p>
+          <p style="color: #64748b; font-size: 12px; line-height: 1.5;">
+            Du bist jederzeit wieder herzlich willkommen, dich neu anzumelden!
+          </p>
+        </div>
+      `,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('[MAILER] Error sending profile deleted email:', err.message);
+    return { success: false, error: err.message };
+  }
+}

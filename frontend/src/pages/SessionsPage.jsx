@@ -62,6 +62,10 @@ export default function SessionsPage({ onNavigate }) {
   const [createError, setCreateError] = useState('');
   const [createSuccessMsg, setCreateSuccessMsg] = useState('');
 
+  // Available registered players & invite list
+  const [availablePlayers, setAvailablePlayers] = useState([]);
+  const [invitedPlayerIds, setInvitedPlayerIds] = useState([]);
+
   // Join Form State
   const [joinName, setJoinName] = useState('');
   const [joinEmail, setJoinEmail] = useState('');
@@ -71,6 +75,13 @@ export default function SessionsPage({ onNavigate }) {
   const [joinSubmitting, setJoinSubmitting] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [joinSuccessMsg, setJoinSuccessMsg] = useState('');
+
+  // Join OTP State
+  const [joinOtpCode, setJoinOtpCode] = useState('');
+  const [joinOtpSent, setJoinOtpSent] = useState(false);
+  const [joinOtpSending, setJoinOtpSending] = useState(false);
+  const [joinOtpError, setJoinOtpError] = useState('');
+  const [joinOtpSuccess, setJoinOtpSuccess] = useState('');
 
   // Manage Form State
   const [managePin, setManagePin] = useState('');
@@ -98,6 +109,12 @@ export default function SessionsPage({ onNavigate }) {
 
   useEffect(() => {
     fetchSessions();
+    // Load active players for direct invites
+    safeFetchJson('/api/players').then(res => {
+      if (res.ok && Array.isArray(res.data)) {
+        setAvailablePlayers(res.data);
+      }
+    }).catch(() => {});
   }, []);
 
   const handleVenueChange = (e) => {
@@ -142,7 +159,8 @@ export default function SessionsPage({ onNavigate }) {
         host_email: createHostEmail.trim().toLowerCase(),
         host_phone: createHostPhone.trim(),
         host_avatar_type: createHostAvatar,
-        host_pin: createHostPin.trim()
+        host_pin: createHostPin.trim(),
+        invited_player_ids: invitedPlayerIds
       };
 
       const res = await safeFetchJson('/api/game-sessions', {
@@ -174,6 +192,35 @@ export default function SessionsPage({ onNavigate }) {
     }
   };
 
+  const handleSendJoinOtp = async () => {
+    setJoinOtpError('');
+    setJoinOtpSuccess('');
+    if (!joinEmail.trim() || !joinEmail.includes('@')) {
+      setJoinOtpError(isDe ? 'Bitte gib eine gültige E-Mail-Adresse ein.' : 'Please enter a valid email address.');
+      return;
+    }
+    try {
+      setJoinOtpSending(true);
+      const res = await safeFetchJson('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: joinEmail.trim().toLowerCase(),
+          scope: 'join_session'
+        })
+      });
+      if (!res.ok) {
+        throw new Error(res.error || (isDe ? 'Fehler beim Senden des Codes.' : 'Failed to send verification code.'));
+      }
+      setJoinOtpSent(true);
+      setJoinOtpSuccess(res.data?.message || (isDe ? 'Code gesendet! Bitte prüfe dein Postfach.' : 'Code sent to your email!'));
+    } catch (err) {
+      setJoinOtpError(err.message || 'Error');
+    } finally {
+      setJoinOtpSending(false);
+    }
+  };
+
   const handleJoinSubmit = async (e) => {
     e.preventDefault();
     setJoinError('');
@@ -184,6 +231,16 @@ export default function SessionsPage({ onNavigate }) {
       return;
     }
 
+    const verifiedStudentEmail = sessionStorage.getItem('tuc_student_email') || '';
+    const isStudentVerified = verifiedStudentEmail && verifiedStudentEmail === joinEmail.trim().toLowerCase();
+
+    if (!isStudentVerified && (!joinOtpCode || joinOtpCode.trim().length !== 6)) {
+      setJoinError(isDe 
+        ? 'Bitte bestätige deine E-Mail-Adresse mit dem 6-stelligen Code vor dem Beitreten.' 
+        : 'Please verify your email address with the 6-digit code before joining.');
+      return;
+    }
+
     try {
       setJoinSubmitting(true);
       const payload = {
@@ -191,7 +248,8 @@ export default function SessionsPage({ onNavigate }) {
         participant_email: joinEmail.trim().toLowerCase(),
         participant_phone: joinPhone.trim(),
         avatar_type: joinAvatar,
-        notes: joinNotes.trim()
+        notes: joinNotes.trim(),
+        otp_code: joinOtpCode.trim()
       };
 
       const res = await safeFetchJson(`/api/game-sessions/${joinModalSession.id}/join`, {
@@ -841,6 +899,62 @@ export default function SessionsPage({ onNavigate }) {
                 </div>
               </div>
 
+              {/* Invite specific registered players */}
+              {availablePlayers.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-800 text-xs">
+                      {isDe ? '👥 Registrierte Spieler gezielt einladen (optional)' : '👥 Invite Registered Players (optional)'}
+                    </label>
+                    <span className="text-[11px] text-[#005A36] font-semibold">
+                      {invitedPlayerIds.length} {isDe ? 'ausgewählt' : 'selected'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    {isDe 
+                      ? 'Ausgewählte Spieler erhalten eine persönliche Einladungs-E-Mail mit den Spieldetails.' 
+                      : 'Selected players will receive a personal invite email with session details.'}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
+                    {availablePlayers.map(p => {
+                      const isSelected = invitedPlayerIds.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setInvitedPlayerIds(invitedPlayerIds.filter(id => id !== p.id));
+                            } else {
+                              setInvitedPlayerIds([...invitedPlayerIds, p.id]);
+                            }
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                            isSelected
+                              ? 'bg-[#005A36] text-white shadow-xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{isSelected ? '✓' : '+'}</span>
+                          <span>{p.name}</span>
+                          <span className="text-[10px] opacity-75">({p.skill_level || 'Badminton'})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Broadcast Notification Hint */}
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-start gap-2">
+                <span className="text-sm">📧</span>
+                <p>
+                  {isDe 
+                    ? 'Automatische Benachrichtigung: Alle aktiven Spieler im Verzeichnis werden nach Veröffentlichung automatisch per E-Mail informiert.' 
+                    : 'Broadcast Alert: All active players in the directory will be automatically notified by email once published.'}
+                </p>
+              </div>
+
               <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
@@ -921,21 +1035,59 @@ export default function SessionsPage({ onNavigate }) {
                 />
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  {isDe ? 'Deine E-Mail *' : 'Your Email *'}
+              <div className="space-y-2">
+                <label className="font-bold text-slate-700 block">
+                  {isDe ? 'Deine E-Mail-Adresse *' : 'Your Email Address *'}
                 </label>
-                <input
-                  type="email"
-                  required
-                  value={joinEmail}
-                  onChange={(e) => setJoinEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-mono text-xs"
-                />
-                <span className="text-[10px] text-slate-400 block mt-0.5">
-                  {isDe ? 'Wird für die Bestätigung und Verbindung zum Host benötigt.' : 'Needed for confirmation and connecting with the host.'}
-                </span>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    required
+                    value={joinEmail}
+                    onChange={(e) => {
+                      setJoinEmail(e.target.value);
+                      if (joinOtpSent) {
+                        setJoinOtpSent(false);
+                        setJoinOtpCode('');
+                      }
+                    }}
+                    placeholder="name@example.com"
+                    className="flex-1 p-2.5 rounded-xl border border-slate-300 font-mono text-xs focus:border-[#005A36] outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendJoinOtp}
+                    disabled={joinOtpSending || !joinEmail.includes('@')}
+                    className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] disabled:opacity-50 whitespace-nowrap shadow-xs"
+                  >
+                    {joinOtpSending ? (isDe ? 'Sendet...' : 'Sending...') : (joinOtpSent ? (isDe ? 'Code erneut' : 'Resend') : (isDe ? 'Code anfordern' : 'Send Code'))}
+                  </button>
+                </div>
+
+                {joinOtpError && (
+                  <p className="text-xs text-red-600 font-semibold">{joinOtpError}</p>
+                )}
+                {joinOtpSuccess && (
+                  <p className="text-xs text-emerald-700 font-semibold">{joinOtpSuccess}</p>
+                )}
+
+                {/* OTP Code Input */}
+                {joinOtpSent && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-1">
+                    <label className="block text-xs font-bold text-emerald-950">
+                      {isDe ? '6-stelliger Bestätigungscode aus deiner E-Mail *' : '6-digit Confirmation Code *'}
+                    </label>
+                    <input
+                      type="text"
+                      maxLength="6"
+                      required
+                      value={joinOtpCode}
+                      onChange={(e) => setJoinOtpCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="123456"
+                      className="w-full p-2.5 rounded-xl border border-emerald-300 bg-white font-mono text-sm tracking-widest text-center font-bold focus:ring-2 focus:ring-[#005A36] outline-none"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>

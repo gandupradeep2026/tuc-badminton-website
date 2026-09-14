@@ -162,9 +162,23 @@ export async function safeFetchJson(endpointOrUrl, options = {}) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
 
+  const defaultHeaders = {};
+  if (typeof window !== 'undefined') {
+    try {
+      const studentToken = sessionStorage.getItem('tuc_student_token');
+      if (studentToken) {
+        defaultHeaders['x-student-token'] = studentToken;
+      }
+    } catch (e) {}
+  }
+
   try {
     const res = await fetch(url, {
       ...fetchOptions,
+      headers: {
+        ...defaultHeaders,
+        ...(fetchOptions.headers || {})
+      },
       signal: controller.signal,
     });
     clearTimeout(id);

@@ -1119,6 +1119,22 @@ export function getPlayerByEmail(email) {
   return db.prepare('SELECT * FROM players WHERE LOWER(email) = LOWER(?)').get(email.trim());
 }
 
+export function deletePlayerByEmail(email) {
+  if (!email) return false;
+  const player = getPlayerByEmail(email);
+  if (!player) return false;
+  try {
+    db.prepare('DELETE FROM tournament_partner_requests WHERE player_id = ?').run(player.id);
+  } catch (e) {}
+  db.prepare('DELETE FROM players WHERE id = ?').run(player.id);
+  return player;
+}
+
+export function getAllActivePlayerEmails() {
+  const rows = db.prepare("SELECT email, name FROM players WHERE status = 'approved' AND email IS NOT NULL AND email != ''").all();
+  return rows.map(r => ({ email: r.email.trim().toLowerCase(), name: r.name }));
+}
+
 export function registerPlayerSubmission({
   name,
   gender,
