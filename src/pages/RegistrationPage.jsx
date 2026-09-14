@@ -74,9 +74,17 @@ export default function RegistrationPage({ onNavigate }) {
   const [servicePricing, setServicePricing] = useState('');
   const [serviceLocation, setServiceLocation] = useState('Sporthalle Thüringer Weg 11 / Campus');
 
-  // Auto-populate when authenticated user is loaded
+  // Auto-populate and lock activeTab when authenticated user is loaded
   useEffect(() => {
     if (user) {
+      if (user.role === 'trainer') {
+        setActiveTab('trainer');
+      } else if (user.role === 'service') {
+        setActiveTab('service');
+      } else {
+        setActiveTab('player');
+      }
+
       if (user.name && !playerName) setPlayerName(user.name);
       if (user.university && !playerUniName) {
         setPlayerUniName(user.university);
@@ -179,6 +187,11 @@ export default function RegistrationPage({ onNavigate }) {
     setErrorMsg('');
     setSuccessMsg('');
 
+    if (!isAuthenticated) {
+      openEntryModal();
+      return;
+    }
+
     const emailToUse = user?.email || trainerEmail.trim().toLowerCase();
     if (!trainerName.trim() || !emailToUse) {
       setErrorMsg(isDe ? 'Name und E-Mail sind erforderlich.' : 'Name and email are required.');
@@ -187,9 +200,13 @@ export default function RegistrationPage({ onNavigate }) {
 
     try {
       setSubmitting(true);
-      const res = await safeFetchJson('/api/trainers/register', {
+      const res = await safeFetchJson('/api/trainers/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-student-token': token,
+        },
         body: JSON.stringify({
           name: trainerName.trim(),
           email: emailToUse,
@@ -207,7 +224,7 @@ export default function RegistrationPage({ onNavigate }) {
       }
 
       setSubmittedType('trainer');
-      setSuccessMsg(res.data?.message || (isDe ? 'Trainer-Profil erfolgreich eingereicht!' : 'Trainer profile submitted!'));
+      setSuccessMsg(res.data?.message || (isDe ? 'Trainer-Profil erfolgreich gespeichert!' : 'Trainer profile saved!'));
     } catch (err) {
       setErrorMsg(err.message || 'Fehler beim Absenden.');
     } finally {
@@ -223,6 +240,11 @@ export default function RegistrationPage({ onNavigate }) {
     setErrorMsg('');
     setSuccessMsg('');
 
+    if (!isAuthenticated) {
+      openEntryModal();
+      return;
+    }
+
     const emailToUse = user?.email || serviceEmail.trim().toLowerCase();
     if (!serviceName.trim() || !emailToUse) {
       setErrorMsg(isDe ? 'Name und E-Mail sind erforderlich.' : 'Name and email are required.');
@@ -231,9 +253,13 @@ export default function RegistrationPage({ onNavigate }) {
 
     try {
       setSubmitting(true);
-      const res = await safeFetchJson('/api/equipment-services/register', {
+      const res = await safeFetchJson('/api/equipment-services/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-student-token': token,
+        },
         body: JSON.stringify({
           name: serviceName.trim(),
           email: emailToUse,
@@ -250,7 +276,7 @@ export default function RegistrationPage({ onNavigate }) {
       }
 
       setSubmittedType('service');
-      setSuccessMsg(res.data?.message || (isDe ? 'Ausrüstungs-Service erfolgreich eingereicht!' : 'Equipment service submitted!'));
+      setSuccessMsg(res.data?.message || (isDe ? 'Ausrüstungs-Service erfolgreich gespeichert!' : 'Equipment service saved!'));
     } catch (err) {
       setErrorMsg(err.message || 'Fehler beim Absenden.');
     } finally {
@@ -268,57 +294,92 @@ export default function RegistrationPage({ onNavigate }) {
           <span>Badminton Student Community</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-          {isDe ? 'Profil erstellen & Community beitreten' : 'Create Profile & Join Community'}
+          {isAuthenticated 
+            ? (user?.role === 'trainer'
+                ? (isDe ? 'Dein Trainer-Profil bearbeiten' : 'Edit Your Coach Profile')
+                : (user?.role === 'service'
+                    ? (isDe ? 'Dein Service-Profil bearbeiten' : 'Edit Your Gear & Service Profile')
+                    : (isDe ? 'Dein Spielerprofil bearbeiten' : 'Edit Your Player Profile')))
+            : (isDe ? 'Profil erstellen & Community beitreten' : 'Create Profile & Join Community')}
         </h1>
         <p className="text-sm text-slate-500 max-w-xl mx-auto">
-          {isDe 
-            ? 'Trage dich in unseren Kader ein, finde Spielpartner für Einzel, Doppel & Mixed oder biete deine Trainings- und Besaitungsdienste an.' 
-            : 'Join our player roster, find sparring partners for singles/doubles, or offer coaching and stringing services.'}
+          {isAuthenticated
+            ? (user?.role === 'trainer'
+                ? (isDe ? 'Verwalte dein Trainerprofil, deine Schwerpunkte und Kontaktaufnahme.' : 'Manage your coaching profile, focus areas, and inquiries.')
+                : (user?.role === 'service'
+                    ? (isDe ? 'Verwalte deine Besaitungsangebote, Preise und Werkstattinfos.' : 'Manage your stringing offerings, pricing, and workshop notes.')
+                    : (isDe ? 'Verwalte deine Spielstärke, Kategorien und Disziplinen im Campus-Kader.' : 'Manage your skill level, preferred categories, and roster info.')))
+            : (isDe 
+                ? 'Trage dich in unseren Kader ein, finde Spielpartner für Einzel, Doppel & Mixed oder biete deine Trainings- und Besaitungsdienste an.' 
+                : 'Join our player roster, find sparring partners for singles/doubles, or offer coaching and stringing services.')}
         </p>
       </div>
 
-      {/* Role Tabs */}
+      {/* Role Tabs - Locked to registered role when authenticated */}
       <div className="flex justify-center">
-        <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
-          <button
-            type="button"
-            onClick={() => { setActiveTab('player'); setSubmittedType(null); setErrorMsg(''); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'player'
-                ? 'bg-[#005A36] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>{isDe ? '🎓 Spieler / Student' : '🎓 Player / Student'}</span>
-          </button>
+        {isAuthenticated ? (
+          <div className="inline-flex items-center gap-2 p-2 px-5 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs font-bold text-emerald-950 shadow-2xs">
+            {user?.role === 'trainer' && (
+              <>
+                <Award className="w-4 h-4 text-emerald-700" />
+                <span>{isDe ? '👥 Trainer-Profil (Rolle gesperrt)' : '👥 Coach Profile (Role-Locked)'}</span>
+              </>
+            )}
+            {user?.role === 'service' && (
+              <>
+                <Wrench className="w-4 h-4 text-emerald-700" />
+                <span>{isDe ? '🔧 Ausrüstungs- & Service-Profil (Rolle gesperrt)' : '🔧 Gear & Service Profile (Role-Locked)'}</span>
+              </>
+            )}
+            {(!user?.role || user?.role === 'student') && (
+              <>
+                <Users className="w-4 h-4 text-emerald-700" />
+                <span>{isDe ? '🎓 Studierenden-Spielerprofil (Rolle gesperrt)' : '🎓 Student Player Profile (Role-Locked)'}</span>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => { setActiveTab('player'); setSubmittedType(null); setErrorMsg(''); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'player'
+                  ? 'bg-[#005A36] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>{isDe ? '🎓 Spieler / Student' : '🎓 Player / Student'}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => { setActiveTab('trainer'); setSubmittedType(null); setErrorMsg(''); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'trainer'
-                ? 'bg-[#005A36] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            <span>{isDe ? '👥 Trainer & Coach' : '👥 Trainer & Coach'}</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('trainer'); setSubmittedType(null); setErrorMsg(''); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'trainer'
+                  ? 'bg-[#005A36] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Award className="w-4 h-4" />
+              <span>{isDe ? '👥 Trainer & Coach' : '👥 Trainer & Coach'}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => { setActiveTab('service'); setSubmittedType(null); setErrorMsg(''); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'service'
-                ? 'bg-[#005A36] text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Wrench className="w-4 h-4" />
-            <span>{isDe ? '🔧 Ausrüstung & Service' : '🔧 Gear & Service'}</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('service'); setSubmittedType(null); setErrorMsg(''); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'service'
+                  ? 'bg-[#005A36] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Wrench className="w-4 h-4" />
+              <span>{isDe ? '🔧 Ausrüstung & Service' : '🔧 Gear & Service'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Authenticated Status or Sign-In Prompt Box */}

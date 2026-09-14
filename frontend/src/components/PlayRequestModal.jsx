@@ -29,6 +29,16 @@ export default function PlayRequestModal({ isOpen, onClose, player }) {
       return;
     }
 
+    if (user?.role === 'trainer') {
+      setErrorMsg(isDe ? 'Trainer können keine Spielanfragen an Spieler senden.' : 'Coaches cannot send play requests to players.');
+      return;
+    }
+
+    if (user?.role === 'service') {
+      setErrorMsg(isDe ? 'Service-Anbieter können keine Spielanfragen an Spieler senden.' : 'Service providers cannot send play requests to players.');
+      return;
+    }
+
     if (!message.trim()) {
       setErrorMsg(isDe ? 'Bitte schreibe eine kurze Nachricht.' : 'Please enter a short message.');
       return;

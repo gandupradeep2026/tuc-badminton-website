@@ -20,6 +20,7 @@ import {
   X
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import StadiumCarousel from '../components/StadiumCarousel';
 import YouTubeSection from '../components/YouTubeSection';
 import { getApiUrl, safeFetchJson } from '../api/client';
@@ -27,6 +28,7 @@ import { getApiUrl, safeFetchJson } from '../api/client';
 export default function HomePage({ onNavigate }) {
   const { t, language } = useLanguage();
   const isDe = language === 'de';
+  const { user, isAuthenticated, openEntryModal } = useAuth();
   const h = t.home;
   const [announcement, setAnnouncement] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -142,11 +144,21 @@ export default function HomePage({ onNavigate }) {
           {/* Quick Action Navigation Buttons - Responsive stack on mobile, row on tablet/desktop */}
           <div className="pt-2 sm:pt-4 flex flex-col sm:flex-row flex-wrap gap-2.5 sm:gap-3">
             <button
-              onClick={() => onNavigate('register')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-amber-400 text-slate-950 hover:bg-amber-300 active:bg-amber-500 transition-colors shadow-md"
+              onClick={() => {
+                if (!isAuthenticated) {
+                  openEntryModal();
+                } else {
+                  onNavigate('register');
+                }
+              }}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-amber-400 text-slate-950 hover:bg-amber-300 active:bg-amber-500 transition-colors shadow-md cursor-pointer"
             >
               <UserPlus className="w-4 h-4 text-slate-950 flex-shrink-0" />
-              <span>{isDe ? 'Mitmachen & Registrieren' : 'Join & Register'}</span>
+              <span>
+                {isAuthenticated 
+                  ? (isDe ? '👤 Mein Profil' : '👤 My Profile') 
+                  : (isDe ? 'Community beitreten / Einloggen' : 'Join Community / Log In')}
+              </span>
             </button>
             <button
               onClick={() => onNavigate('sessions')}

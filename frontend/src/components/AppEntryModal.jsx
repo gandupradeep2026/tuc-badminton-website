@@ -129,6 +129,22 @@ export default function AppEntryModal({ isOpen, onClose }) {
       setErrorMsg(isDe ? 'Bitte gib eine gültige E-Mail-Adresse ein.' : 'Please enter a valid email address.');
       return;
     }
+
+    if (regRole === 'student') {
+      const emailLower = regEmail.trim().toLowerCase();
+      const forbiddenDomains = [
+        '@gmail.', '@googlemail.', '@yahoo.', '@hotmail.', '@outlook.', '@gmx.', '@web.', '@icloud.', '@aol.', '@proton.'
+      ];
+      if (forbiddenDomains.some(dom => emailLower.includes(dom))) {
+        setErrorMsg(
+          isDe
+            ? 'Studierende müssen ihre Hochschul-E-Mail nutzen (z.B. @tu-chemnitz.de, @mytuc.org, .edu). Private E-Mails (Gmail, Yahoo etc.) sind nicht zugelassen.'
+            : 'Students must use their university email (e.g. @tu-chemnitz.de, @mytuc.org, .edu). Personal emails (Gmail, Yahoo, etc.) are strictly rejected.'
+        );
+        return;
+      }
+    }
+
     if (!regPassword || regPassword.length < 6) {
       setErrorMsg(isDe ? 'Das Passwort muss mindestens 6 Zeichen lang sein.' : 'Password must be at least 6 characters long.');
       return;
@@ -498,7 +514,7 @@ export default function AppEntryModal({ isOpen, onClose }) {
                   </div>
 
                   <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                    {regRole === 'student' ? a.studentHint : a.trainerHint}
+                    {regRole === 'student' ? a.studentHint : (regRole === 'trainer' ? a.trainerHint : a.serviceHint)}
                   </p>
                 </div>
               )}
@@ -656,7 +672,7 @@ export default function AppEntryModal({ isOpen, onClose }) {
                         maxLength="6"
                         required
                         value={regCode}
-                        onChange={(e) => setRegCode(e.target.value.replace(/D/g, ''))}
+                        onChange={(e) => setRegCode(e.target.value.replace(/\D/g, ''))}
                         placeholder={a.codePlaceholder}
                         className="w-full pl-10 pr-3.5 py-3 rounded-xl border border-slate-300 text-center font-mono font-bold text-lg tracking-widest focus:ring-2 focus:ring-[#005A36] outline-none"
                       />

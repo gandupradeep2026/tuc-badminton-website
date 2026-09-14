@@ -78,6 +78,8 @@ import {
   getDonationSettings,
   updateDonationSettings,
   getTrainerById,
+  getTrainerByEmail,
+  getEquipmentServiceByEmail,
   createContactInquiry,
   getAllContactInquiries,
   getPendingContactInquiries,
@@ -1154,6 +1156,12 @@ app.post('/api/auth/logout', (req, res) => {
 // -------------------------------------------------------------
 app.post('/api/players/profile', requireStudentUser, upload.single('photo'), (req, res) => {
   try {
+    if (req.studentUser?.role && req.studentUser.role !== 'student') {
+      return res.status(403).json({
+        error: 'Only registered students can create or update a player profile. / Nur registrierte Studierende können ein Spielerprofil anlegen.'
+      });
+    }
+
     const email = req.studentEmail;
     const {
       name,
@@ -1224,10 +1232,187 @@ app.post('/api/players/profile', requireStudentUser, upload.single('photo'), (re
 });
 
 // -------------------------------------------------------------
+// Streamlined Trainer Profile (Authenticated Trainer)
+// -------------------------------------------------------------
+app.post('/api/trainers/profile', requireStudentUser, upload.single('photo'), (req, res) => {
+  try {
+    if (req.studentUser?.role !== 'trainer') {
+      return res.status(403).json({
+        error: 'Only registered trainers can create or update a trainer profile. / Nur registrierte Trainer können ein Trainer-Profil anlegen.'
+      });
+    }
+    const email = req.studentEmail;
+    const {
+      name,
+      phone,
+      role,
+      hourly_rate,
+      experience_years,
+      focus_areas,
+      availability,
+      photo_url_input
+    } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name ist erforderlich.' });
+    }
+
+    let photo_url = photo_url_input !== undefined ? photo_url_input.trim() : (req.body.photo_url || '');
+    if (req.file) {
+      photo_url = `/uploads/${req.file.filename}`;
+    }
+
+    const existingTrainer = getTrainerByEmail(email);
+    let trainer;
+    if (existingTrainer) {
+      trainer = updateTrainer(existingTrainer.id, {
+        name: name.trim(),
+        role: role ? role.trim() : existingTrainer.role,
+        email,
+        phone: phone !== undefined ? phone.trim() : existingTrainer.phone,
+        show_phone: 0,
+        focus_areas: focus_areas ? focus_areas.trim() : existingTrainer.focus_areas,
+        photo_url: photo_url || existingTrainer.photo_url,
+        trainer_type: existingTrainer.trainer_type || 'private',
+        hourly_rate: hourly_rate !== undefined ? hourly_rate.trim() : existingTrainer.hourly_rate,
+        availability: availability !== undefined ? availability.trim() : existingTrainer.availability,
+        experience_years: experience_years !== undefined ? experience_years.trim() : existingTrainer.experience_years,
+        hochschulsport_approved: existingTrainer.hochschulsport_approved !== undefined ? existingTrainer.hochschulsport_approved : 1,
+        hochschulsport_note: existingTrainer.hochschulsport_note || 'USZ-Zulassung vorhanden',
+        status: 'approved'
+      });
+    } else {
+      trainer = createTrainer({
+        name: name.trim(),
+        role: role ? role.trim() : 'Badminton Coach',
+        email,
+        phone: phone ? phone.trim() : '',
+        show_phone: 0,
+        focus_areas: focus_areas ? focus_areas.trim() : 'Technik & Taktik',
+        photo_url,
+        trainer_type: 'private',
+        hourly_rate: hourly_rate ? hourly_rate.trim() : '',
+        availability: availability ? availability.trim() : '',
+        experience_years: experience_years ? experience_years.trim() : '',
+        hochschulsport_approved: 1,
+        hochschulsport_note: 'Community Trainer',
+        status: 'approved'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Dein Trainer-Profil wurde erfolgreich gespeichert!',
+      trainer
+    });
+  } catch (err) {
+    console.error('Error saving trainer profile:', err);
+    res.status(500).json({ error: err.message || 'Fehler beim Speichern des Trainer-Profils.' });
+  }
+});
+
+// Alias for backwards compatibility
+app.post('/api/trainers/register', requireStudentUser, upload.single('photo'), (req, res, next) => {
+  return app._router.handle({ ...req, url: '/api/trainers/profile' }, res, next);
+});
+
+// -------------------------------------------------------------
+// Streamlined Equipment Service Profile (Authenticated Service)
+// -------------------------------------------------------------
+app.post('/api/equipment-services/profile', requireStudentUser, upload.single('photo'), (req, res) => {
+  try {
+    if (req.studentUser?.role !== 'service') {
+      return res.status(403).json({
+        error: 'Only registered service providers can create or update a service profile. / Nur registrierte Dienstleister können ein Ausrüstungs-Profil anlegen.'
+      });
+    }
+    const email = req.studentEmail;
+    const {
+      name,
+      phone,
+      service_type,
+      pricing_details,
+      available_items,
+      location_note,
+      experience_years,
+      photo_url_input
+    } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name ist erforderlich.' });
+    }
+
+    let photo_url = photo_url_input !== undefined ? photo_url_input.trim() : (req.body.photo_url || '');
+    if (req.file) {
+      photo_url = `/uploads/${req.file.filename}`;
+    }
+
+    const existingService = getEquipmentServiceByEmail(email);
+    let service;
+    if (existingService) {
+      service = updateEquipmentService(existingService.id, {
+        name: name.trim(),
+        service_type: service_type ? service_type.trim() : existingService.service_type,
+        email,
+        phone: phone !== undefined ? phone.trim() : existingService.phone,
+        show_phone: 0,
+        pricing_details: pricing_details !== undefined ? pricing_details.trim() : existingService.pricing_details,
+        available_items: available_items !== undefined ? available_items.trim() : existingService.available_items,
+        location_note: location_note !== undefined ? location_note.trim() : existingService.location_note,
+        experience_years: experience_years !== undefined ? experience_years.trim() : existingService.experience_years,
+        photo_url: photo_url || existingService.photo_url,
+        status: 'approved'
+      });
+    } else {
+      service = createEquipmentService({
+        name: name.trim(),
+        service_type: service_type ? service_type.trim() : 'Schläger-Besaitungsservice & Ausrüstung',
+        email,
+        phone: phone ? phone.trim() : '',
+        show_phone: 0,
+        pricing_details: pricing_details ? pricing_details.trim() : '',
+        available_items: available_items ? available_items.trim() : '',
+        location_note: location_note ? location_note.trim() : 'Sporthalle Thüringer Weg 11 / Campus',
+        experience_years: experience_years ? experience_years.trim() : '',
+        photo_url,
+        status: 'approved'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Dein Ausrüstungs- & Besaitungs-Profil wurde erfolgreich gespeichert!',
+      service
+    });
+  } catch (err) {
+    console.error('Error saving equipment service profile:', err);
+    res.status(500).json({ error: err.message || 'Fehler beim Speichern des Service-Profils.' });
+  }
+});
+
+// Alias for backwards compatibility
+app.post('/api/equipment-services/register', requireStudentUser, upload.single('photo'), (req, res, next) => {
+  return app._router.handle({ ...req, url: '/api/equipment-services/profile' }, res, next);
+});
+
+// -------------------------------------------------------------
 // Play Contact Requests (Strict Privacy Shielding: Request & Reply)
 // -------------------------------------------------------------
 app.post('/api/players/:id/contact-request', requireStudentUser, async (req, res) => {
   try {
+    // Permission Gating: Trainers cannot send requests to players
+    if (req.studentUser?.role === 'trainer') {
+      return res.status(403).json({
+        error: 'Trainers cannot send requests to players. / Trainer können keine Anfragen an Spieler senden.'
+      });
+    }
+    // Permission Gating: Service providers cannot send requests to players
+    if (req.studentUser?.role === 'service') {
+      return res.status(403).json({
+        error: 'Service providers cannot send requests to players. / Service-Anbieter können keine Anfragen an Spieler senden.'
+      });
+    }
+
     const targetPlayerId = parseInt(req.params.id, 10);
     const targetPlayer = getPlayerById(targetPlayerId);
     if (!targetPlayer) {
@@ -2759,6 +2944,16 @@ app.post('/api/inquiries', async (req, res) => {
     }
     if (!message || !message.trim()) {
       return res.status(400).json({ error: 'Bitte gib eine Nachricht oder Beschreibung deiner Anfrage ein.' });
+    }
+
+    // Permission Gating: Service providers cannot send requests to trainers
+    const auth = getAuthenticatedStudentUser(req);
+    const callerEmail = auth?.email || requester_email.trim().toLowerCase();
+    const callerRole = auth?.user?.role || getStudentUserByEmail(callerEmail)?.role;
+    if (callerRole === 'service' && target_type === 'trainer') {
+      return res.status(403).json({
+        error: 'Service providers cannot send requests to trainers. / Service-Anbieter können keine Anfragen an Trainer senden.'
+      });
     }
 
     // Lookup target to get target name and private email

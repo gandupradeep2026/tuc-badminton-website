@@ -272,18 +272,56 @@ export default function PlayersPage({ onNavigate }) {
 
         {/* Privacy Shielding & Direct Message Action */}
         <div className="pt-3 border-t border-slate-100 space-y-2">
-          <button
-            type="button"
-            onClick={() => setSelectedMember(member)}
-            className="flex items-center justify-center gap-2 w-full py-2.5 px-3 min-h-[42px] rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#005A36] to-emerald-700 hover:from-[#00472A] hover:to-emerald-800 shadow-xs hover:shadow transition-all cursor-pointer"
-          >
-            <Mail className="w-3.5 h-3.5 text-emerald-200" />
-            <span>
-              {isDe 
-                ? (isTrainer ? '🏸 Trainer diskret anfragen' : (isService ? '🔧 Service anfragen' : '💬 Spielanfrage senden')) 
-                : (isTrainer ? '🏸 Request Coach Discretely' : (isService ? '🔧 Request Service' : '💬 Send Play Request'))}
-            </span>
-          </button>
+          {(() => {
+            const isOwnCard = user?.email && member.email && user.email.toLowerCase() === member.email.toLowerCase();
+            if (isOwnCard) {
+              return (
+                <div className="flex items-center justify-center gap-1.5 w-full py-2.5 px-3 min-h-[42px] rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{isDe ? '✨ Dein eigenes Profil' : '✨ Your Profile'}</span>
+                </div>
+              );
+            }
+
+            // Trainer Restriction: Cannot send requests to players
+            if (user?.role === 'trainer' && isStudent) {
+              return (
+                <div 
+                  className="flex items-center justify-center text-center gap-1.5 w-full py-2 px-3 min-h-[42px] rounded-xl text-[11px] font-bold text-slate-500 bg-slate-100 border border-slate-200" 
+                  title={isDe ? 'Trainer können keine Spielanfragen an Spieler senden' : 'Coaches cannot send play requests to players'}
+                >
+                  <span>{isDe ? '🚫 Keine Anfragen an Spieler möglich' : '🚫 Coaches cannot request players'}</span>
+                </div>
+              );
+            }
+
+            // Service Provider Restriction: Cannot send requests to students or trainers
+            if (user?.role === 'service' && (isStudent || isTrainer)) {
+              return (
+                <div 
+                  className="flex items-center justify-center text-center gap-1.5 w-full py-2 px-3 min-h-[42px] rounded-xl text-[11px] font-bold text-slate-500 bg-slate-100 border border-slate-200" 
+                  title={isDe ? 'Service-Anbieter können keine Anfragen an Spieler oder Trainer senden' : 'Service providers cannot send requests to players or coaches'}
+                >
+                  <span>{isDe ? '🚫 Nur für Studierende / Trainer' : '🚫 Only for students / coaches'}</span>
+                </div>
+              );
+            }
+
+            return (
+              <button
+                type="button"
+                onClick={() => setSelectedMember(member)}
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-3 min-h-[42px] rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#005A36] to-emerald-700 hover:from-[#00472A] hover:to-emerald-800 shadow-xs hover:shadow transition-all cursor-pointer"
+              >
+                <Mail className="w-3.5 h-3.5 text-emerald-200" />
+                <span>
+                  {isDe 
+                    ? (isTrainer ? '🏸 Trainer diskret anfragen' : (isService ? '🔧 Service anfragen' : '💬 Spielanfrage senden')) 
+                    : (isTrainer ? '🏸 Request Coach Discretely' : (isService ? '🔧 Request Service' : '💬 Send Play Request'))}
+                </span>
+              </button>
+            );
+          })()}
 
           <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 font-medium">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
@@ -312,11 +350,18 @@ export default function PlayersPage({ onNavigate }) {
             </h1>
             {onNavigate && (
               <button
-                onClick={() => onNavigate('register')}
+                onClick={() => {
+                  if (!isAuthenticated) openEntryModal();
+                  else onNavigate('register');
+                }}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-xs cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>{isDe ? 'Mein Profil anlegen' : 'Create Profile'}</span>
+                <span>
+                  {isAuthenticated 
+                    ? (isDe ? 'Mein Profil verwalten' : 'Manage Profile') 
+                    : (isDe ? 'Einloggen / Profil anlegen' : 'Log In / Create Profile')}
+                </span>
               </button>
             )}
             {isAuthenticated && (
@@ -612,11 +657,18 @@ export default function PlayersPage({ onNavigate }) {
               </p>
               {onNavigate && (
                 <button
-                  onClick={() => onNavigate('register')}
+                  onClick={() => {
+                    if (!isAuthenticated) openEntryModal();
+                    else onNavigate('register');
+                  }}
                   className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-sm cursor-pointer"
                 >
                   <UserPlus className="w-4 h-4" />
-                  <span>{isDe ? 'Jetzt Spielerprofil anlegen' : 'Register Profile'}</span>
+                  <span>
+                    {isAuthenticated 
+                      ? (isDe ? 'Mein Profil verwalten' : 'Manage Profile') 
+                      : (isDe ? 'Einloggen & Profil anlegen' : 'Log In & Create Profile')}
+                  </span>
                 </button>
               )}
             </div>

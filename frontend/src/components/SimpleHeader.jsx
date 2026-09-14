@@ -34,7 +34,6 @@ export default function SimpleHeader({ activePage, onNavigate }) {
     { id: 'services', label: isDe ? 'Besaitung & Ausrüstung' : 'Stringing & Gear', icon: '🔧' },
     { id: 'tournaments', label: t.nav.tournaments, icon: '🏆' },
     { id: 'gallery', label: t.nav.gallery, icon: '📸' },
-    { id: 'register', label: isDe ? 'Registrieren' : 'Register', icon: '✍️' },
   ];
 
   // Close mobile menu on page change or ESC
@@ -156,7 +155,17 @@ export default function SimpleHeader({ activePage, onNavigate }) {
           {isAuthenticated ? (
             <div className="hidden sm:flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1.5 text-xs">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-bold text-emerald-950 truncate max-w-[120px]">{user?.name || user?.email}</span>
+              <button
+                type="button"
+                onClick={() => handleSelect('register')}
+                className="font-bold text-emerald-950 hover:text-emerald-700 truncate max-w-[120px] cursor-pointer text-left"
+                title={isDe ? 'Mein Profil verwalten' : 'Manage My Profile'}
+              >
+                {user?.name || user?.email}
+              </button>
+              <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900">
+                {user?.role === 'trainer' ? 'Trainer' : (user?.role === 'service' ? 'Service' : 'Student')}
+              </span>
               <button
                 type="button"
                 onClick={logout}
@@ -226,17 +235,29 @@ export default function SimpleHeader({ activePage, onNavigate }) {
             {/* Mobile Auth Button */}
             <div className="pb-2 mb-2 border-b border-slate-100">
               {isAuthenticated ? (
-                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span className="font-bold text-xs text-emerald-950">{user?.name || user?.email}</span>
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                      <span className="font-bold text-xs text-emerald-950 truncate">{user?.name || user?.email}</span>
+                      <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-200 text-emerald-900 flex-shrink-0">
+                        {user?.role === 'trainer' ? 'Trainer' : (user?.role === 'service' ? 'Service' : 'Student')}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { logout(); setMobileMenuOpen(false); }}
+                      className="text-xs font-bold text-red-600 bg-white px-2 py-1 rounded-lg border border-red-200 cursor-pointer"
+                    >
+                      {isDe ? 'Abmelden' : 'Log Out'}
+                    </button>
                   </div>
                   <button
                     type="button"
-                    onClick={() => { logout(); setMobileMenuOpen(false); }}
-                    className="text-xs font-bold text-red-600 bg-white px-2 py-1 rounded-lg border border-red-200"
+                    onClick={() => handleSelect('register')}
+                    className="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] text-center cursor-pointer"
                   >
-                    {isDe ? 'Abmelden' : 'Log Out'}
+                    {isDe ? '👤 Mein Profil verwalten' : '👤 Manage My Profile'}
                   </button>
                 </div>
               ) : (
@@ -246,7 +267,7 @@ export default function SimpleHeader({ activePage, onNavigate }) {
                   className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[#005A36] hover:bg-[#00472A] flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>{isDe ? 'Anmelden / Registrieren' : 'Log In / Register'}</span>
+                  <span>{isDe ? 'Anmelden' : 'Log In'}</span>
                 </button>
               )}
             </div>

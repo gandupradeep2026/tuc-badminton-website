@@ -15,10 +15,12 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { safeFetchJson, getUploadUrl } from '../api/client';
 import InquiryModal from '../components/InquiryModal';
 
 export default function ServicesPage({ onNavigate }) {
+  const { user, isAuthenticated, openEntryModal } = useAuth();
   const { language } = useLanguage();
   const isDe = language === 'de';
 
@@ -70,13 +72,20 @@ export default function ServicesPage({ onNavigate }) {
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
               {isDe ? 'Besaitungsservice & Ausrüstung' : 'Racket Stringing & Equipment'}
             </h1>
-            {onNavigate && (
+            {onNavigate && (!isAuthenticated || user?.role === 'service') && (
               <button
-                onClick={() => onNavigate('register')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-xs"
+                onClick={() => {
+                  if (!isAuthenticated) openEntryModal();
+                  else onNavigate('register');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-xs cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>{isDe ? 'Als Anbieter registrieren' : 'Register as Provider'}</span>
+                <span>
+                  {isAuthenticated 
+                    ? (isDe ? 'Mein Service-Profil verwalten' : 'Manage Service Profile') 
+                    : (isDe ? 'Service-Login / Registrieren' : 'Service Log In / Register')}
+                </span>
               </button>
             )}
           </div>
@@ -157,13 +166,20 @@ export default function ServicesPage({ onNavigate }) {
                 : 'Do you string rackets or sell shuttles and grips to students? Join our campus badminton equipment network!'}
             </p>
           </div>
-          {onNavigate && (
+          {onNavigate && (!isAuthenticated || user?.role === 'service') && (
             <button
-              onClick={() => onNavigate('register')}
-              className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-sm"
+              onClick={() => {
+                if (!isAuthenticated) openEntryModal();
+                else onNavigate('register');
+              }}
+              className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-sm cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
-              <span>{isDe ? 'Jetzt als Besaiter / Ausrüster registrieren' : 'Register as Stringer / Supplier'}</span>
+              <span>
+                {isAuthenticated 
+                  ? (isDe ? 'Mein Service-Profil verwalten' : 'Manage Service Profile') 
+                  : (isDe ? 'Service-Login / Registrieren' : 'Service Log In / Register')}
+              </span>
             </button>
           )}
         </div>
@@ -310,12 +326,17 @@ export default function ServicesPage({ onNavigate }) {
               : 'Register as an equipment partner for free and support fellow students with quick racket stringing and shuttles right on campus.'}
           </p>
         </div>
-        {onNavigate && (
+        {onNavigate && (!isAuthenticated || user?.role === 'service') && (
           <button
-            onClick={() => onNavigate('register')}
+            onClick={() => {
+              if (!isAuthenticated) openEntryModal();
+              else onNavigate('register');
+            }}
             className="px-5 py-3 rounded-xl font-black text-xs sm:text-sm text-[#005A36] bg-white hover:bg-emerald-50 transition-colors whitespace-nowrap shadow-sm flex-shrink-0 cursor-pointer"
           >
-            {isDe ? 'Jetzt als Partner eintragen' : 'Join as Equipment Partner'}
+            {isAuthenticated 
+              ? (isDe ? 'Mein Service-Profil' : 'My Service Profile') 
+              : (isDe ? 'Als Partner beitreten' : 'Join as Equipment Partner')}
           </button>
         )}
       </div>

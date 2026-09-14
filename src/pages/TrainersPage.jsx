@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Mail, Phone, UserPlus, ShieldCheck, Sparkles, Clock, DollarSign, Award } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 import { getApiUrl, getUploadUrl, safeFetchJson } from '../api/client';
 import { DEFAULT_TRAINERS } from '../data/mockData';
 import InquiryModal from '../components/InquiryModal';
 
 export default function TrainersPage({ onNavigate }) {
+  const { user, isAuthenticated, openEntryModal } = useAuth();
   const [trainers, setTrainers] = useState(DEFAULT_TRAINERS);
   const [loading, setLoading] = useState(true);
   const [inquiryTarget, setInquiryTarget] = useState(null);
@@ -53,13 +55,20 @@ export default function TrainersPage({ onNavigate }) {
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
               {tr.title}
             </h1>
-            {onNavigate && (
+            {onNavigate && (!isAuthenticated || user?.role === 'trainer') && (
               <button
-                onClick={() => onNavigate('register')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-xs"
+                onClick={() => {
+                  if (!isAuthenticated) openEntryModal();
+                  else onNavigate('register');
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-xs cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>{isDe ? 'Als Badminton-Trainer registrieren' : 'Register as a Badminton Trainer'}</span>
+                <span>
+                  {isAuthenticated 
+                    ? (isDe ? 'Mein Trainer-Profil verwalten' : 'Manage Coach Profile') 
+                    : (isDe ? 'Trainer-Login / Registrieren' : 'Coach Log In / Register')}
+                </span>
               </button>
             )}
           </div>
@@ -88,13 +97,20 @@ export default function TrainersPage({ onNavigate }) {
               ? 'Trainer und Betreuer können über das Admin-Portal oder die Registrierungsseite hinzugefügt werden.'
               : 'Coaches and trainers can be added via the admin dashboard or registration page.'}
           </p>
-          {onNavigate && (
+          {onNavigate && (!isAuthenticated || user?.role === 'trainer') && (
             <button
-              onClick={() => onNavigate('register')}
-              className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-sm"
+              onClick={() => {
+                if (!isAuthenticated) openEntryModal();
+                else onNavigate('register');
+              }}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-[#005A36] text-white hover:bg-[#00472A] transition-colors shadow-sm cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
-              <span>{isDe ? 'Als Trainer bewerben' : 'Apply as Coach'}</span>
+              <span>
+                {isAuthenticated 
+                  ? (isDe ? 'Mein Trainer-Profil verwalten' : 'Manage Coach Profile') 
+                  : (isDe ? 'Trainer-Login / Registrieren' : 'Coach Log In / Register')}
+              </span>
             </button>
           )}
         </div>
