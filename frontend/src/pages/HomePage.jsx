@@ -17,12 +17,16 @@ import {
   ExternalLink,
   Sparkles,
   UserPlus,
-  X
+  X,
+  Box
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import StadiumCarousel from '../components/StadiumCarousel';
 import YouTubeSection from '../components/YouTubeSection';
+import HeroBadminton3D from '../components/3d/HeroBadminton3D';
+import BadmintonCourtViewer3D from '../components/3d/BadmintonCourtViewer3D';
+import TiltCard3D from '../components/3d/TiltCard3D';
 import { getApiUrl, safeFetchJson } from '../api/client';
 
 export default function HomePage({ onNavigate }) {
@@ -126,85 +130,95 @@ export default function HomePage({ onNavigate }) {
         </div>
       )}
 
-      {/* 1. Hero / Overview Banner */}
-      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#005A36] to-[#003B23] text-white p-6 sm:p-10 md:p-12 shadow-md">
-        <div className="relative z-10 max-w-3xl space-y-3 sm:space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-emerald-200 text-[11px] sm:text-xs font-semibold max-w-full truncate">
-            <span className="truncate">{h.heroBadge}</span>
+      {/* 1. Hero / Overview Banner with Live Interactive 3D Badminton Canvas */}
+      <section className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#005A36] to-[#003B23] text-white p-6 sm:p-8 md:p-10 shadow-xl border border-emerald-600/30">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center relative z-10">
+          
+          <div className="lg:col-span-7 space-y-3 sm:space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm text-emerald-200 text-[11px] sm:text-xs font-semibold max-w-full truncate border border-emerald-400/20">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+              <span className="truncate">{h.heroBadge}</span>
+            </div>
+
+            <h1 className="font-display font-black text-2xl sm:text-4xl md:text-5xl tracking-tight leading-tight">
+              {h.heroTitle1} <span className="text-emerald-300">{h.heroTitle2}</span>
+            </h1>
+
+            <p className="text-xs sm:text-sm md:text-base text-white/85 leading-relaxed">
+              {h.heroDesc}
+            </p>
+
+            {/* Quick Action Navigation Buttons */}
+            <div className="pt-2 sm:pt-4 flex flex-col sm:flex-row flex-wrap gap-2.5 sm:gap-3">
+              <button
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    openEntryModal();
+                  } else {
+                    onNavigate('register');
+                  }
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-amber-400 text-slate-950 hover:bg-amber-300 active:bg-amber-500 transition-colors shadow-md cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-slate-950 flex-shrink-0" />
+                <span>
+                  {isAuthenticated 
+                    ? (isDe ? '👤 Mein Profil' : '👤 My Profile') 
+                    : (isDe ? 'Community beitreten / Einloggen' : 'Join Community / Log In')}
+                </span>
+              </button>
+              <button
+                onClick={() => onNavigate('sessions')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-emerald-500/25 border border-emerald-400/50 text-white hover:bg-emerald-500/40 active:bg-white/20 transition-colors shadow-sm cursor-pointer"
+              >
+                <span>{isDe ? '🏸 Host a Game & Mitspielen' : '🏸 Host a Game & Play'}</span>
+                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 text-amber-300" />
+              </button>
+              <button
+                onClick={() => onNavigate('trainers')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-white text-[#005A36] hover:bg-emerald-50 active:bg-slate-100 transition-colors shadow-sm cursor-pointer"
+              >
+                <span>{h.ctaTrainers}</span>
+                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+              </button>
+              <button
+                onClick={() => onNavigate('players')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-[#00472A] border border-white/20 text-white hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
+              >
+                <span>{h.ctaPlayers}</span>
+                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+              </button>
+              <button
+                onClick={() => onNavigate('tournaments')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-[#00472A] border border-white/20 text-white hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
+              >
+                <span>{h.ctaTournaments}</span>
+                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+              </button>
+              <button
+                onClick={() => onNavigate('services')}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-[#00472A] border border-white/20 text-white hover:bg-white/10 active:bg-white/20 transition-colors cursor-pointer"
+              >
+                <span>{isDe ? '🏸 Besaitung & Ausrüstung' : '🏸 Stringing & Gear'}</span>
+                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+              </button>
+            </div>
           </div>
 
-          <h1 className="font-display font-black text-2xl sm:text-4xl md:text-5xl tracking-tight leading-tight">
-            {h.heroTitle1} <span className="text-emerald-300">{h.heroTitle2}</span>
-          </h1>
-
-          <p className="text-xs sm:text-sm md:text-base text-white/85 leading-relaxed">
-            {h.heroDesc}
-          </p>
-
-          {/* Quick Action Navigation Buttons - Responsive stack on mobile, row on tablet/desktop */}
-          <div className="pt-2 sm:pt-4 flex flex-col sm:flex-row flex-wrap gap-2.5 sm:gap-3">
-            <button
-              onClick={() => {
-                if (!isAuthenticated) {
-                  openEntryModal();
-                } else {
-                  onNavigate('register');
-                }
-              }}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-amber-400 text-slate-950 hover:bg-amber-300 active:bg-amber-500 transition-colors shadow-md cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4 text-slate-950 flex-shrink-0" />
-              <span>
-                {isAuthenticated 
-                  ? (isDe ? '👤 Mein Profil' : '👤 My Profile') 
-                  : (isDe ? 'Community beitreten / Einloggen' : 'Join Community / Log In')}
-              </span>
-            </button>
-            <button
-              onClick={() => onNavigate('sessions')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-emerald-500/25 border border-emerald-400/50 text-white hover:bg-emerald-500/40 active:bg-white/20 transition-colors shadow-sm"
-            >
-              <span>{isDe ? '🏸 Host a Game & Mitspielen' : '🏸 Host a Game & Play'}</span>
-              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0 text-amber-300" />
-            </button>
-            <button
-              onClick={() => onNavigate('trainers')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-white text-[#005A36] hover:bg-emerald-50 active:bg-slate-100 transition-colors shadow-sm"
-            >
-              <span>{h.ctaTrainers}</span>
-              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
-            </button>
-            <button
-              onClick={() => onNavigate('players')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-[#00472A] border border-white/20 text-white hover:bg-white/10 active:bg-white/20 transition-colors"
-            >
-              <span>{h.ctaPlayers}</span>
-              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
-            </button>
-            <button
-              onClick={() => onNavigate('tournaments')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-[#00472A] border border-white/20 text-white hover:bg-white/10 active:bg-white/20 transition-colors"
-            >
-              <span>{h.ctaTournaments}</span>
-              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
-            </button>
-            <button
-              onClick={() => onNavigate('services')}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-3 sm:py-2.5 min-h-[44px] rounded-xl text-xs font-bold bg-[#00472A] border border-white/20 text-white hover:bg-white/10 active:bg-white/20 transition-colors"
-            >
-              <span>{isDe ? '🏸 Besaitung & Ausrüstung' : '🏸 Stringing & Gear'}</span>
-              <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
-            </button>
+          {/* Interactive 3D Badminton Hero Canvas */}
+          <div className="lg:col-span-5 w-full">
+            <HeroBadminton3D />
           </div>
+
         </div>
 
         {/* Ambient background decoration */}
         <div className="absolute right-0 bottom-0 translate-x-12 translate-y-12 w-64 sm:w-80 h-64 sm:h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
       </section>
 
-      {/* 2. Key Facts / Overview Matrix (2-col on phones, 4-col on tablet/desktop) */}
+      {/* 2. Key Facts / Overview Matrix (Wrapped in 3D Parallax Tilt Cards) */}
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div 
+        <TiltCard3D 
           onClick={() => onNavigate('players')}
           className="p-3.5 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 active:scale-[0.98] border border-slate-200 transition-all cursor-pointer space-y-1 shadow-sm"
         >
@@ -214,9 +228,9 @@ export default function HomePage({ onNavigate }) {
           <span className="text-xl sm:text-2xl font-black text-slate-900 block">{h.statPlayersNum}</span>
           <h3 className="font-bold text-xs sm:text-sm text-slate-800 leading-tight">{h.statPlayersTitle}</h3>
           <p className="text-[10px] sm:text-xs text-slate-500 leading-normal">{h.statPlayersSub}</p>
-        </div>
+        </TiltCard3D>
 
-        <div 
+        <TiltCard3D 
           onClick={() => onNavigate('trainers')}
           className="p-3.5 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 active:scale-[0.98] border border-slate-200 transition-all cursor-pointer space-y-1 shadow-sm"
         >
@@ -226,9 +240,9 @@ export default function HomePage({ onNavigate }) {
           <span className="text-xl sm:text-2xl font-black text-slate-900 block">{h.statTrainersNum}</span>
           <h3 className="font-bold text-xs sm:text-sm text-slate-800 leading-tight">{h.statTrainersTitle}</h3>
           <p className="text-[10px] sm:text-xs text-slate-500 leading-normal">{h.statTrainersSub}</p>
-        </div>
+        </TiltCard3D>
 
-        <div 
+        <TiltCard3D 
           onClick={() => onNavigate('tournaments')}
           className="p-3.5 sm:p-5 rounded-2xl bg-white hover:bg-slate-50 active:scale-[0.98] border border-slate-200 transition-all cursor-pointer space-y-1 shadow-sm"
         >
@@ -238,16 +252,35 @@ export default function HomePage({ onNavigate }) {
           <span className="text-xl sm:text-2xl font-black text-slate-900 block">{h.statTourneysNum}</span>
           <h3 className="font-bold text-xs sm:text-sm text-slate-800 leading-tight">{h.statTourneysTitle}</h3>
           <p className="text-[10px] sm:text-xs text-slate-500 leading-normal">{h.statTourneysSub}</p>
-        </div>
+        </TiltCard3D>
 
-        <div className="p-3.5 sm:p-5 rounded-2xl bg-white border border-slate-200 space-y-1 shadow-sm">
+        <TiltCard3D className="p-3.5 sm:p-5 rounded-2xl bg-white border border-slate-200 space-y-1 shadow-sm">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-100 text-[#005A36] flex items-center justify-center font-black mb-2 sm:mb-3">
             <Clock className="w-4 h-4" />
           </div>
           <span className="text-xl sm:text-2xl font-black text-slate-900 block">{h.statTrainingNum}</span>
           <h3 className="font-bold text-xs sm:text-sm text-slate-800 leading-tight">{h.statTrainingTitle}</h3>
           <p className="text-[10px] sm:text-xs text-slate-500 leading-normal">{h.statTrainingSub}</p>
+        </TiltCard3D>
+      </section>
+
+      {/* 2.5 Interaktives 3D Spielfeld / 3D Court Explorer */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-[#005A36] dark:text-emerald-400">
+              <Box className="w-4 h-4" />
+            </span>
+            <h2 className="font-display font-black text-lg sm:text-xl text-slate-900 dark:text-white">
+              {isDe ? 'Interaktives 3D Spielfeld & BWF Richtlinien' : 'Interactive 3D Court & BWF Guidelines'}
+            </h2>
+          </div>
+          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-900/40 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-700/50">
+            3D WebGL
+          </span>
         </div>
+
+        <BadmintonCourtViewer3D />
       </section>
 
       {/* 3. Training & Location Overview (Stacked on phones, 2-col on tablets/desktop) */}

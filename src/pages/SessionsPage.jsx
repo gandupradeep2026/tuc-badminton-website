@@ -20,7 +20,8 @@ import {
   Activity,
   Flame,
   Smile,
-  ChevronDown
+  ChevronDown,
+  Box
 } from 'lucide-react';
 import {
   downloadIcsCalendarFile,
@@ -32,6 +33,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
 import { safeFetchJson } from '../api/client';
 import BadmintonAvatar, { AVATAR_OPTIONS } from '../components/BadmintonAvatar';
+import BadmintonCourtViewer3D from '../components/3d/BadmintonCourtViewer3D';
 
 const POPULAR_VENUES = [
   { name: 'Feels Good Club Chemnitz', address: 'Neefestraße 86, 09119 Chemnitz' },
@@ -75,6 +77,7 @@ export default function SessionsPage({ onNavigate }) {
   const [filterShuttle, setFilterShuttle] = useState('all'); // 'all' | 'feather' | 'plastic'
   const [filterIntensity, setFilterIntensity] = useState('all'); // 'all' | 'casual' | 'sparring'
   const [showOnlyOpen, setShowOnlyOpen] = useState(false);
+  const [showCourt3D, setShowCourt3D] = useState(false);
 
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -435,15 +438,33 @@ export default function SessionsPage({ onNavigate }) {
           </p>
         </div>
 
-        {/* Action Button: Create Session */}
-        <button
-          onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold bg-[#005A36] text-white hover:bg-[#00472A] active:bg-[#003820] transition-colors shadow-sm self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{isDe ? 'Neue Spielrunde erstellen' : 'Create Game Session'}</span>
-        </button>
+        {/* Action Buttons: 3D Court Visualizer & Create Session */}
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setShowCourt3D(!showCourt3D)}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-2xl text-xs sm:text-sm font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-xs cursor-pointer"
+          >
+            <Box className="w-4 h-4 text-emerald-600" />
+            <span>{showCourt3D ? (isDe ? '3D Feld schließen' : 'Close 3D Court') : (isDe ? '3D Spielfeld öffnen' : '3D Court View')}</span>
+          </button>
+          
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold bg-[#005A36] text-white hover:bg-[#00472A] active:bg-[#003820] transition-colors shadow-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{isDe ? 'Neue Spielrunde erstellen' : 'Create Game Session'}</span>
+          </button>
+        </div>
       </div>
+
+      {/* Optional Interactive 3D Badminton Court Visualizer */}
+      {showCourt3D && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+          <BadmintonCourtViewer3D />
+        </div>
+      )}
 
       {/* Privacy Shield Notice */}
       <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
