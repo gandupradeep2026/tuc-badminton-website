@@ -22,7 +22,7 @@ export default function Footer({ onOpenDbInspector, onOpenRegister }) {
               </span>
             </div>
             <p className="text-xs sm:text-sm text-slate-400 max-w-sm leading-relaxed">
-              Official badminton sports portal for students, university employees, and guest athletes at Technische Universität Chemnitz.
+              Independent badminton community site for students, university employees, and guest athletes at Technische Universität Chemnitz.
             </p>
             <div className="pt-2 flex items-center gap-3 text-xs">
               <button

@@ -182,7 +182,7 @@ export function initDatabase() {
       bank_name TEXT DEFAULT '',
       bank_reference TEXT DEFAULT 'Spende Badminton TU Chemnitz',
       sponsor_email TEXT DEFAULT 'gandupradeep2026@gmail.com',
-      sponsor_info TEXT DEFAULT 'Möchten Sie oder Ihr Unternehmen das Badminton-Team der TU Chemnitz als offizieller Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.',
+      sponsor_info TEXT DEFAULT 'Möchten Sie oder Ihr Unternehmen die Badminton-Community an der TU Chemnitz als Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.',
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -192,15 +192,19 @@ export function initDatabase() {
   if (!existingDonation) {
     db.prepare(`
       INSERT INTO donation_settings (id, is_active, title, subtitle, description, paypal_me_link, paypal_email, bank_recipient, bank_iban, bank_bic, bank_name, bank_reference, sponsor_email, sponsor_info)
-      VALUES (1, 0, 'Unterstütze das Badminton-Team der TU Chemnitz', 'Gemeinsam für Training, Ausrüstung & Turniere', 'Als universitäre Badminton-Gemeinschaft finanzieren wir Trainingsbälle, Ausrüstung und Turnierfahrten für Studierende. Deine Unterstützung hilft uns, den Badmintonsport an der TU Chemnitz weiterzuentwickeln!', '', '', 'TU Chemnitz Badminton Community', '', '', '', 'Spende Badminton TU Chemnitz', 'gandupradeep2026@gmail.com', 'Möchten Sie oder Ihr Unternehmen das Badminton-Team der TU Chemnitz als offizieller Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.')
+      VALUES (1, 0, 'Unterstütze das Badminton-Team der TU Chemnitz', 'Gemeinsam für Training, Ausrüstung & Turniere', 'Als universitäre Badminton-Gemeinschaft finanzieren wir Trainingsbälle, Ausrüstung und Turnierfahrten für Studierende. Deine Unterstützung hilft uns, den Badmintonsport an der TU Chemnitz weiterzuentwickeln!', '', '', 'TU Chemnitz Badminton Community', '', '', '', 'Spende Badminton TU Chemnitz', 'gandupradeep2026@gmail.com', 'Möchten Sie oder Ihr Unternehmen die Badminton-Community an der TU Chemnitz als Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.')
     `).run();
   }
 
-  // Seed default admin password if empty (default: tuc-badminton-admin)
+  // Seed the admin password if empty: ADMIN_INITIAL_PASSWORD from .env, otherwise a random one printed once
   const existingAdmin = db.prepare('SELECT id FROM admin_settings WHERE id = 1').get();
   if (!existingAdmin) {
+    const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(12).toString('base64url');
+    if (!process.env.ADMIN_INITIAL_PASSWORD) {
+      console.log(`[DB] Generated initial admin password: ${initialPassword} (change it after the first login)`);
+    }
     const defaultSalt = crypto.randomBytes(16).toString('hex');
-    const defaultHash = crypto.scryptSync('tuc-badminton-admin', defaultSalt, 64).toString('hex');
+    const defaultHash = crypto.scryptSync(initialPassword, defaultSalt, 64).toString('hex');
     db.prepare(`
       INSERT INTO admin_settings (id, password_hash, password_salt)
       VALUES (1, ?, ?)
@@ -1625,13 +1629,22 @@ export function createPasswordResetToken(email = 'gandupradeep2026@gmail.com') {
   };
 }
 
+// Keys that were published in the public repository: never accepted, even if still set in .env
+const LEAKED_KEYS = ['TUC-MASTER-ADMIN-KEY-2026'];
+
+function safeEqual(a, b) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
 export function verifyPasswordResetApproval({ email, approvalCode, token }) {
   const cleanCode = (approvalCode || '').trim();
   if (!cleanCode) return null;
 
-  // 1. Support Master Recovery Key (failsafe for site owner from backend .env)
-  const masterKey = process.env.ADMIN_MASTER_RECOVERY_KEY || 'TUC-MASTER-ADMIN-KEY-2026';
-  if (cleanCode === masterKey) {
+  // 1. Master Recovery Key: only when set in backend .env and long enough to resist guessing
+  const masterKey = process.env.ADMIN_MASTER_RECOVERY_KEY || '';
+  if (masterKey.length >= 24 && !LEAKED_KEYS.includes(masterKey) && safeEqual(cleanCode, masterKey)) {
     return { valid: true, isMasterKey: true, email: email || 'gandupradeep2026@gmail.com' };
   }
 
@@ -1989,7 +2002,7 @@ export function getDonationSettings() {
       bank_name: '',
       bank_reference: 'Spende Badminton TU Chemnitz',
       sponsor_email: 'gandupradeep2026@gmail.com',
-      sponsor_info: 'Möchten Sie oder Ihr Unternehmen das Badminton-Team der TU Chemnitz als offizieller Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.',
+      sponsor_info: 'Möchten Sie oder Ihr Unternehmen die Badminton-Community an der TU Chemnitz als Sponsor oder Partner unterstützen? Wir bieten Trikotwerbung, Turniersponsoring und Logoplatzierungen auf unserer Vereinsplattform.',
     };
   }
   return {

@@ -3,9 +3,10 @@ import { MapPin, Mail } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function SimpleFooter({ onNavigate }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const f = t.footer;
   const n = t.nav;
+  const isEn = language === 'en';
 
   return (
     <footer className="border-t border-slate-200 bg-slate-50 text-slate-600 text-xs py-8 sm:py-10 mt-auto">
@@ -26,7 +27,7 @@ export default function SimpleFooter({ onNavigate }) {
             <button onClick={() => onNavigate('home')} className="p-1 hover:text-[#005A36] transition-colors">{n.home}</button>
             <button onClick={() => onNavigate('trainers')} className="p-1 hover:text-[#005A36] transition-colors">{n.trainers}</button>
             <button onClick={() => onNavigate('players')} className="p-1 hover:text-[#005A36] transition-colors">{n.players}</button>
-            <button onClick={() => onNavigate('services')} className="p-1 hover:text-[#005A36] transition-colors">{t.language === 'en' ? 'Services' : 'Besaitung & Ausrüstung'}</button>
+            <button onClick={() => onNavigate('services')} className="p-1 hover:text-[#005A36] transition-colors">{isEn ? 'Services' : 'Besaitung & Ausrüstung'}</button>
             <button onClick={() => onNavigate('tournaments')} className="p-1 hover:text-[#005A36] transition-colors">{n.tournaments}</button>
             <button onClick={() => onNavigate('gallery')} className="p-1 hover:text-[#005A36] transition-colors">{n.gallery}</button>
             <button onClick={() => onNavigate('admin')} className="p-1 hover:text-[#005A36] text-slate-500 transition-colors">🔒 {n.admin}</button>
@@ -41,14 +42,22 @@ export default function SimpleFooter({ onNavigate }) {
             </span>
             <span className="flex items-center gap-1.5">
               <Mail className="w-3.5 h-3.5 text-[#005A36] flex-shrink-0" />
-              <a href="mailto:badminton@tu-chemnitz.de" className="hover:underline">badminton@tu-chemnitz.de</a>
+              <a href="mailto:gandupradeep2026@gmail.com" className="hover:underline">gandupradeep2026@gmail.com</a>
             </span>
           </div>
 
-          <div className="pt-2 sm:pt-0">
-            © {new Date().getFullYear()} {f.copyright}
+          <div className="flex flex-wrap items-center gap-3 pt-2 sm:pt-0">
+            <button onClick={() => onNavigate('impressum')} className="hover:underline">Impressum</button>
+            <button onClick={() => onNavigate('datenschutz')} className="hover:underline">{isEn ? 'Privacy' : 'Datenschutz'}</button>
+            <span>© {new Date().getFullYear()} {f.copyright}</span>
           </div>
         </div>
+
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          {isEn
+            ? 'Independent community site, not run by Chemnitz University of Technology or its University Sports Centre (USZ).'
+            : 'Unabhängige Community-Seite, nicht betrieben von der TU Chemnitz oder ihrem Universitätssportzentrum (USZ).'}
+        </p>
 
       </div>
     </footer>

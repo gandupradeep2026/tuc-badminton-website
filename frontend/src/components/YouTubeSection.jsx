@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { safeFetchJson, getUploadUrl } from '../api/client';
+import ConsentEmbed, { useConsent } from './ConsentEmbed';
 
 const DEFAULT_VIDEOS = [
   {
@@ -28,7 +29,7 @@ const DEFAULT_VIDEOS = [
     title: 'Training & Footwork Drills - Sporthalle Thüringer Weg',
     category: 'Training',
     youtube_url: 'https://www.youtube.com/watch?v=lTRiuFIWV54',
-    thumbnail_url: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=600&q=80',
+    thumbnail_url: '/uploads/tournament_2026/teamcup_2026_group_all_teams.jpeg',
     description: 'Multi-Shuttle Footwork Speed Drills mit den Spielern der TU Chemnitz.',
   }
 ];
@@ -42,6 +43,7 @@ export default function YouTubeSection() {
   const [channelUrl, setChannelUrl] = useState('https://www.youtube.com/@TUCBadminton');
   const [activeVideo, setActiveVideo] = useState(DEFAULT_VIDEOS[0]);
   const [loading, setLoading] = useState(true);
+  const [youtubeAllowed, allowYoutube] = useConsent('youtube');
 
   const fetchVideos = async () => {
     try {
@@ -86,7 +88,7 @@ export default function YouTubeSection() {
             {y.title || 'Unsere Badminton-Videos & Match-Highlights'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">
-            {y.subtitle || 'Erlebe packende Ballwechsel, Turniervideos und Trainingsszenen direkt hier oder besuche unseren offiziellen YouTube-Kanal!'}
+            {y.subtitle || 'Erlebe packende Ballwechsel, Turniervideos und Trainingsszenen direkt hier oder besuche unseren YouTube-Kanal!'}
           </p>
         </div>
 
@@ -101,7 +103,7 @@ export default function YouTubeSection() {
           <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
           </svg>
-          <span>{y.channelButton || 'Offizieller YouTube-Kanal'}</span>
+          <span>{y.channelButton || 'Unser YouTube-Kanal'}</span>
           <ExternalLink className="w-3.5 h-3.5 opacity-80" />
         </a>
       </div>
@@ -122,13 +124,15 @@ export default function YouTubeSection() {
           {/* Main Embedded Player (Spans 2 columns on desktop) */}
           <div className="lg:col-span-2 space-y-3">
             <div className="relative w-full aspect-video rounded-2xl sm:rounded-3xl overflow-hidden bg-black shadow-lg border border-slate-800">
-              <iframe
-                title={activeVideo.title}
-                src={`https://www.youtube-nocookie.com/embed/${activeVideo.video_id}?autoplay=0&rel=0`}
-                className="w-full h-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
+              <ConsentEmbed provider="youtube" allowed={youtubeAllowed} onAllow={allowYoutube} className="w-full h-full">
+                <iframe
+                  title={activeVideo.title}
+                  src={`https://www.youtube-nocookie.com/embed/${activeVideo.video_id || activeVideo.youtube_id}?autoplay=0&rel=0`}
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </ConsentEmbed>
             </div>
 
             {/* Video Details Card */}
@@ -173,7 +177,9 @@ export default function YouTubeSection() {
             <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
               {videos.map((vid, idx) => {
                 const isSelected = activeVideo.id === vid.id;
-                const thumb = `https://img.youtube.com/vi/${vid.video_id}/mqdefault.jpg`;
+                // YouTube thumbnails come from Google servers: show them only after consent
+                const localThumb = '/uploads/tournament_2026/teamcup_2026_group_all_teams.jpeg';
+                const thumb = youtubeAllowed ? `https://img.youtube.com/vi/${vid.video_id || vid.youtube_id}/mqdefault.jpg` : localThumb;
 
                 return (
                   <div

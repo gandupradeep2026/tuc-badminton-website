@@ -103,10 +103,6 @@ export default function AdminPage() {
   });
 
   const handleUnauthorized = () => {
-    if (token && token.startsWith('tuc-admin-session-')) {
-      // Preserve offline browser session on GitHub Pages
-      return;
-    }
     localStorage.removeItem('tuc_admin_token');
     setToken('');
     setIsAuthenticated(false);
@@ -337,7 +333,7 @@ export default function AdminPage() {
       const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_gallery_ids') || '[]')).map(String);
       const customGallery = JSON.parse(localStorage.getItem('tuc_custom_gallery') || '[]');
       const res = await safeFetchJson('/api/admin/gallery', { headers: getAdminHeaders() });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...DEFAULT_GALLERY];
       const mergedMap = new Map();
       list.forEach(g => mergedMap.set(String(g.id), g));
@@ -429,7 +425,7 @@ export default function AdminPage() {
       const deletedIds = (JSON.parse(localStorage.getItem('tuc_deleted_tournament_ids') || '[]')).map(String);
       const customTourneys = JSON.parse(localStorage.getItem('tuc_custom_tournaments') || '[]');
       const res = await safeFetchJson('/api/admin/tournaments', { headers: getAdminHeaders() });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       let list = (res.ok && res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : [...(TERMINE_LIST || [])];
       const mergedMap = new Map();
       list.forEach(t => mergedMap.set(String(t.id), t));
@@ -570,7 +566,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: getAdminHeaders(),
       });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       if (res.ok || res.isOffline) {
         setFeedback({ type: 'success', message: `${name}: ${adm.registrationsTab?.approvedSuccess || 'Erfolgreich freigeschaltet!'}` });
         fetchPendingRegistrations();
@@ -596,7 +592,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: getAdminHeaders(),
       });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       if (res.ok || res.isOffline) {
         setFeedback({ type: 'success', message: `${name}: ${adm.registrationsTab?.rejectedSuccess || 'Registrierung abgelehnt.'}` });
         fetchPendingRegistrations();
@@ -620,7 +616,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: getAdminHeaders(),
       });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       if (res.ok || res.isOffline) {
         setFeedback({ type: 'success', message: `${name}: ${adm.registrationsTab?.approvedSuccess || 'Erfolgreich freigeschaltet!'}` });
         fetchPendingRegistrations();
@@ -646,7 +642,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: getAdminHeaders(),
       });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       if (res.ok || res.isOffline) {
         setFeedback({ type: 'success', message: `${name}: ${adm.registrationsTab?.rejectedSuccess || 'Registrierung abgelehnt.'}` });
         fetchPendingRegistrations();
@@ -685,7 +681,7 @@ export default function AdminPage() {
     try {
       setInquiriesLoading(true);
       const res = await safeFetchJson('/api/admin/inquiries', { headers: getAdminHeaders() });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       if (res.ok && Array.isArray(res.data)) {
         setInquiriesList(res.data);
       } else {
@@ -768,7 +764,7 @@ export default function AdminPage() {
     try {
       setStatsLoading(true);
       const res = await safeFetchJson('/api/admin/system-stats', { headers: getAdminHeaders() });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       if (res.ok && res.data) {
         setSystemStats(res.data);
         setStatsLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -784,7 +780,7 @@ export default function AdminPage() {
     try {
       setAdminSessionsLoading(true);
       const res = await safeFetchJson('/api/admin/game-sessions', { headers: getAdminHeaders() });
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       if (res.ok && Array.isArray(res.data)) {
         setAdminSessions(res.data);
       } else {
@@ -963,8 +959,6 @@ export default function AdminPage() {
     setAuthError('');
 
     const inputPw = password.trim();
-    const storedLocalPw = localStorage.getItem('tuc_admin_local_pw');
-    const isLocalMatch = inputPw === 'tuc-badminton-admin' || (storedLocalPw && inputPw === storedLocalPw);
 
     try {
       const res = await safeFetchJson('/api/admin/login', {
@@ -981,32 +975,15 @@ export default function AdminPage() {
         return;
       }
 
-      // If backend is offline or on static GitHub Pages, allow direct browser login
-      if (res.isOffline || res.status === 404 || !res.ok) {
-        if (isLocalMatch) {
-          const offlineToken = 'tuc-admin-session-' + Date.now();
-          localStorage.setItem('tuc_admin_token', offlineToken);
-          setToken(offlineToken);
-          setIsAuthenticated(true);
-          setPassword('');
-          return;
-        } else {
-          setAuthError(adm.wrongPassword);
-          return;
-        }
+      // Admin access only through the server: there is no offline login
+      if (res.isOffline) {
+        setAuthError(isDe ? 'Server nicht erreichbar. Bitte später erneut versuchen.' : 'Server unreachable. Please try again later.');
+        return;
       }
 
       setAuthError(res.error || adm.wrongPassword);
     } catch (err) {
-      if (isLocalMatch) {
-        const offlineToken = 'tuc-admin-session-' + Date.now();
-        localStorage.setItem('tuc_admin_token', offlineToken);
-        setToken(offlineToken);
-        setIsAuthenticated(true);
-        setPassword('');
-      } else {
-        setAuthError(adm.wrongPassword);
-      }
+      setAuthError(isDe ? 'Server nicht erreichbar. Bitte später erneut versuchen.' : 'Server unreachable. Please try again later.');
     } finally {
       setAuthLoading(false);
     }
@@ -1697,7 +1674,7 @@ export default function AdminPage() {
         body: JSON.stringify(announcement),
       });
 
-      if (res.status === 401 && !token.startsWith('tuc-admin-session-')) return handleUnauthorized();
+      if (res.status === 401) return handleUnauthorized();
       localStorage.setItem('tuc_announcement', JSON.stringify(announcement));
       setAnnouncement(res.data?.announcement || announcement);
       setFeedback({ type: 'success', message: adm.announceSavedSuccess });
@@ -1775,36 +1752,15 @@ export default function AdminPage() {
       if (res.ok && res.data?.success && res.data?.token) {
         localStorage.setItem('tuc_admin_token', res.data.token);
         setToken(res.data.token);
-        localStorage.setItem('tuc_admin_local_pw', newPassword);
         setFeedback({ type: 'success', message: adm.passwordChangedSuccess });
         setCurrPassword('');
         setNewPassword('');
         setConfirmPassword('');
-      } else if (res.isOffline || res.status === 404 || !res.ok) {
-        const localPw = localStorage.getItem('tuc_admin_local_pw') || 'tuc-badminton-admin';
-        if (currPassword === localPw || currPassword === 'tuc-badminton-admin') {
-          localStorage.setItem('tuc_admin_local_pw', newPassword);
-          setFeedback({ type: 'success', message: adm.passwordChangedSuccess });
-          setCurrPassword('');
-          setNewPassword('');
-          setConfirmPassword('');
-        } else {
-          setFeedback({ type: 'error', message: adm.invalidCurrentPassword });
-        }
       } else {
         setFeedback({ type: 'error', message: res.error || adm.invalidCurrentPassword });
       }
     } catch (err) {
-      const localPw = localStorage.getItem('tuc_admin_local_pw') || 'tuc-badminton-admin';
-      if (currPassword === localPw || currPassword === 'tuc-badminton-admin') {
-        localStorage.setItem('tuc_admin_local_pw', newPassword);
-        setFeedback({ type: 'success', message: adm.passwordChangedSuccess });
-        setCurrPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } else {
-        setFeedback({ type: 'error', message: err.message });
-      }
+      setFeedback({ type: 'error', message: err.message });
     } finally {
       setPwSubmitting(false);
     }
@@ -4095,7 +4051,7 @@ export default function AdminPage() {
                 {adm.youtubeTab?.title || 'YouTube & Videos'}
               </h2>
               <p className="text-xs text-slate-500">
-                {isDe ? 'Verwalte den YouTube-Kanal-Link und Videos, die auf der Website abgespielt werden können.' : 'Manage your official YouTube channel URL and match videos embedded on the website.'}
+                {isDe ? 'Verwalte den YouTube-Kanal-Link und Videos, die auf der Website abgespielt werden können.' : 'Manage your YouTube channel URL and match videos embedded on the website.'}
               </p>
             </div>
 
@@ -4117,7 +4073,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">
-                    {adm.youtubeTab?.channelUrlLabel || 'Offizieller YouTube-Kanal-Link'}
+                    {adm.youtubeTab?.channelUrlLabel || 'YouTube-Kanal-Link'}
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     {isDe ? 'Auf diesen Link werden Besucher über den "Kanal ansehen"-Button geleitet.' : 'Visitors are directed to this channel when clicking the "View Channel" button.'}

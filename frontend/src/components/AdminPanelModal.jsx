@@ -631,7 +631,7 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Default: tuc-badminton-admin"
+                  placeholder="Admin password"
                   className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-tuc-700"
                 />
               </div>
@@ -645,9 +645,6 @@ export default function AdminPanelModal({ isOpen, onClose, onDataChanged }) {
               </button>
             </form>
 
-            <div className="text-center text-[11px] text-slate-400">
-              Passcode configured in project environment: <code className="font-mono font-bold text-slate-600 dark:text-slate-300">tuc-badminton-admin</code>
-            </div>
           </div>
         ) : (
           /* Dashboard Layout */

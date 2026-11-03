@@ -155,33 +155,37 @@ const dataDir = process.env.DATA_DIR || path.join(__dirname, 'data');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Nginx runs on the same host: trust only the loopback proxy, so req.ip is the real client IP
+app.set('trust proxy', 'loopback');
+app.disable('x-powered-by');
+
 // -------------------------------------------------------------
 // Security Headers Middleware (OWASP Hardening)
 // -------------------------------------------------------------
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
 
 // -------------------------------------------------------------
 // Cross-Origin Resource Sharing (CORS) Configuration
 // -------------------------------------------------------------
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://gandupradeep2026.github.io')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
+const localDevOrigin = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow local development, GitHub Pages, or tunnels
-    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin) || origin.endsWith('.github.io') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+    // Same-origin requests (no Origin header), the listed origins and local development only
+    if (!origin || allowedOrigins.includes(origin) || localDevOrigin.test(origin)) {
       return callback(null, true);
     }
-    // Fallback permit for custom dynamic tunnels
-    return callback(null, true);
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -269,7 +273,7 @@ const upload = multer({
 const loginAttempts = new Map(); // ip -> { count: number, lockedUntil: number }
 
 function rateLimitLogin(req, res, next) {
-  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+  const clientIp = req.ip || '127.0.0.1';
   const now = Date.now();
   const record = loginAttempts.get(clientIp);
 
@@ -317,9 +321,6 @@ function createSession() {
 
 function isValidSession(token) {
   if (!token || typeof token !== 'string') return false;
-  if (token.startsWith('tuc-admin-session-') || token === (process.env.MASTER_ADMIN_KEY || 'TUC-MASTER-ADMIN-KEY-2026')) {
-    return true;
-  }
   const session = activeSessions.get(token);
   if (!session) return false;
   if (Date.now() > session.expiresAt) {
@@ -430,17 +431,6 @@ function requireStudentOrAdmin(req, res, next) {
 // API Routes
 // -------------------------------------------------------------
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'online',
-    system: 'TU Chemnitz Badminton Community Portal API',
-    database: 'SQLite (better-sqlite3)',
-    databaseFile: 'data/badminton_community.db',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Stats
 app.get('/api/stats', (req, res) => {
   try {
@@ -521,7 +511,7 @@ app.get('/api/admin/system-stats', requireAdmin, (req, res) => {
 
 // Admin Login with Rate Limiting and Salted Scrypt Hash Verification
 app.post('/api/admin/login', rateLimitLogin, (req, res) => {
-  const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+  const clientIp = req.ip || '127.0.0.1';
   const { password } = req.body;
 
   if (!password || typeof password !== 'string') {
@@ -533,8 +523,7 @@ app.post('/api/admin/login', rateLimitLogin, (req, res) => {
     return res.status(500).json({ error: 'Admin-Einstellungen nicht initialisiert.' });
   }
 
-  const isMasterOrDefault = password === 'tuc-badminton-admin' || password === (process.env.MASTER_ADMIN_KEY || 'TUC-MASTER-ADMIN-KEY-2026');
-  const isValid = isMasterOrDefault || verifyPassword(password, adminCreds.password_hash, adminCreds.password_salt);
+  const isValid = verifyPassword(password, adminCreds.password_hash, adminCreds.password_salt);
   if (isValid) {
     resetLoginAttempts(clientIp);
     const token = createSession();
@@ -924,7 +913,7 @@ app.post('/api/auth/register-confirm', (req, res) => {
 });
 
 // 3. User Login with Email & Password (Zero OTP!)
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', rateLimitLogin, (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -942,9 +931,11 @@ app.post('/api/auth/login', (req, res) => {
           error: 'Your account was created with email-only login. Please click "Forgot password?" to set your password. / Bitte klicke auf "Passwort vergessen?", um dein Passwort erstmalig festzulegen.'
         });
       }
+      recordFailedLogin(req.ip || '127.0.0.1');
       return res.status(401).json({ error: 'Invalid email or password. / E-Mail oder Passwort ungültig.' });
     }
 
+    resetLoginAttempts(req.ip || '127.0.0.1');
     const sessionToken = createStudentUserSession(cleanEmail, user.name);
     const player = getPlayerByEmail(cleanEmail);
 
@@ -2135,7 +2126,7 @@ app.delete('/api/media/:id', requireAdmin, (req, res) => {
 // -------------------------------------------------------------
 // Registrations Endpoints
 // -------------------------------------------------------------
-app.get('/api/registrations', (req, res) => {
+app.get('/api/registrations', requireAdmin, (req, res) => {
   try {
     const records = getAllRegistrations();
     res.json(records);
@@ -2380,7 +2371,7 @@ app.get('/api/admin/verify-reset-token', (req, res) => {
   }
 });
 
-app.post('/api/admin/reset-password', (req, res) => {
+app.post('/api/admin/reset-password', rateLimitLogin, (req, res) => {
   try {
     const { email, approvalCode, newPassword, token } = req.body;
 
@@ -2401,6 +2392,7 @@ app.post('/api/admin/reset-password', (req, res) => {
     });
 
     if (!auth || !auth.valid) {
+      recordFailedLogin(req.ip || '127.0.0.1');
       return res.status(401).json({
         error: 'Ungültiger oder abgelaufener Bestätigungscode. Die Passwortänderung wurde verweigert.'
       });
@@ -2812,7 +2804,7 @@ const partnerRequestLimits = new Map();
 // 2b. Tournament Partner Request (Send Email to Player)
 app.post('/api/players/:id/partner-request', async (req, res) => {
   try {
-    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const clientIp = req.ip || '127.0.0.1';
     const now = Date.now();
     const timestamps = (partnerRequestLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000); // 10 min window
     if (timestamps.length >= 5) {
@@ -2909,7 +2901,7 @@ const inquiryLimits = new Map();
 // Public: Submit Contact Inquiry
 app.post('/api/inquiries', async (req, res) => {
   try {
-    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const clientIp = req.ip || '127.0.0.1';
     const now = Date.now();
     const timestamps = (inquiryLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000);
     if (timestamps.length >= 5) {
@@ -3098,7 +3090,7 @@ app.get('/api/game-sessions', (req, res) => {
 // 2. Public: Create a Game Session
 app.post('/api/game-sessions', async (req, res) => {
   try {
-    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const clientIp = req.ip || '127.0.0.1';
     const now = Date.now();
     const timestamps = (sessionLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000);
     if (timestamps.length >= 5) {
@@ -3253,7 +3245,7 @@ app.post('/api/game-sessions', async (req, res) => {
 // 3. Public: Join a Game Session
 app.post('/api/game-sessions/:id/join', async (req, res) => {
   try {
-    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || '127.0.0.1';
+    const clientIp = req.ip || '127.0.0.1';
     const now = Date.now();
     const timestamps = (sessionLimits.get(clientIp) || []).filter(t => now - t < 10 * 60 * 1000);
     if (timestamps.length >= 10) {
@@ -3486,7 +3478,7 @@ app.get('/api/game-sessions/invitations/respond/:token', (req, res) => {
 });
 
 // 4c. Get Invitations for a Session
-app.get('/api/game-sessions/:id/invitations', (req, res) => {
+app.get('/api/game-sessions/:id/invitations', requireAdmin, (req, res) => {
   try {
     const sessionId = parseInt(req.params.id, 10);
     const invitations = getSessionInvitations(sessionId);

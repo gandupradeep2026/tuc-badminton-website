@@ -40,7 +40,7 @@ The system is decoupled into a static frontend designed for continuous deploymen
    - The code is dispatched to the admin's email via Nodemailer (if SMTP is configured) and simultaneously printed in bold to the **laptop's secure server console**.
    - No one on the internet can change the admin password without this 6-digit code!
 3. **Master Emergency Recovery Key**:
-   - The owner can use `ADMIN_MASTER_RECOVERY_KEY` (configured in `backend/.env`) in the reset modal as a failsafe code.
+   - Optional: set `ADMIN_MASTER_RECOVERY_KEY` (at least 24 random characters) in `backend/.env` as a failsafe code. It is never stored in the code.
 4. **Session Invalidation**:
    - Resetting the password automatically invalidates all previous reset tokens and revokes all active admin JWT/Bearer sessions.
 

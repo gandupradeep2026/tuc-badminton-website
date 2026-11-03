@@ -15,8 +15,6 @@ services:
       - key: ADMIN_EMAIL
         value: gandupradeep2026@gmail.com
       - key: ALLOWED_ORIGINS
-        value: "*"
-      - key: SESSION_SECRET
-        value: tuc-badminton-secure-session-2026
+        value: https://gandupradeep2026.github.io
       - key: GMAIL_APP_PASSWORD
         sync: false

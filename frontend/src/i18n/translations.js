@@ -22,7 +22,7 @@ export const translations = {
       heroBadge: '🏛️ TU Chemnitz • Universitäts-Sportzentrum (USZ)',
       heroTitle1: 'TU Chemnitz',
       heroTitle2: 'Badminton',
-      heroDesc: 'Die offizielle Badminton-Gemeinschaft der Technischen Universität Chemnitz. Vom Einsteiger im Hochschulsport bis zu aktiven Wettkampfmannschaften in der Sachsenliga und Bezirksliga bieten wir allen Studierenden und Mitarbeitern professionelles Training und echte Teamgemeinschaft.',
+      heroDesc: 'Die Badminton-Community an der Technischen Universität Chemnitz. Vom Einsteiger im Hochschulsport bis zu aktiven Wettkampfmannschaften in der Sachsenliga und Bezirksliga bieten wir allen Studierenden und Mitarbeitern professionelles Training und echte Teamgemeinschaft.',
       ctaTrainers: 'Unsere Trainer kennenlernen',
       ctaPlayers: 'Spielerliste (Herren & Damen)',
       ctaTournaments: 'Aktuelle Turniere',
@@ -101,8 +101,8 @@ export const translations = {
       youtube: {
         badge: '▶️ YouTube & Videos',
         title: 'Unsere Badminton-Videos & Match-Highlights',
-        subtitle: 'Erlebe packende Ballwechsel, Turniervideos und Trainingsszenen direkt hier oder besuche unseren offiziellen YouTube-Kanal!',
-        channelButton: 'Offizieller YouTube-Kanal',
+        subtitle: 'Erlebe packende Ballwechsel, Turniervideos und Trainingsszenen direkt hier oder besuche unseren YouTube-Kanal!',
+        channelButton: 'Unser YouTube-Kanal',
         watchOnYoutube: 'Auf YouTube ansehen',
         playVideo: 'Video abspielen',
         noVideos: 'Derzeit sind noch keine Videos eingetragen.',
@@ -375,7 +375,7 @@ export const translations = {
       youtubeTab: {
         title: 'YouTube & Videos',
         badge: 'Kanal & Match-Videos',
-        channelUrlLabel: 'Offizieller YouTube-Kanal Link (Kanal-URL)',
+        channelUrlLabel: 'YouTube-Kanal Link (Kanal-URL)',
         saveChannelBtn: 'Kanal-Link speichern',
         addVideoBtn: 'Neues Video hinzufügen',
         editVideoTitle: 'Video bearbeiten',
@@ -564,7 +564,7 @@ export const translations = {
       title: 'TU Chemnitz Badminton Community',
       subtitle: 'Universitäts-Sportzentrum (USZ) • Technische Universität Chemnitz',
       venue: 'Universitäts-Sporthalle Thüringer Weg 11, 09126 Chemnitz (12 Spielfelder)',
-      copyright: 'Technische Universität Chemnitz Badminton',
+      copyright: 'Badminton-Community an der TU Chemnitz',
     }
   },
 
@@ -591,7 +591,7 @@ export const translations = {
       heroBadge: '🏛️ TU Chemnitz • University Sports Centre (USZ)',
       heroTitle1: 'TU Chemnitz',
       heroTitle2: 'Badminton',
-      heroDesc: 'The official Badminton Community at Chemnitz University of Technology. From university recreation courses to competitive squads competing in the Saxony State League, we offer student athletes and staff high-quality coaching and team camaraderie.',
+      heroDesc: 'The badminton community at Chemnitz University of Technology. From university recreation courses to competitive squads competing in the Saxony State League, we offer student athletes and staff high-quality coaching and team camaraderie.',
       ctaTrainers: 'Meet Our Coaches',
       ctaPlayers: 'Player List (Men & Women)',
       ctaTournaments: 'Upcoming Tournaments',
@@ -670,8 +670,8 @@ export const translations = {
       youtube: {
         badge: '▶️ YouTube & Videos',
         title: 'Our Badminton Videos & Match Highlights',
-        subtitle: 'Experience exciting rallies, tournament coverage and training action directly here or visit our official YouTube channel!',
-        channelButton: 'Official YouTube Channel',
+        subtitle: 'Experience exciting rallies, tournament coverage and training action directly here or visit our YouTube channel!',
+        channelButton: 'Our YouTube Channel',
         watchOnYoutube: 'Watch on YouTube',
         playVideo: 'Play Video',
         noVideos: 'No YouTube videos added yet.',
@@ -944,7 +944,7 @@ export const translations = {
       youtubeTab: {
         title: 'YouTube & Videos',
         badge: 'Channel & Match Videos',
-        channelUrlLabel: 'Official YouTube Channel Link (Channel URL)',
+        channelUrlLabel: 'YouTube Channel Link (Channel URL)',
         saveChannelBtn: 'Save Channel Link',
         addVideoBtn: 'Add New Video',
         editVideoTitle: 'Edit Video',
@@ -1075,7 +1075,7 @@ export const translations = {
       successTrainerDesc: 'Thank you for your trainer application! Your credentials and USZ approval will be reviewed by the administrator. Once approved, your profile will be published on the site.',
       whatNext: 'What happens next?',
       step1: '1. Your submission is queued in the protected admin review dashboard.',
-      step2: '2. Once approved, your profile is published in the official roster.',
+      step2: '2. Once approved, your profile is published in the roster.',
       step3: '3. Our coaches or admin will contact you via email or WhatsApp if needed.',
       btnAnother: 'Submit another registration',
       btnBackHome: 'Back to Home',
@@ -1133,7 +1133,7 @@ export const translations = {
       title: 'TU Chemnitz Badminton Community',
       subtitle: 'University Sports Centre (USZ) • Chemnitz University of Technology',
       venue: 'University Sports Hall Thüringer Weg 11, 09126 Chemnitz, Germany (12 Courts)',
-      copyright: 'Chemnitz University of Technology Badminton',
+      copyright: 'Badminton Community at TU Chemnitz',
     }
   }
 };

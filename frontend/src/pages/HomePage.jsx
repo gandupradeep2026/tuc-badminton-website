@@ -28,9 +28,11 @@ import HeroBadminton3D from '../components/3d/HeroBadminton3D';
 import BadmintonCourtViewer3D from '../components/3d/BadmintonCourtViewer3D';
 import TiltCard3D from '../components/3d/TiltCard3D';
 import { getApiUrl, safeFetchJson } from '../api/client';
+import ConsentEmbed, { useConsent } from '../components/ConsentEmbed';
 
 export default function HomePage({ onNavigate }) {
   const { t, language } = useLanguage();
+  const [mapsAllowed, allowMaps] = useConsent('maps');
   const isDe = language === 'de';
   const { user, isAuthenticated, openEntryModal } = useAuth();
   const h = t.home;
@@ -424,13 +426,15 @@ export default function HomePage({ onNavigate }) {
                   <span className="font-mono text-[10px] text-slate-400">50.8142° N, 12.9304° E</span>
                 </div>
                 <div className="relative w-full h-44 sm:h-48 rounded-xl overflow-hidden border border-slate-200 shadow-2xs bg-slate-100">
-                  <iframe
-                    title="Live Location Map - Universitäts-Sporthalle TU Chemnitz"
-                    src="https://maps.google.com/maps?q=Universit%C3%A4ts-Sporthalle%20Th%C3%BCringer%20Weg%2011,%2009126%20Chemnitz&t=&z=16&ie=UTF8&iwloc=&output=embed"
-                    className="w-full h-full border-0"
-                    loading="lazy"
-                    allowFullScreen
-                  />
+                  <ConsentEmbed provider="maps" allowed={mapsAllowed} onAllow={allowMaps} className="w-full h-full">
+                    <iframe
+                      title="Live Location Map - Universitäts-Sporthalle TU Chemnitz"
+                      src="https://maps.google.com/maps?q=Universit%C3%A4ts-Sporthalle%20Th%C3%BCringer%20Weg%2011,%2009126%20Chemnitz&t=&z=16&ie=UTF8&iwloc=&output=embed"
+                      className="w-full h-full border-0"
+                      loading="lazy"
+                      allowFullScreen
+                    />
+                  </ConsentEmbed>
                 </div>
               </div>
             </div>

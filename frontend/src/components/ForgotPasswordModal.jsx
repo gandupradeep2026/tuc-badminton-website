@@ -50,14 +50,7 @@ export default function ForgotPasswordModal({
 
       if (!res.ok) {
         if (res.isOffline) {
-          setFeedback({ 
-            type: 'info', 
-            message: isDe 
-              ? 'Laptop-Server offline: Geben Sie Ihren Master-Recovery-Key (TUC-MASTER-ADMIN-KEY-2026) ein oder starten Sie start-server.bat.' 
-              : 'Server offline: Enter your Master Recovery Key (TUC-MASTER-ADMIN-KEY-2026) or start the server.'
-          });
-          setStep('verify');
-          return;
+          throw new Error(isDe ? 'Server nicht erreichbar. Bitte später erneut versuchen.' : 'Server unreachable. Please try again later.');
         }
         throw new Error(res.error || (isDe ? 'Fehler beim Anfordern des Codes.' : 'Failed to request approval code.'));
       }
@@ -121,24 +114,8 @@ export default function ForgotPasswordModal({
       });
 
       if (!res.ok) {
-        if (res.isOffline || res.status === 404) {
-          const inputCode = approvalCode.trim();
-          if (inputCode === 'TUC-MASTER-ADMIN-KEY-2026') {
-            localStorage.setItem('tuc_admin_local_pw', newPassword);
-            setFeedback({ 
-              type: 'success', 
-              message: isDe ? 'Passwort erfolgreich mit Master-Key aktualisiert!' : 'Password updated successfully with Master Recovery Key!' 
-            });
-            setTimeout(() => {
-              if (onResetSuccess) onResetSuccess();
-              onClose();
-            }, 1600);
-            return;
-          } else {
-            throw new Error(isDe 
-              ? 'Server ist offline. Bitte geben Sie den Master-Key ein (TUC-MASTER-ADMIN-KEY-2026) oder starten Sie start-server.bat.'
-              : 'Server is offline. Please enter your Master Key (TUC-MASTER-ADMIN-KEY-2026) or run start-server.bat.');
-          }
+        if (res.isOffline) {
+          throw new Error(isDe ? 'Server nicht erreichbar. Bitte später erneut versuchen.' : 'Server unreachable. Please try again later.');
         }
         throw new Error(res.error || (isDe ? 'Passwortänderung verweigert: Ungültiger Code.' : 'Password change refused: Invalid code.'));
       }

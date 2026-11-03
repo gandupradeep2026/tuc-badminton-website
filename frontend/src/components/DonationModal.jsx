@@ -196,7 +196,7 @@ export default function DonationModal({ isOpen, onClose, settings }) {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
                 <h4 className="font-bold text-amber-950 text-sm">
-                  {isDe ? 'Offizieller Sponsor oder Partner werden' : 'Become a Sponsor or Official Partner'}
+                  {isDe ? 'Sponsor oder Partner werden' : 'Become a Sponsor or Partner'}
                 </h4>
               </div>
               <p className="text-xs text-amber-900/85 leading-relaxed">

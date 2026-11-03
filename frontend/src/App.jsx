@@ -15,6 +15,7 @@ const TournamentsPage = lazy(() => import('./pages/TournamentsPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const RegistrationPage = lazy(() => import('./pages/RegistrationPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
+const LegalPage = lazy(() => import('./pages/LegalPage'));
 
 function PageFallback() {
   return (
@@ -43,7 +44,7 @@ function AppContent() {
   // Read initial page from URL hash if present
   const getPageFromHash = () => {
     const hash = window.location.hash.replace('#', '').toLowerCase();
-    if (['sessions', 'trainers', 'players', 'services', 'tournaments', 'gallery', 'register', 'admin'].includes(hash)) {
+    if (['sessions', 'trainers', 'players', 'services', 'tournaments', 'gallery', 'register', 'admin', 'impressum', 'datenschutz'].includes(hash)) {
       return hash;
     }
     return 'home';
@@ -113,6 +114,10 @@ function AppContent() {
 
           {activePage === 'admin' && (
             <AdminPage />
+          )}
+
+          {(activePage === 'impressum' || activePage === 'datenschutz') && (
+            <LegalPage kind={activePage} />
           )}
         </Suspense>
       </main>

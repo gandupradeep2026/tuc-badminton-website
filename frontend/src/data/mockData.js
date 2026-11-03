@@ -271,28 +271,6 @@ export const DEFAULT_GALLERY = [
     caption: 'Bronze & MVP-Auszeichnung für Pradeep Gandu mit 8 Einzelsiegen!',
     status: 'approved',
     submitted_by: 'TUC Challengers'
-  },
-  {
-    id: 3,
-    tournament_name: 'Sächsische Hochschulmeisterschaft 2025',
-    result: '🥈 2. Platz (Silber) - Mixed Doppel',
-    date: '15.11.2025',
-    player_name: 'Felix Richter & Elena Fischer',
-    photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80',
-    caption: 'Silbermedaille im Mixed-Finale an der Universität Leipzig.',
-    status: 'approved',
-    submitted_by: 'Elena Fischer'
-  },
-  {
-    id: 4,
-    tournament_name: 'Chemnitzer Stadtmeisterschaft 2025',
-    result: '🥇 1. Platz (Gold) - Herreneinzel',
-    date: '18.10.2025',
-    player_name: 'Lukas Weber',
-    photo_url: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80',
-    caption: 'Erster Platz im Einzel nach packendem 3-Satz-Krimi im Finale.',
-    status: 'approved',
-    submitted_by: 'Lukas Weber'
   }
 ];
 

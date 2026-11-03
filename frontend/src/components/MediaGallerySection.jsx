@@ -33,8 +33,8 @@ const DEFAULT_MEDIA_ITEMS = [
     id: 3,
     title: 'Doppel-Ballwechsel - Thüringer Weg 11',
     type: 'photo',
-    file_url: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80',
-    thumbnail_url: 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=400&q=80',
+    file_url: '/uploads/tournament_2026/teamcup_2026_group_all_teams.jpeg',
+    thumbnail_url: '/uploads/tournament_2026/teamcup_2026_group_all_teams.jpeg',
     caption: 'Intensives Training auf den 12 Hallenfeldern.',
   }
 ];

@@ -1,9 +1,7 @@
 name: Deploy Frontend to GitHub Pages
 
+# Manual only: a private repository on the free plan cannot publish GitHub Pages
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages

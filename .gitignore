@@ -18,6 +18,10 @@ backend/.env
 frontend/.env.local
 frontend/.env.*.local
 
+# SQLite databases hold users' personal data: never commit them
+*.db
+*.sqlite
+
 # SQLite temporary journal and WAL files
 data/*.db-wal
 data/*.db-shm
